@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Remember RPS - Login</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <div id="game-container">
+        <section id="login-screen" class="screen active">
+            <div class="logo">
+                <h1>REMEMBER<br><span>RPS</span></h1>
+            </div>
+
+            <div class="login-form">
+                <input type="email" id="email" placeholder="이메일 주소">
+                <input type="password" id="password" placeholder="비밀번호">
+                
+                <button id="btn-login" class="primary-btn">로그인</button>
+                <button id="btn-signup" class="secondary-btn">회원가입</button>
+                
+                <div class="divider"><span>또는</span></div>
+                
+                <button id="btn-google" class="social-btn google">
+                    Google로 시작하기
+                </button>
+            </div>
+            
+            <p class="copyright">Copyright (C) 2026 [사업체명]. All rights reserved.</p>
+        </section>
+
+        <section id="main-lobby" class="screen">
+            </section>
+    </div>
+
+    <script src="auth.js"></script>
+</body>
+</html>
