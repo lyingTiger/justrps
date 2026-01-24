@@ -2,20 +2,27 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient'; 
 
 export default function App() {
-  // --- [상태 관리: 유저 및 UI] ---
+  // ==========================================
+  // 1. 상태 관리 (States)
+  // ==========================================
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isSignUpMode, setIsSignUpMode] = useState(false); 
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false); // 닉네임 메뉴 상태
+  const [isCoinMenuOpen, setIsCoinMenuOpen] = useState(false); // 코인 메뉴 상태
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [userNickname, setUserNickname] = useState('');
-  const [rememberMe, setRememberMe] = useState(false); // [수정] 원본에서 누락되었던 상태 추가
+  const [rememberMe, setRememberMe] = useState(false);
 
-  // --- [상태 관리: 볼륨 컨트롤] ---
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
 
-  // --- [사운드 시스템] ---
+  // ==========================================
+  // 2. 사운드 시스템 (Sound System)
+  // ==========================================
   const playSound = (path: string) => {
     const audio = new Audio(path);
     audio.volume = isMuted ? 0 : volume;
@@ -34,7 +41,9 @@ export default function App() {
     setVolume(prev => Math.max(prev - 0.1, 0.0)); 
   };
 
-  // --- [인증 로직: 세션 체크] ---
+  // ==========================================
+  // 3. 인증 및 사용자 로직 (Auth Logic)
+  // ==========================================
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser();
@@ -46,50 +55,50 @@ export default function App() {
     checkUser();
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     playClickSound();
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert(error.message);
-    else {
-      playStartSound();
-      setIsLoggedIn(true);
-      setUserNickname(data.user?.user_metadata.display_name || 'Player');
-    }
-    setLoading(false);
-  };
 
-  const handleSignUp = async () => {
-    playClickSound();
-    if (!email || !password || !username) return alert("모든 항목을 입력해주세요.");
-    setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email, password, options: { data: { display_name: username } }
-    });
-    if (error) alert(error.message);
-    else alert("가입 확인 메일을 보냈습니다!");
+    if (isSignUpMode) {
+      if (!username) return alert("닉네임을 입력해주세요.");
+      const { error } = await supabase.auth.signUp({
+        email, password, options: { data: { display_name: username } }
+      });
+      if (error) alert(error.message);
+      else alert("가입 확인 메일을 보냈습니다!");
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) alert(error.message);
+      else {
+        playStartSound();
+        setIsLoggedIn(true);
+        setUserNickname(data.user?.user_metadata.display_name || 'Player');
+      }
+    }
     setLoading(false);
   };
 
   const handleLogout = async () => {
     playClickSound();
+    setIsUserMenuOpen(false);
     await supabase.auth.signOut();
     setIsLoggedIn(false);
   };
 
   // ==========================================
-  // 화면 A: 로비 (로그인 성공 시)
+  // 4. 로비 화면 렌더링 (Lobby View)
   // ==========================================
   if (isLoggedIn) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col font-sans">
-        <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black/50 backdrop-blur-md sticky top-0 z-50">
+      <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => { setIsUserMenuOpen(false); setIsCoinMenuOpen(false); }}>
+        
+        {/* [파트 A] 상단 헤더 섹션 */}
+        <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black/50 backdrop-blur-md sticky top-0 z-50" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-6">
-            <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter">just RPS</h2>
+            <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter cursor-default">just RPS</h2>
             
-            {/* [교체된 코드] 볼륨 컨트롤러: 아이콘 대신 'VOL.' 텍스트 적용 */}
-            {/* 볼륨 컨트롤러 (화이트 텍스트 버전) */}
+            {/* 볼륨 컨트롤러 */}
             <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800">
               <button 
                 onClick={() => { playClickSound(); setIsMuted(!isMuted); }} 
@@ -97,31 +106,57 @@ export default function App() {
               >
                 VOL.
               </button>
-              
               <div className="flex items-center gap-2 border-l border-zinc-800 pl-2">
                 <button onClick={decreaseVolume} className="w-5 h-5 flex items-center justify-center bg-zinc-800 rounded hover:bg-zinc-700 text-[10px] text-white">-</button>
-                
-                {/* 수치 부분을 흰색으로 변경 */}
                 <span className="text-[11px] font-mono w-9 text-center text-white font-medium">
                   {isMuted ? '0' : Math.round(volume * 100)}%
                 </span>
-                
                 <button onClick={increaseVolume} className="w-5 h-5 flex items-center justify-center bg-zinc-800 rounded hover:bg-zinc-700 text-[10px] text-white">+</button>
               </div>
             </div>
           </div>
           
-          <div className="flex items-center gap-4 bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800">
-            <span className="text-sm font-medium">{userNickname}</span>
-            <div className="w-[1px] h-3 bg-zinc-700" />
-            <div className="flex items-center gap-1.5 pl-1">
-              <img src="/images/coin.png" alt="coin" className="w-4 h-4" />
-              <span className="text-sm font-bold text-[#FF9900]">1,250</span>
+          <div className="flex items-center gap-4">
+            {/* 닉네임 드롭다운: 설정, 로그아웃 */}
+            <div className="relative">
+              <button 
+                onClick={() => { playClickSound(); setIsUserMenuOpen(!isUserMenuOpen); setIsCoinMenuOpen(false); }}
+                className="flex items-center gap-2 bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800 hover:bg-zinc-800 transition-colors"
+              >
+                <span className="text-sm font-medium">{userNickname}</span>
+                <span className="text-[10px] text-zinc-500">▼</span>
+              </button>
+
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl py-1 z-[100]">
+                  <button onClick={() => { playClickSound(); setIsUserMenuOpen(false); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800">설정</button>
+                  <div className="border-t border-zinc-800 my-1" />
+                  <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-xs text-red-500 hover:bg-zinc-800 font-bold">로그아웃</button>
+                </div>
+              )}
             </div>
-            <button onClick={handleLogout} className="ml-2 text-[10px] text-zinc-500 hover:text-white underline uppercase">Out</button>
+
+            {/* 코인 드롭다운: 코인 충전 */}
+            <div className="relative">
+              <button 
+                onClick={() => { playClickSound(); setIsCoinMenuOpen(!isCoinMenuOpen); setIsUserMenuOpen(false); }}
+                className="flex items-center gap-1.5 bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800 hover:bg-zinc-800 transition-colors"
+              >
+                <img src="/images/coin.png" alt="coin" className="w-4 h-4" />
+                <span className="text-sm font-bold text-[#FF9900]">1,250</span>
+                <span className="text-[10px] text-zinc-500 ml-1">▼</span>
+              </button>
+
+              {isCoinMenuOpen && (
+                <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl py-1 z-[100]">
+                  <button onClick={() => { playClickSound(); setIsCoinMenuOpen(false); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800">코인 충전</button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
+        {/* [파트 B] 메인 로비 콘텐츠 */}
         <main className="flex-1 flex flex-col items-center justify-center p-4">
           <div className="flex gap-3 mb-12">
             {['rock', 'paper', 'scissor'].map((img) => (
@@ -156,7 +191,7 @@ export default function App() {
   }
 
   // ==========================================
-  // 화면 B: 로그인 (기본 화면)
+  // 5. 로그인/회원가입 화면 렌더링 (Auth View)
   // ==========================================
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
@@ -166,31 +201,27 @@ export default function App() {
           <p className="text-[#FF9900]/60 text-[10px] font-mono tracking-widest uppercase">System v1.1.1</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white focus:outline-none focus:border-[#FF9900] transition-colors" required />
-          <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white focus:outline-none focus:border-[#FF9900] transition-colors" required />
+          {isSignUpMode && (
+            <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white focus:outline-none focus:border-[#FF9900] transition-colors" required />
+          )}
           <div className="space-y-1.5">
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white focus:outline-none focus:border-[#FF9900] transition-colors" required />
-            <p className="text-[11px] text-zinc-600 ml-1">* 최소 6자 이상 입력</p>
           </div>
-          
           <div className="flex items-center gap-2 py-2">
-            <input 
-              type="checkbox" 
-              id="rem" 
-              checked={rememberMe} 
-              onChange={(e) => { playClickSound(); setRememberMe(e.target.checked); }} 
-              className="accent-[#FF9900]"
-            />
+            <input type="checkbox" id="rem" checked={rememberMe} onChange={(e) => { playClickSound(); setRememberMe(e.target.checked); }} className="accent-[#FF9900]" />
             <label htmlFor="rem" className="text-xs text-zinc-500 cursor-pointer hover:text-white transition-colors">접속 정보 기억하기</label>
           </div>
-
-          <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl hover:bg-[#FF8000] transition-all active:scale-95 shadow-lg shadow-orange-900/20">
-            {loading ? 'AUTHENTICATING...' : 'LOG IN'}
+          <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl hover:bg-[#FF8000] transition-all active:scale-95 shadow-lg shadow-orange-900/20 uppercase tracking-widest">
+            {loading ? 'WAIT...' : (isSignUpMode ? 'Join Now' : 'Log In')}
           </button>
-
-          <button type="button" onClick={handleSignUp} className="w-full text-xs text-zinc-500 hover:text-[#FF9900] transition-colors mt-2">
-            신규 플레이어이신가요? <span className="underline font-bold ml-1">회원가입</span>
+          <button 
+            type="button" 
+            onClick={() => { playClickSound(); setIsSignUpMode(!isSignUpMode); }} 
+            className="w-full text-xs text-zinc-500 hover:text-[#FF9900] transition-colors mt-2 text-center"
+          >
+            {isSignUpMode ? "이미 계정이 있으신가요?" : "신규 플레이어이신가요?"} <span className="underline font-bold ml-1">{isSignUpMode ? "로그인하기" : "회원가입"}</span>
           </button>
         </form>
       </div>
