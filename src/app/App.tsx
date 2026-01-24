@@ -53,15 +53,15 @@ export default function App() {
           {/* 이미지로 교체된 가위바위보 아이콘 섹션 */}
           <div className="flex justify-center items-center gap-1 mb-4">
             <div className="w-20 h-20 rounded-2xl bg-black/50 flex items-center justify-center backdrop-blur-sm overflow-hidden">
-              <img src="public/images/rock.png" alt="Rock" className="w-full h-full object-cover" />
+              <img src="/images/rock.png" alt="Rock" className="w-full h-full object-cover" />
             </div>
             
             <div className="w-20 h-20 rounded-2xl bg-black/50 flex items-center justify-center backdrop-blur-sm overflow-hidden">
-              <img src="public/images/paper.png" alt="Paper" className="w-full h-full object-cover" />
+              <img src="/images/paper.png" alt="Paper" className="w-full h-full object-cover" />
             </div>
 
             <div className="w-20 h-20 rounded-2xl bg-black/50 flex items-center justify-center backdrop-blur-sm overflow-hidden">
-              <img src="public/images/scissor.png" alt="Scissors" className="w-full h-full object-cover" />
+              <img src="/images/scissor.png" alt="Scissors" className="w-full h-full object-cover" />
             </div>
  
           </div>
