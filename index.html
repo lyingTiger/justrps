@@ -2,40 +2,35 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Remember RPS - Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to RPS - Login</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+    <div class="login-container">
+        <header>
+            <h1>just<span>RPS</span></h1>
+        </header>
 
-    <div id="game-container">
-        <section id="login-screen" class="screen active">
-            <div class="logo">
-                <h1>REMEMBER<br><span>RPS</span></h1>
-            </div>
+        <div class="icon-group">
+            <div class="icon-box blue">✊</div>
+            <div class="icon-box green">✋</div>
+            <div class="icon-box pink">✌️</div>
+        </div>
 
-            <div class="login-form">
-                <input type="email" id="email" placeholder="이메일 주소">
-                <input type="password" id="password" placeholder="비밀번호">
-                
-                <button id="btn-login" class="primary-btn">로그인</button>
-                <button id="btn-signup" class="secondary-btn">회원가입</button>
-                
-                <div class="divider"><span>또는</span></div>
-                
-                <button id="btn-google" class="social-btn google">
-                    Google로 시작하기
-                </button>
-            </div>
+        <form class="login-form">
+            <input type="text" placeholder="USERNAME" required>
+            <input type="password" placeholder="PASSWORD" required>
+            <a href="#" class="forgot-password">Forgot Password?</a>
             
-            <p class="copyright">Copyright (C) 2026 [사업체명]. All rights reserved.</p>
-        </section>
+            <button type="submit" class="login-btn">LOGIN</button>
+        </form>
 
-        <section id="main-lobby" class="screen">
-            </section>
+        <footer class="signup-footer">
+            <p>Don't have an account?</p>
+            <a href="#" class="signup-link">SIGN UP</a>
+            <p class="slogan">We'll do RPS for you</p>
+        </footer>
     </div>
-
-    <script src="auth.js"></script>
 </body>
 </html>
