@@ -1,26 +1,32 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient'; 
 import GameEngine from './GameEngine';
+import SettingsPage from './SettingsPage'; // 새로 만든 설정 페이지 임포트
 
 export default function App() {
   // --- 1. 상태 관리 (States) ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle'>('lobby');
+  // view 상태에 'settings' 추가
+  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings'>('lobby');
   const [round, setRound] = useState(1);
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
-  const [isCoinMenuOpen, setIsCoinMenuOpen] = useState(false);
 
-  // 인증 및 UI 상태
+  // 인증 및 유저 정보
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [userNickname, setUserNickname] = useState('');
+  
+  // UI 상태
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isCoinMenuOpen, setIsCoinMenuOpen] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // 사운드 상태 (설정 페이지와 공유)
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
 
   // --- 2. 시스템 로직 ---
   const playSound = (path: string) => {
@@ -29,6 +35,12 @@ export default function App() {
     audio.play().catch(() => {});
   };
   const playClickSound = () => playSound('/sound/mouseClick.mp3');
+
+  // 외부 클릭 시 메뉴 닫기
+  const closeMenus = () => {
+    if (isUserMenuOpen) setIsUserMenuOpen(false);
+    if (isCoinMenuOpen) setIsCoinMenuOpen(false);
+  };
 
   useEffect(() => {
     const checkUser = async () => {
@@ -40,6 +52,14 @@ export default function App() {
     };
     checkUser();
   }, []);
+
+  const handleLogout = async () => {
+    playClickSound();
+    await supabase.auth.signOut();
+    setIsLoggedIn(false);
+    setView('lobby');
+    setIsUserMenuOpen(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,15 +82,7 @@ export default function App() {
     setLoading(false);
   };
 
-  const handleLogout = async () => {
-    playClickSound();
-    await supabase.auth.signOut();
-    setIsLoggedIn(false);
-    setView('lobby');
-    setIsUserMenuOpen(false);
-  };
-
-  // --- 3. UI 렌더링 (인증 화면) ---
+  // --- 3. UI 렌더링 (로그인 전) ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
@@ -92,80 +104,81 @@ export default function App() {
     );
   }
 
-  // --- 4. UI 렌더링 (메인 게임 화면) ---
+  // --- 4. UI 렌더링 (로그인 후 메인) ---
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => setIsUserMenuOpen(false)}>
-      {/* 헤더 섹션: 복구된 볼륨, 코인, 드롭다운 포함 */}
+    <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={closeMenus}>
+      {/* 헤더: 볼륨 조절 삭제, 메뉴 로직 최적화 */}
       <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-6">
           <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter cursor-pointer uppercase" onClick={() => setView('lobby')}>just RPS</h2>
-          
-          {/* 볼륨 조절부 복구 */}
-          <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800 text-white font-bold">
-            <button onClick={() => { playClickSound(); setIsMuted(!isMuted); }} className={`text-[10px] w-8 text-left ${isMuted ? 'text-zinc-600' : 'text-white'}`}>VOL.</button>
-            <div className="flex items-center gap-2 border-l border-zinc-800 pl-2">
-              <button onClick={() => { playClickSound(); setVolume(prev => Math.max(prev - 0.1, 0)); }} className="w-5 h-5 flex items-center justify-center bg-zinc-800 rounded text-[10px] hover:bg-zinc-700">-</button>
-              <span className="text-[11px] font-mono w-9 text-center">{isMuted ? '0' : Math.round(volume * 100)}%</span>
-              <button onClick={() => { playClickSound(); setVolume(prev => Math.min(prev + 0.1, 1)); }} className="w-5 h-5 flex items-center justify-center bg-zinc-800 rounded text-[10px] hover:bg-zinc-700">+</button>
-            </div>
-          </div>
         </div>
 
-       <div className="flex items-center gap-4">
-            {/* [수정] 닉네임 메뉴: Settings 우선 노출 */}
-            <div className="relative">
-              <button 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setIsUserMenuOpen(!isUserMenuOpen); 
-                  setIsCoinMenuOpen(false); // 코인 메뉴는 닫기
-                }} 
-                className="text-sm font-medium hover:text-[#FF9900] transition-colors flex items-center gap-1"
-              >
-                {userNickname} <span className="text-[10px] opacity-50">▼</span>
-              </button>
-              
-              {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-1 z-[100] shadow-2xl">
-                  <button className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold text-white">Settings</button>
-                  <div className="border-t border-zinc-800 my-1"></div>
-                  <button 
-                    onClick={handleLogout} 
-                    className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* [수정] 코인 영역: 클릭 시 충전 메뉴 노출 */}
-            <div className="relative">
-              <button 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setIsCoinMenuOpen(!isCoinMenuOpen); 
-                  setIsUserMenuOpen(false); // 유저 메뉴는 닫기
-                }}
-                className="flex items-center gap-2 bg-zinc-900 px-4 py-2 rounded-full border border-zinc-800 hover:bg-zinc-800 transition-colors"
-              >
-                <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
-                <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">1,250</span>
-                <span className="text-[10px] opacity-50 ml-1">▼</span>
-              </button>
-
-              {isCoinMenuOpen && (
-                <div className="absolute right-0 mt-2 w-36 bg-zinc-900 border border-zinc-800 rounded-lg py-1 z-[100] shadow-2xl">
-                  <button className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold text-[#FF9900]">Buy Coins</button>
-                  
-                </div>
-              )}
-            </div>
+        <div className="flex items-center gap-4">
+          {/* 닉네임 메뉴 */}
+          <div className="relative">
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setIsUserMenuOpen(!isUserMenuOpen); 
+                setIsCoinMenuOpen(false); 
+              }} 
+              className="text-sm font-medium hover:text-[#FF9900] transition-colors flex items-center gap-1"
+            >
+              {userNickname} <span className="text-[10px] opacity-50">▼</span>
+            </button>
+            {isUserMenuOpen && (
+              <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-1 z-[100] shadow-2xl">
+                <button 
+                  onClick={() => { setView('settings'); setIsUserMenuOpen(false); }}
+                  className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold"
+                >
+                  Settings
+                </button>
+                <div className="border-t border-zinc-800 my-1"></div>
+                <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800">Logout</button>
+              </div>
+            )}
           </div>
+
+          {/* 코인 메뉴 */}
+          <div className="relative">
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setIsCoinMenuOpen(!isCoinMenuOpen); 
+                setIsUserMenuOpen(false); 
+              }}
+              className="flex items-center gap-2 bg-zinc-900 px-4 py-2 rounded-full border border-zinc-800 hover:bg-zinc-800 transition-colors shadow-inner"
+            >
+              <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
+              <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">1,250</span>
+              <span className="text-[10px] opacity-50 ml-1">▼</span>
+            </button>
+            {isCoinMenuOpen && (
+              <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-1 z-[100] shadow-2xl text-center">
+                <button className="w-full px-4 py-2 text-xs hover:bg-zinc-800 font-bold text-[#FF9900]">Buy Coins</button>
+              </div>
+            )}
+          </div>
+        </div>
       </header>
 
       {/* 중앙 메인 컨텐츠 */}
       <main className="flex-1 flex flex-col items-center justify-start p-0">
+        
+        {/* 설정 페이지 뷰 */}
+        {view === 'settings' && (
+          <SettingsPage 
+            userNickname={userNickname}
+            setUserNickname={setUserNickname}
+            volume={volume}
+            setVolume={setVolume}
+            isMuted={isMuted}
+            setIsMuted={setIsMuted}
+            onBack={() => setView('lobby')}
+          />
+        )}
+
         {view === 'lobby' && (
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 space-y-3">
              <div className="flex gap-3 mb-12">
@@ -184,7 +197,6 @@ export default function App() {
 
         {view === 'modeSelect' && (
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 gap-3">
-            <button onClick={() => { setRound(1); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all">Multiplay</button>
             <button onClick={() => { setRound(1); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all">Single Play</button>
             <h3 className="text-[#FF9900] text-[10px] font-bold text-center mt-2 uppercase tracking-widest">Select Mode</h3>
             <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full">
@@ -213,12 +225,21 @@ export default function App() {
           />
         )}
 
-        {/* 하단 스탯 보드 */}
-        {view !== 'battle' && (
+        {/* 하단 스탯 보드: 설정 페이지나 게임 중에는 숨김 */}
+        {(view === 'lobby' || view === 'modeSelect') && (
           <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 flex gap-10 backdrop-blur-sm shadow-xl">
-            <div className="text-center"><p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Total Games</p><p className="text-2xl font-bold font-mono tracking-tighter text-white">42</p></div>
-            <div className="text-center"><p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Win Rate</p><p className="text-green-400 text-2xl font-bold font-mono tracking-tighter">67%</p></div>
-            <div className="text-center"><p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Rank</p><p className="text-[#FF9900] text-2xl font-bold font-mono tracking-tighter">#156</p></div>
+            <div className="text-center">
+              <p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Total Games</p>
+              <p className="text-2xl font-bold font-mono tracking-tighter text-white">42</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Win Rate</p>
+              <p className="text-green-400 text-2xl font-bold font-mono tracking-tighter">67%</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Rank</p>
+              <p className="text-[#FF9900] text-2xl font-bold font-mono tracking-tighter">#156</p>
+            </div>
           </div>
         )}
       </main>
