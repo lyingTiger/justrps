@@ -116,9 +116,11 @@ export default function App() {
   // 🚀 [추가] 구글 로그인 핸들러 🚀
   const handleGoogleLogin = async () => {
     try {
+      const redirectUrl = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
+          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
