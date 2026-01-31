@@ -10,47 +10,40 @@ import WaitingRoom from './WaitingRoom';
 import MultiGameEngine from './MultiGameEngine'; 
 
 export default function App() {
-  // --- 1. 상태 관리 ---
+  // --- 1. 유저 및 세션 상태 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle'>('lobby');
-  const [round, setRound] = useState(1);
-  const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
-
   const [userNickname, setUserNickname] = useState('Loading...');
   const [userCoins, setUserCoins] = useState(0); 
-  const [sessionCoins, setSessionCoins] = useState(0); 
+
+  // --- 2. 게임 및 뷰 제어 ---
+  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle'>('lobby');
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); 
+  const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
+  const [round, setRound] = useState(1);
+  const [gameKey, setGameKey] = useState(Date.now());
+
+  // --- 3. 통계 및 설정 ---
   const [stats, setStats] = useState({ total_games: 0, multi_win_rate: 0, best_rank: 0, best_mode: '' });
-  
+  const [volume, setVolume] = useState(0.5);
+  const [isMuted, setIsMuted] = useState(false);
+
+  // --- 4. 로그인 폼 상태 ---
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [volume, setVolume] = useState(0.5);
-  const [isMuted, setIsMuted] = useState(false);
 
+  // --- 5. 결과창 상태 ---
   const [showResultModal, setShowResultModal] = useState(false);
   const [resultData, setResultData] = useState({ round: 0, time: 0, coins: 0, isNewRecord: false });
   const [continueCount, setContinueCount] = useState(3);
+  const [sessionCoins, setSessionCoins] = useState(0); 
   const CONTINUE_COST = 50;
 
-  const [gameKey, setGameKey] = useState(Date.now());
-  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
-
-  // --- 2. 시스템 로직 ---
-  useEffect(() => {
-    document.title = "just RPS";
-  }, []);
-
-  const playClickSound = () => {
-    const audio = new Audio('/sound/mouseClick.mp3');
-    audio.volume = isMuted ? 0 : volume;
-    audio.play().catch(() => {});
-  };
-
+  // --- [시스템: 데이터 로드] ---
   const fetchUserData = async (userId: string) => {
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (profile) {
@@ -67,30 +60,8 @@ export default function App() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin }
-    });
-    if (error) alert(error.message);
-  };
-
-  const handleSaveNickname = async (newNickname: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { error } = await supabase.from('profiles').update({ display_name: newNickname }).eq('id', user.id);
-    if (!error) {
-      setUserNickname(newNickname);
-      alert("닉네임이 변경되었습니다!");
-    }
-  };
-
-  const handleEarnCoin = () => {
-    setUserCoins(prev => prev + 1);
-    setSessionCoins(prev => prev + 1);
-  };
-
   useEffect(() => {
+    document.title = "just RPS";
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser();
       if (data?.user) {
@@ -102,39 +73,49 @@ export default function App() {
     checkUser();
   }, [view]);
 
-  const handleGameOver = async (finalRound: number, entryTime: number) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: record } = await supabase.from('mode_records').select('*').eq('user_id', user.id).eq('mode', selectedOption).maybeSingle();
-    const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && entryTime < record.best_time);
-
-    if (isNewRecord) {
-      await supabase.from('mode_records').upsert({ 
-        user_id: user.id, mode: selectedOption, best_round: finalRound, best_time: entryTime, updated_at: new Date().toISOString() 
-      }, { onConflict: 'user_id, mode' });
-    }
-
-    await Promise.all([
-      supabase.from('game_logs').insert({ user_id: user.id, mode: selectedOption, reached_round: finalRound, play_time: entryTime }),
-      sessionCoins > 0 ? supabase.rpc('add_coins_batch', { row_id: user.id, amount: sessionCoins }) : Promise.resolve()
-    ]);
-
-    setResultData({ round: finalRound, time: entryTime, coins: sessionCoins, isNewRecord: isNewRecord });
-    setShowResultModal(true);
-  };
-
-  const handleContinue = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user || userCoins < CONTINUE_COST || continueCount <= 0) return;
-
-    const { error } = await supabase.rpc('add_coins_batch', { row_id: user.id, amount: -CONTINUE_COST });
+  // --- [액션: 닉네임 저장] ---
+  const handleSaveNickname = async (newNickname: string) => {
+    if (!currentUserId) return;
+    const { error } = await supabase.from('profiles').update({ display_name: newNickname }).eq('id', currentUserId);
     if (!error) {
-      setUserCoins(prev => prev - CONTINUE_COST);
-      setContinueCount(prev => prev - 1);
-      setShowResultModal(false); 
+      setUserNickname(newNickname);
+      alert("닉네임이 성공적으로 변경되었습니다.");
     }
   };
+
+  // --- [액션: 인증 처리] ---
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (isSignUpMode) {
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: username } } });
+        if (error) throw error;
+        if (data?.user) await supabase.from('profiles').insert({ id: data.user.id, display_name: username, coins: 0 });
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        if (data.user) setIsLoggedIn(true);
+      }
+    } catch (err: any) { alert(err.message); }
+    finally { setLoading(false); }
+  };
+
+const handleLogout = async () => {
+  // 🚀 [추가] 로그아웃 전 대기실에 있었다면 방에서 먼저 나가기
+  if (currentUserId && currentRoomId) {
+    await supabase.from('room_participants')
+      .delete()
+      .eq('room_id', currentRoomId)
+      .eq('user_id', currentUserId);
+  }
+  
+  await supabase.auth.signOut();
+  setIsLoggedIn(false);
+  setCurrentUserId(null);
+  setCurrentRoomId(null); // 방 ID 초기화
+  setView('lobby');
+};
 
   const resetGameSession = () => {
     setRound(1);
@@ -143,51 +124,42 @@ export default function App() {
     setGameKey(Date.now());
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setIsLoggedIn(false);
-    setView('lobby');
+  const playClickSound = () => {
+    const audio = new Audio('/sound/mouseClick.mp3');
+    audio.volume = isMuted ? 0 : volume;
+    audio.play().catch(() => {});
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    if (isSignUpMode) {
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: username } } });
-      if (data?.user) {
-        await supabase.from('profiles').insert({ id: data.user.id, display_name: username, coins: 0 });
-        alert("가입 확인 메일을 보냈습니다!");
-      }
-    } else {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (data.user) {
-        setIsLoggedIn(true);
-        fetchUserData(data.user.id);
-      }
+  const handleGameOver = async (finalRound: number, entryTime: number) => {
+    if (!currentUserId) return;
+    const { data: record } = await supabase.from('mode_records').select('*').eq('user_id', currentUserId).eq('mode', selectedOption).maybeSingle();
+    const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && entryTime < record.best_time);
+
+    if (isNewRecord) {
+      await supabase.from('mode_records').upsert({ user_id: currentUserId, mode: selectedOption, best_round: finalRound, best_time: entryTime, updated_at: new Date().toISOString() }, { onConflict: 'user_id, mode' });
     }
-    setLoading(false);
+
+    await Promise.all([
+      supabase.from('game_logs').insert({ user_id: currentUserId, mode: selectedOption, reached_round: finalRound, play_time: entryTime }),
+      sessionCoins > 0 ? supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: sessionCoins }) : Promise.resolve()
+    ]);
+
+    setResultData({ round: finalRound, time: entryTime, coins: sessionCoins, isNewRecord: isNewRecord });
+    setShowResultModal(true);
   };
 
-  // --- 3. 렌더링 영역 ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="w-full max-w-[320px]">
           <h1 className="text-5xl font-black text-[#FF9900] mb-8 text-center italic tracking-tighter uppercase">just RPS</h1>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />
-            {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />}
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />
-            <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all">{loading ? 'Wait...' : (isSignUpMode ? 'Join Now' : 'Log In')}</button>
+          <form onSubmit={handleAuthSubmit} className="space-y-4">
+            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
+            {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />}
+            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
+            <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all">{loading ? 'Wait...' : (isSignUpMode ? 'Join Session' : 'Access Data')}</button>
           </form>
-          <div className="mt-6 space-y-4">
-            <div className="flex items-center gap-2"><div className="flex-1 h-[1px] bg-zinc-800"></div><span className="text-zinc-600 text-[10px] font-bold uppercase">OR</span><div className="flex-1 h-[1px] bg-zinc-800"></div></div>
-            <button onClick={handleGoogleLogin} className="w-full h-14 bg-zinc-900 text-white border border-zinc-800 font-bold rounded-xl flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-zinc-800">
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="google" />
-              <span>Continue with Google</span>
-            </button>
-          </div>
-          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-4">{isSignUpMode ? "이미 계정이 있으신가요? 로그인" : "처음이신가요? 회원가입"}</button>
+          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-4 uppercase">{isSignUpMode ? "Back to Login" : "Create Account"}</button>
         </div>
       </div>
     );
@@ -199,7 +171,7 @@ export default function App() {
         <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>just RPS</h2>
         <div className="flex items-center gap-4">
           <div className="relative">
-            {/* 🚀 [UPDATE] 닉네임 대소문자 유지 🚀 */}
+            {/* 🚀 [UPDATE] 닉네임 대소문자 유지 (uppercase 제거) 🚀 */}
             <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 tracking-tighter">
               {userNickname} <span className="text-[10px] opacity-50">▼</span>
             </button>
@@ -218,19 +190,29 @@ export default function App() {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-start p-0">
-        {view === 'settings' && <SettingsPage userNickname={userNickname} setUserNickname={setUserNickname} onSaveNickname={handleSaveNickname} volume={volume} setVolume={setVolume} isMuted={isMuted} setIsMuted={setIsMuted} onBack={() => setView('lobby')} />}
+        {view === 'settings' && (
+          <SettingsPage 
+            userNickname={userNickname} setUserNickname={setUserNickname} 
+            onSaveNickname={(nick: string) => handleSaveNickname(nick)} 
+            volume={volume} setVolume={setVolume} isMuted={isMuted} setIsMuted={setIsMuted} onBack={() => setView('lobby')} 
+          />
+        )}
         
         {view === 'lobby' && (
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 space-y-3 px-4">
              <div className="flex gap-3 mb-12">{['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}</div>
-             <button onClick={() => { resetGameSession(); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
+             <button onClick={() => { resetGameSession(); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
              <button onClick={() => setView('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
-             <button onClick={() => setView('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Best Records</button>
+             <button onClick={() => setView('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Records</button>
              <button onClick={() => setView('tutorial')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Tutorial</button>
 
              <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center">
                 <div className="grid grid-cols-3 w-full mb-1"><p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Total Play</p><p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Win Rate</p><p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Best Rank</p></div>
-                <div className="grid grid-cols-3 w-full mb-1 items-center"><p className="text-2xl font-bold font-mono text-white text-center">{stats.total_games}</p><p className="text-2xl font-bold font-mono text-green-400 text-center">{stats.multi_win_rate > 0 ? `${stats.multi_win_rate}%` : '-'}</p><p className="text-2xl font-bold font-mono text-[#FF9900] text-center">#{stats.best_rank > 0 ? stats.best_rank : '-'}</p></div>
+                <div className="grid grid-cols-3 w-full mb-1 items-center">
+                  <p className="text-2xl font-bold font-mono text-white text-center">{stats.total_games}</p>
+                  <p className="text-2xl font-bold font-mono text-green-400 text-center">{stats.multi_win_rate > 0 ? `${stats.multi_win_rate}%` : '-'}</p>
+                  <p className="text-2xl font-bold font-mono text-[#FF9900] text-center">#{stats.best_rank > 0 ? stats.best_rank : '-'}</p>
+                </div>
                 <div className="grid grid-cols-3 w-full"><div /><div /><p className="text-[10px] text-white uppercase font-bold text-center">{stats.best_mode?.split(' ')[0]}</p></div>
              </div>
           </div>
@@ -238,37 +220,56 @@ export default function App() {
 
         {view === 'modeSelect' && (
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 gap-3 px-4">
-            <button onClick={() => { resetGameSession(); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.2)]">Single Play</button>
+            <button onClick={() => { resetGameSession(); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 shadow-[0_5px_15px_rgba(255,153,0,0.2)]">Single Play</button>
             <button onClick={() => setView('multiplay')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Multi Play</button>
-            <h3 className="text-[#FF9900] text-[10px] font-bold text-center mt-6 uppercase tracking-widest italic">Select Mode</h3>
-            <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full shadow-inner">
+            <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full mt-6">
               {['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'].map(opt => (
                 <label key={opt} className="flex items-center gap-2 cursor-pointer text-[10px] font-bold">
                   <input type="radio" checked={selectedOption === opt} onChange={() => setSelectedOption(opt)} className="accent-[#FF9900]" />
-                  <span className={selectedOption === opt ? 'text-[#FF9900]' : 'text-zinc-500 uppercase'}>{opt}</span>
+                  <span className={selectedOption === opt ? 'text-[#FF9900]' : 'text-zinc-500'}>{opt}</span>
                 </label>
               ))}
             </div>
-            <button onClick={() => setView('lobby')} className="text-[10px] text-zinc-600 underline uppercase mt-8 font-bold">Back to Lobby</button>
+            <button onClick={() => setView('lobby')} className="text-[10px] text-zinc-600 underline uppercase mt-8 font-bold">Lobby</button>
           </div>
         )}
 
-        {view === 'multiplay' && <MultiplayPage selectedMode={selectedOption} onBack={() => setView('modeSelect')} onJoin={(roomId: string) => { setCurrentRoomId(roomId); setView('waitingRoom'); }} />}
+        {view === 'multiplay' && (
+          <MultiplayPage 
+            selectedMode={selectedOption} 
+            onBack={() => setView('modeSelect')} 
+            onJoin={(roomId) => { 
+              setCurrentRoomId(roomId); 
+              setView('waitingRoom'); 
+            }} 
+          />
+        )}
         
-        {/* ✨ [UPDATE] roomId={currentRoomId} 로 수정 ✨ */}
-        {view === 'waitingRoom' && <WaitingRoom roomId={currentRoomId} onLeave={() => setView('multiplay')} onStartGame={() => setView('multiBattle')} />}
+        {view === 'waitingRoom' && currentRoomId && (
+          <WaitingRoom 
+            roomId={currentRoomId} 
+            onLeave={() => { setCurrentRoomId(null); setView('multiplay'); }} 
+            onStartGame={() => setView('multiBattle')} 
+          />
+        )}
         
-        {view === 'multiBattle' && currentRoomId && <MultiGameEngine roomId={currentRoomId} userNickname={userNickname} playClickSound={playClickSound} onGameOver={(finalRound, rank) => { if (currentUserId) fetchUserData(currentUserId); setView('lobby'); }} onBackToLobby={() => setView('lobby')} />}
-        
-        {view === 'tutorial' && <TutorialPage onBack={() => setView('lobby')} />}
+        {view === 'multiBattle' && currentRoomId && (
+          <MultiGameEngine 
+            roomId={currentRoomId}
+            userNickname={userNickname}
+            playClickSound={playClickSound}
+            onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('lobby'); }}
+            onBackToLobby={() => setView('lobby')}
+          />
+        )}
 
-        {view === 'battle' && <GameEngine key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} onEarnCoin={handleEarnCoin} onRoundClear={(next) => setRound(next)} onGameOver={handleGameOver} isModalOpen={showResultModal} />}
-        
+        {view === 'tutorial' && <TutorialPage onBack={() => setView('lobby')} />}
+        {view === 'battle' && <GameEngine key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} onRoundClear={(next) => setRound(next)} onGameOver={handleGameOver} isModalOpen={showResultModal} />}
         {view === 'ranking' && <RankingPage onBack={() => setView('lobby')} playClickSound={playClickSound} />}
-        {view === 'shop' && <div className="p-20 text-white font-bold uppercase text-center animate-pulse">Shop coming soon...<button onClick={() => setView('lobby')} className="block mx-auto mt-4 text-xs underline">Back</button></div>}
+        {view === 'shop' && <div className="p-20 text-white font-bold uppercase text-center animate-pulse">Shop coming soon...<button onClick={() => setView('lobby')} className="block mx-auto mt-4 text-xs underline font-bold">Back</button></div>}
       </main>
 
-      <ResultModal isOpen={showResultModal} mode={selectedOption} round={resultData.round} time={resultData.time} earnedCoins={resultData.coins} userCoins={userCoins} isNewRecord={resultData.isNewRecord} continueCount={continueCount} continueCost={CONTINUE_COST} onContinue={handleContinue} onRetry={() => { playClickSound(); setShowResultModal(false); resetGameSession(); setView('battle'); }} onLobby={() => { playClickSound(); setShowResultModal(false); resetGameSession(); setView('lobby'); }} onShop={() => { playClickSound(); setShowResultModal(false); setView('shop'); }} />
+      <ResultModal isOpen={showResultModal} mode={selectedOption} round={resultData.round} time={resultData.time} earnedCoins={resultData.coins} userCoins={userCoins} isNewRecord={resultData.isNewRecord} continueCount={continueCount} continueCost={CONTINUE_COST} onContinue={() => { if(userCoins >= CONTINUE_COST) { setUserCoins(c => c - CONTINUE_COST); setContinueCount(prev => prev - 1); setShowResultModal(false); } }} onRetry={() => { setShowResultModal(false); resetGameSession(); setView('battle'); }} onLobby={() => { setShowResultModal(false); resetGameSession(); setView('lobby'); }} onShop={() => { setShowResultModal(false); setView('shop'); }} />
     </div>
   );
 }
