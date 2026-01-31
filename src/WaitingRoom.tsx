@@ -89,7 +89,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
                   <div className={`w-14 h-14 rounded-2xl mb-3 flex items-center justify-center border font-black text-xl italic ${isParticipantHost ? 'bg-zinc-800 border-[#FF9900] text-[#FF9900]' : 'bg-zinc-700 border-zinc-600 text-zinc-400'}`}>
                     {p.profiles?.display_name?.[0]}
                   </div>
-                  <span className="text-[11px] font-black text-white uppercase tracking-tighter line-clamp-1">{p.profiles?.display_name}</span>
+                  <span className="text-[11px] font-black text-white tracking-tighter line-clamp-1">{p.profiles?.display_name}</span>
                   <span className={`text-[8px] font-bold uppercase mt-1 px-2 py-0.5 rounded-full ${isParticipantHost ? 'bg-[#FF9900] text-black' : 'text-zinc-500'}`}>
                     {isParticipantHost ? 'Host' : 'Ready'}
                   </span>

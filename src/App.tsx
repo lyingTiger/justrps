@@ -6,16 +6,12 @@ import RankingPage from './RankingPage';
 import ResultModal from './ResultModal';
 import MultiplayPage from './MultiplayPage';
 import TutorialPage from './TutorialPage';
-import WaitingRoom from './WaitingRoom'; // [ADD] 대기실 컴포넌트 임포트
-import MultiGameEngine from './MultiGameEngine'; // [ADD] 멀티플레이 전용 엔진 임포트
+import WaitingRoom from './WaitingRoom'; 
+import MultiGameEngine from './MultiGameEngine'; 
 
 export default function App() {
-  // --- 1. 상태 관리 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  
-  // [UPDATE] 'multiBattle' 뷰 타입 추가
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle'>('lobby');
-  
   const [round, setRound] = useState(1);
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
 
@@ -41,7 +37,6 @@ export default function App() {
   const [gameKey, setGameKey] = useState(Date.now());
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
 
-  // --- 2. 시스템 로직 ---
   useEffect(() => {
     document.title = "just RPS";
   }, []);
@@ -65,6 +60,14 @@ export default function App() {
         best_mode: statsData?.[0]?.best_mode || ''
       });
     }
+  };
+
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin }
+    });
+    if (error) alert(error.message);
   };
 
   const handleSaveNickname = async (newNickname: string) => {
@@ -164,13 +167,35 @@ export default function App() {
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="w-full max-w-[320px]">
           <h1 className="text-5xl font-black text-[#FF9900] mb-8 text-center italic tracking-tighter uppercase">just RPS</h1>
+          
           <form onSubmit={handleSubmit} className="space-y-4">
             <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />
             {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />}
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />
-            <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all">{loading ? 'Wait...' : (isSignUpMode ? 'Join Now' : 'Log In')}</button>
-            <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-2">{isSignUpMode ? "로그인하기" : "회원가입하기"}</button>
+            <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all">
+              {loading ? 'Wait...' : (isSignUpMode ? 'Join Now' : 'Log In')}
+            </button>
           </form>
+
+          <div className="mt-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-[1px] bg-zinc-800"></div>
+              <span className="text-zinc-600 text-[10px] font-bold uppercase">OR</span>
+              <div className="flex-1 h-[1px] bg-zinc-800"></div>
+            </div>
+
+            <button 
+              onClick={handleGoogleLogin}
+              className="w-full h-14 bg-zinc-900 text-white border border-zinc-800 font-bold rounded-xl flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-zinc-800"
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="google" />
+              <span>Continue with Google</span>
+            </button>
+          </div>
+
+          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-4">
+            {isSignUpMode ? "이미 계정이 있으신가요? 로그인" : "처음이신가요? 회원가입"}
+          </button>
         </div>
       </div>
     );
@@ -182,7 +207,7 @@ export default function App() {
         <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>just RPS</h2>
         <div className="flex items-center gap-4">
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 uppercase tracking-tighter">
+            <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 tracking-tighter">
               {userNickname} <span className="text-[10px] opacity-50">▼</span>
             </button>
             {isUserMenuOpen && (
@@ -212,7 +237,7 @@ export default function App() {
              <div className="flex gap-3 mb-12">
                {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
              </div>
-             <button onClick={() => { resetGameSession(); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
+             <button onClick={() => { resetGameSession(); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_0_20_rgba(255,153,0,0.2)]">Play</button>
              <button onClick={() => setView('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
              <button onClick={() => setView('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Best Records</button>
              <button onClick={() => setView('tutorial')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Tutorial</button>
@@ -261,7 +286,6 @@ export default function App() {
           />
         )}
 
-        {/* [UPDATE] 대기실 전환 로직: onStartGame 시 multiBattle로 이동 */}
         {view === 'waitingRoom' && (
           <WaitingRoom 
             roomId={currentRoomId} 
@@ -270,7 +294,6 @@ export default function App() {
           />
         )}
 
-        {/* [ADD] 멀티플레이 전용 엔진 연결 */}
         {view === 'multiBattle' && currentRoomId && (
           <MultiGameEngine 
             roomId={currentRoomId}
