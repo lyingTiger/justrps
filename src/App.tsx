@@ -60,28 +60,36 @@ export default function App() {
     }
   };
 
+  // App.tsx 의 useEffect 수정
+
   useEffect(() => {
     document.title = "just RPS";
     const checkUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        // 🚀 [Google Login 보완] 구글 로그인 시 프로필이 없으면 자동 생성 🚀
-        const { data: existingProfile } = await supabase.from('profiles').select('id').eq('id', data.user.id).single();
-        if (!existingProfile) {
-            const googleName = data.user.user_metadata.full_name || data.user.email?.split('@')[0] || 'GoogleUser';
-            await supabase.from('profiles').insert({
-                id: data.user.id,
-                display_name: googleName,
-                coins: 0
-            });
+      try {
+        // 1. 세션 가져오기 시도
+        const { data, error } = await supabase.auth.getUser();
+        
+        // 2. 에러가 있거나 유저가 없으면 강제 로그아웃 처리
+        if (error || !data?.user) {
+          console.warn("세션이 유효하지 않습니다. 로그아웃 처리합니다.", error?.message);
+          throw new Error("Invalid Session");
         }
-        // -------------------------------------------------------------
 
+        // 3. 정상이면 로그인 처리
         setIsLoggedIn(true);
         setCurrentUserId(data.user.id);
         fetchUserData(data.user.id);
+
+      } catch (err) {
+        // 4. 세션 문제 발생 시 확실하게 상태 초기화
+        await supabase.auth.signOut(); // 수파베이스 세션 삭제
+        setIsLoggedIn(false);
+        setCurrentUserId(null);
+        setUserNickname('Loading...'); // 닉네임 잔상 제거
+        localStorage.clear(); // 🚀 로컬 스토리지 강제 청소 (선택 사항)
       }
     };
+
     checkUser();
   }, [view]);
 
