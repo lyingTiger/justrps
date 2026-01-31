@@ -65,6 +65,18 @@ export default function App() {
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser();
       if (data?.user) {
+        // 🚀 [Google Login 보완] 구글 로그인 시 프로필이 없으면 자동 생성 🚀
+        const { data: existingProfile } = await supabase.from('profiles').select('id').eq('id', data.user.id).single();
+        if (!existingProfile) {
+            const googleName = data.user.user_metadata.full_name || data.user.email?.split('@')[0] || 'GoogleUser';
+            await supabase.from('profiles').insert({
+                id: data.user.id,
+                display_name: googleName,
+                coins: 0
+            });
+        }
+        // -------------------------------------------------------------
+
         setIsLoggedIn(true);
         setCurrentUserId(data.user.id);
         fetchUserData(data.user.id);
@@ -83,7 +95,7 @@ export default function App() {
     }
   };
 
-  // --- [액션: 인증 처리] ---
+  // --- [액션: 인증 처리 (이메일)] ---
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -101,21 +113,38 @@ export default function App() {
     finally { setLoading(false); }
   };
 
-const handleLogout = async () => {
-  // 🚀 [추가] 로그아웃 전 대기실에 있었다면 방에서 먼저 나가기
-  if (currentUserId && currentRoomId) {
-    await supabase.from('room_participants')
-      .delete()
-      .eq('room_id', currentRoomId)
-      .eq('user_id', currentUserId);
-  }
-  
-  await supabase.auth.signOut();
-  setIsLoggedIn(false);
-  setCurrentUserId(null);
-  setCurrentRoomId(null); // 방 ID 초기화
-  setView('lobby');
-};
+  // 🚀 [추가] 구글 로그인 핸들러 🚀
+  const handleGoogleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      alert("Google 로그인 에러: " + error.message);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (currentUserId && currentRoomId) {
+      await supabase.from('room_participants')
+        .delete()
+        .eq('room_id', currentRoomId)
+        .eq('user_id', currentUserId);
+    }
+    
+    await supabase.auth.signOut();
+    setIsLoggedIn(false);
+    setCurrentUserId(null);
+    setCurrentRoomId(null);
+    setView('lobby');
+  };
 
   const resetGameSession = () => {
     setRound(1);
@@ -153,13 +182,42 @@ const handleLogout = async () => {
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="w-full max-w-[320px]">
           <h1 className="text-5xl font-black text-[#FF9900] mb-8 text-center italic tracking-tighter uppercase">just RPS</h1>
+          
           <form onSubmit={handleAuthSubmit} className="space-y-4">
             <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
             {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />}
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
-            <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all">{loading ? 'Wait...' : (isSignUpMode ? 'Join Session' : 'Access Data')}</button>
+            <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all shadow-[0_5px_15px_rgba(255,153,0,0.3)]">
+              {loading ? 'Wait...' : (isSignUpMode ? 'Join Session' : 'Access Data')}
+            </button>
           </form>
-          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-4 uppercase">{isSignUpMode ? "Back to Login" : "Create Account"}</button>
+
+          {/* 🚀 [추가] 구글 로그인 버튼 영역 🚀 */}
+          <div className="flex items-center gap-2 my-4">
+             <div className="h-[1px] bg-zinc-800 flex-1"></div>
+             <span className="text-[10px] text-zinc-600 font-bold uppercase">or</span>
+             <div className="h-[1px] bg-zinc-800 flex-1"></div>
+          </div>
+
+          <button 
+            type="button"
+            onClick={handleGoogleLogin} 
+            className="w-full h-14 bg-white text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3 shadow-[0_5px_15px_rgba(255,255,255,0.1)]"
+          >
+            {/* Google SVG Icon */}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M23.52 12.29C23.52 11.43 23.45 10.61 23.31 9.82H12V14.45H18.45C18.17 15.93 17.31 17.18 16.03 18.04V21.03H19.9C22.16 18.95 23.52 15.89 23.52 12.29Z" fill="#4285F4"/>
+              <path d="M12 24C15.24 24 17.96 22.92 19.9 21.03L16.03 18.04C14.95 18.76 13.58 19.18 12 19.18C8.88 19.18 6.23 17.07 5.29 14.25H1.31V17.34C3.26 21.21 7.29 24 12 24Z" fill="#34A853"/>
+              <path d="M5.29 14.25C5.05 13.53 4.92 12.77 4.92 12C4.92 11.23 5.05 10.47 5.29 9.75V6.66H1.31C0.47 8.33 0 10.11 0 12C0 13.89 0.47 15.67 1.31 17.34L5.29 14.25Z" fill="#FBBC05"/>
+              <path d="M12 4.82C13.76 4.82 15.34 5.43 16.58 6.61L20.01 3.17C17.95 1.25 15.24 0 12 0C7.29 0 3.26 2.79 1.31 6.66L5.29 9.75C6.23 6.93 8.88 4.82 12 4.82Z" fill="#EA4335"/>
+            </svg>
+            Sign in with Google
+          </button>
+          {/* ------------------------------------- */}
+
+          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-4 uppercase hover:text-[#FF9900]">
+            {isSignUpMode ? "Back to Login" : "Create Account"}
+          </button>
         </div>
       </div>
     );
