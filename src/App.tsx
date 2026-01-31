@@ -43,20 +43,18 @@ export default function App() {
   const [sessionCoins, setSessionCoins] = useState(0); 
   const CONTINUE_COST = 50;
 
-  // --- [시스템: 데이터 로드] ---
- // --- [시스템: 데이터 로드] ---
+  // --- [시스템: 데이터 로드 (에러 추적 강화)] ---
   const fetchUserData = async (userId: string) => {
     try {
-      // 1. 프로필 데이터 조회
+      // 1. 프로필 조회
       let { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      // 2. 프로필이 없으면(null) 에러가 아니라 '아직 안 만든 것'으로 간주하고 생성 시도
+      // 2. 프로필 없으면 자동 생성 (Self-Healing)
       if (!profile && !error) {
-        console.log("프로필이 없어서 새로 생성합니다.");
         const { data: userUser } = await supabase.auth.getUser();
         const newName = userUser?.user?.email?.split('@')[0] || 'Player';
         
@@ -70,12 +68,19 @@ export default function App() {
         profile = newProfile;
       }
 
-      // 3. 데이터가 있으면 상태 업데이트 (화면에 즉시 반영)
+      // 3. 에러 발생 시 아이폰 화면에 띄우기 (디버깅용)
+      if (error) {
+        console.error("프로필 로드 에러:", error);
+        // 🚀 [중요] 아이폰에서만 발생하는 에러를 잡기 위해 일시적으로 사용
+        // 만약 'Loading...'이 계속되면 이 에러 메시지를 확인하세요.
+        // alert("프로필 에러: " + error.message); 
+      }
+
+      // 4. 상태 업데이트
       if (profile) {
-        setUserNickname(profile.display_name || 'Player'); // 닉네임 반영
-        setUserCoins(profile.coins || 0); // 코인 반영
+        setUserNickname(profile.display_name || 'Player');
+        setUserCoins(profile.coins || 0);
         
-        // 통계 데이터 가져오기
         const { data: statsData } = await supabase.rpc('get_user_stats', { target_user_id: userId });
         const winRate = profile.multi_games > 0 ? Math.round((profile.multi_score / profile.multi_games) * 100) : 0;
         
@@ -85,43 +90,55 @@ export default function App() {
           best_rank: statsData?.[0]?.best_rank || 0,
           best_mode: statsData?.[0]?.best_mode || ''
         });
-        
-        console.log("데이터 로드 완료:", profile.display_name);
       }
     } catch (err: any) {
-      console.error("데이터 불러오기 실패:", err.message);
-      // 에러가 나도 'Loading...'으로 두지 말고 기본값 표시
-      setUserNickname((prev) => prev === 'Loading...' ? 'Unknown' : prev);
+      console.error("데이터 로드 실패:", err.message);
+      setUserNickname('Error'); // 화면에 Error라고 표시
+      // alert("데이터 로드 실패: " + err.message);
     }
   };
 
-  // App.tsx 의 useEffect 수정
-
- useEffect(() => {
+  // --- [시스템: 인증 상태 감지 (onAuthStateChange 사용)] ---
+  useEffect(() => {
     document.title = "just RPS";
-    
-    const checkUser = async () => {
-      // 1. 현재 세션 확인
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
+
+    // 🚀 [핵심 수정] getUser() 대신 상태 변경을 '구독'합니다.
+    // 아이폰은 로컬 스토리지 로딩이 느려서 getUser()가 null을 반환할 때가 있습니다.
+    // 이 방식은 세션이 로드되는 순간을 정확히 잡아냅니다.
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // console.log("Auth Event:", event); // 디버깅용
+
       if (session?.user) {
-        // 이미 로그인 상태라면
+        // 로그인 됨 (또는 세션 복구됨)
         if (!isLoggedIn) setIsLoggedIn(true);
-        if (currentUserId !== session.user.id) setCurrentUserId(session.user.id);
+        if (currentUserId !== session.user.id) {
+          setCurrentUserId(session.user.id);
+          // 세션이 확인되자마자 데이터 로드
+          await fetchUserData(session.user.id);
+        }
         
-        // 🚀 [핵심 수정] 유저 ID가 확인되면 무조건 데이터를 다시 불러옵니다.
-        await fetchUserData(session.user.id);
-      } else {
-        // 세션이 없으면 초기화
+        // 🚀 [Google Login 보완] 프로필 없을 시 자동 생성 체크
+        const { data: exist } = await supabase.from('profiles').select('id').eq('id', session.user.id).single();
+        if (!exist) {
+           const name = session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'Player';
+           await supabase.from('profiles').insert({ id: session.user.id, display_name: name, coins: 0 });
+           await fetchUserData(session.user.id); // 생성 후 다시 로드
+        }
+
+      } else if (event === 'SIGNED_OUT') {
+        // 로그아웃 됨
         setIsLoggedIn(false);
         setCurrentUserId(null);
+        setUserNickname('Loading...');
+        setStats({ total_games: 0, multi_win_rate: 0, best_rank: 0, best_mode: '' });
       }
-    };
+    });
 
-    checkUser();
-    
-    // 🚀 [핵심 수정] view 뿐만 아니라 'isLoggedIn' 상태가 변할 때도 실행되어야 함
-  }, [view, isLoggedIn]);
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []); // 의존성 배열 비움 (한 번만 등록하면 알아서 감지함)
+
 
   // --- [액션: 닉네임 저장] ---
   const handleSaveNickname = async (newNickname: string) => {
@@ -133,59 +150,56 @@ export default function App() {
     }
   };
 
-  // --- [액션: 인증 처리 (이메일)] ---
+  // --- [액션: 인증 처리] ---
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       if (isSignUpMode) {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: username } } });
+        const { data, error } = await supabase.auth.signUp({ 
+          email, 
+          password, 
+          options: { 
+            data: { display_name: username },
+            emailRedirectTo: window.location.origin // 아이폰 호환성용
+          } 
+        });
         if (error) throw error;
-        if (data?.user) await supabase.from('profiles').insert({ id: data.user.id, display_name: username, coins: 0 });
+        if (data?.user) {
+             await supabase.from('profiles').insert({ id: data.user.id, display_name: username, coins: 0 });
+             alert("회원가입 완료! 로그인해주세요.");
+        }
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        if (data.user) setIsLoggedIn(true);
-        setCurrentUserId(data.user.id);
-          // 🚀 [추가] 로그인 성공하자마자 데이터를 강제로 긁어옵니다.
-          await fetchUserData(data.user.id);
+        // 여기서는 아무것도 안 해도 됩니다. onAuthStateChange가 감지해서 처리합니다.
       }
     } catch (err: any) { alert(err.message); }
     finally { setLoading(false); }
   };
 
-  // 🚀 [추가] 구글 로그인 핸들러 🚀
+  // --- [액션: 구글 로그인] ---
   const handleGoogleLogin = async () => {
     try {
-      const redirectUrl = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
+          redirectTo: window.location.origin, // 아이폰 호환성용
+          queryParams: { access_type: 'offline', prompt: 'consent' },
         },
       });
       if (error) throw error;
     } catch (error: any) {
-      alert("Google 로그인 에러: " + error.message);
+      alert("Google Login Error: " + error.message);
     }
   };
 
   const handleLogout = async () => {
     if (currentUserId && currentRoomId) {
-      await supabase.from('room_participants')
-        .delete()
-        .eq('room_id', currentRoomId)
-        .eq('user_id', currentUserId);
+      await supabase.from('room_participants').delete().eq('room_id', currentRoomId).eq('user_id', currentUserId);
     }
-    
     await supabase.auth.signOut();
-    setIsLoggedIn(false);
-    setCurrentUserId(null);
-    setCurrentRoomId(null);
+    // 상태 초기화는 onAuthStateChange가 처리함
     setView('lobby');
   };
 
@@ -218,6 +232,8 @@ export default function App() {
 
     setResultData({ round: finalRound, time: entryTime, coins: sessionCoins, isNewRecord: isNewRecord });
     setShowResultModal(true);
+    // 게임 끝나고 데이터 최신화
+    fetchUserData(currentUserId);
   };
 
   if (!isLoggedIn) {
@@ -235,29 +251,17 @@ export default function App() {
             </button>
           </form>
 
-          {/* 🚀 [추가] 구글 로그인 버튼 영역 🚀 */}
           <div className="flex items-center gap-2 my-4">
              <div className="h-[1px] bg-zinc-800 flex-1"></div>
              <span className="text-[10px] text-zinc-600 font-bold uppercase">or</span>
              <div className="h-[1px] bg-zinc-800 flex-1"></div>
           </div>
 
-          <button 
-            type="button"
-            onClick={handleGoogleLogin} 
-            className="w-full h-14 bg-white text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3 shadow-[0_5px_15px_rgba(255,255,255,0.1)]"
-          >
-            {/* Google SVG Icon */}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M23.52 12.29C23.52 11.43 23.45 10.61 23.31 9.82H12V14.45H18.45C18.17 15.93 17.31 17.18 16.03 18.04V21.03H19.9C22.16 18.95 23.52 15.89 23.52 12.29Z" fill="#4285F4"/>
-              <path d="M12 24C15.24 24 17.96 22.92 19.9 21.03L16.03 18.04C14.95 18.76 13.58 19.18 12 19.18C8.88 19.18 6.23 17.07 5.29 14.25H1.31V17.34C3.26 21.21 7.29 24 12 24Z" fill="#34A853"/>
-              <path d="M5.29 14.25C5.05 13.53 4.92 12.77 4.92 12C4.92 11.23 5.05 10.47 5.29 9.75V6.66H1.31C0.47 8.33 0 10.11 0 12C0 13.89 0.47 15.67 1.31 17.34L5.29 14.25Z" fill="#FBBC05"/>
-              <path d="M12 4.82C13.76 4.82 15.34 5.43 16.58 6.61L20.01 3.17C17.95 1.25 15.24 0 12 0C7.29 0 3.26 2.79 1.31 6.66L5.29 9.75C6.23 6.93 8.88 4.82 12 4.82Z" fill="#EA4335"/>
-            </svg>
+          <button onClick={handleGoogleLogin} className="w-full h-14 bg-white text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3 shadow-[0_5px_15px_rgba(255,255,255,0.1)]">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M23.52 12.29C23.52 11.43 23.45 10.61 23.31 9.82H12V14.45H18.45C18.17 15.93 17.31 17.18 16.03 18.04V21.03H19.9C22.16 18.95 23.52 15.89 23.52 12.29Z" fill="#4285F4"/><path d="M12 24C15.24 24 17.96 22.92 19.9 21.03L16.03 18.04C14.95 18.76 13.58 19.18 12 19.18C8.88 19.18 6.23 17.07 5.29 14.25H1.31V17.34C3.26 21.21 7.29 24 12 24Z" fill="#34A853"/><path d="M5.29 14.25C5.05 13.53 4.92 12.77 4.92 12C4.92 11.23 5.05 10.47 5.29 9.75V6.66H1.31C0.47 8.33 0 10.11 0 12C0 13.89 0.47 15.67 1.31 17.34L5.29 14.25Z" fill="#FBBC05"/><path d="M12 4.82C13.76 4.82 15.34 5.43 16.58 6.61L20.01 3.17C17.95 1.25 15.24 0 12 0C7.29 0 3.26 2.79 1.31 6.66L5.29 9.75C6.23 6.93 8.88 4.82 12 4.82Z" fill="#EA4335"/></svg>
             Sign in with Google
           </button>
-          {/* ------------------------------------- */}
-
+          
           <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-4 uppercase hover:text-[#FF9900]">
             {isSignUpMode ? "Back to Login" : "Create Account"}
           </button>
@@ -272,10 +276,22 @@ export default function App() {
         <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>just RPS</h2>
         <div className="flex items-center gap-4">
           <div className="relative">
-            {/* 🚀 [UPDATE] 닉네임 대소문자 유지 (uppercase 제거) 🚀 */}
-            <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 tracking-tighter">
+            {/* 닉네임 버튼: Loading 상태라면 클릭해서 재시도 가능하게 처리 */}
+            <button 
+                onClick={(e) => { 
+                    e.stopPropagation(); 
+                    // 🚀 [아이폰용 긴급 조치] 로딩이 안 풀리면 눌러서 재시도
+                    if (userNickname === 'Loading...' || userNickname === 'Error') {
+                        if(currentUserId) fetchUserData(currentUserId);
+                    } else {
+                        setIsUserMenuOpen(!isUserMenuOpen); 
+                    }
+                }} 
+                className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 tracking-tighter"
+            >
               {userNickname} <span className="text-[10px] opacity-50">▼</span>
             </button>
+            
             {isUserMenuOpen && (
               <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-1 z-[100] shadow-2xl overflow-hidden">
                 <button onClick={() => setView('settings')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">Settings</button>
@@ -289,7 +305,8 @@ export default function App() {
           </div>
         </div>
       </header>
-
+      
+      {/* ... Main Content (이전과 동일) ... */}
       <main className="flex-1 flex flex-col items-center justify-start p-0">
         {view === 'settings' && (
           <SettingsPage 
