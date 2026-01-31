@@ -7,7 +7,7 @@ interface GameProps {
   onGameOver: (finalRound: number, time: number) => void;
   onRoundClear: (nextRound: number) => void;
   playClickSound: () => void;
-  onEarnCoin: () => void; // 👈 이미지의 타입 에러 해결
+  onEarnCoin: () => void; 
 }
 
 export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin }: GameProps) {

@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import GameEngine from './GameEngine';
 import SettingsPage from './SettingsPage';
+import RankingPage from './RankingPage';
 
 export default function App() {
   // --- 1. 상태 관리 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings'>('lobby');
+  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking'>('lobby');
   const [round, setRound] = useState(1);
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
 
@@ -238,12 +239,19 @@ export default function App() {
 
         {view === 'lobby' && (
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 space-y-3">
+
              <div className="flex gap-3 mb-12">
                {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl shadow-orange-900/10"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
              </div>
-             <button onClick={() => { setSessionCoins(0); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all">Play</button>
+
+             <button onClick={() => { setSessionCoins(0); setView('modeSelect'); }} 
+             className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all">Play</button>
+
              <button className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
-             <button className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase text-lg hover:bg-zinc-800">Best Records</button>
+            
+             <button onClick={() => { playClickSound(); setView('ranking'); }} 
+              className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase text-lg hover:bg-zinc-800">Best Records</button>
+
              <button className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase font-mono text-lg tracking-tighter">Tutorial</button>
           </div>
         )}
@@ -282,6 +290,13 @@ export default function App() {
             <div className="text-center"><p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Win Rate</p><p className="text-green-400 text-2xl font-bold font-mono tracking-tighter">67%</p></div>
             <div className="text-center"><p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Rank</p><p className="text-[#FF9900] text-2xl font-bold font-mono tracking-tighter">#156</p></div>
           </div>
+        )}
+
+        {view === 'ranking' && (
+          <RankingPage 
+            onBack={() => setView('lobby')} 
+            playClickSound={playClickSound} 
+          />
         )}
       </main>
     </div>
