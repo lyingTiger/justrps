@@ -44,54 +44,84 @@ export default function App() {
   const CONTINUE_COST = 50;
 
   // --- [시스템: 데이터 로드] ---
+ // --- [시스템: 데이터 로드] ---
   const fetchUserData = async (userId: string) => {
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    if (profile) {
-      setUserNickname(profile.display_name || 'Player');
-      setUserCoins(profile.coins || 0);
-      const { data: statsData } = await supabase.rpc('get_user_stats', { target_user_id: userId });
-      const winRate = profile.multi_games > 0 ? Math.round((profile.multi_score / profile.multi_games) * 100) : 0;
-      setStats({
-        total_games: statsData?.[0]?.total_games || 0,
-        multi_win_rate: winRate,
-        best_rank: statsData?.[0]?.best_rank || 0,
-        best_mode: statsData?.[0]?.best_mode || ''
-      });
+    try {
+      // 1. 프로필 데이터 조회
+      let { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      // 2. 프로필이 없으면(null) 에러가 아니라 '아직 안 만든 것'으로 간주하고 생성 시도
+      if (!profile && !error) {
+        console.log("프로필이 없어서 새로 생성합니다.");
+        const { data: userUser } = await supabase.auth.getUser();
+        const newName = userUser?.user?.email?.split('@')[0] || 'Player';
+        
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({ id: userId, display_name: newName, coins: 0 })
+          .select()
+          .single();
+          
+        if (createError) throw createError;
+        profile = newProfile;
+      }
+
+      // 3. 데이터가 있으면 상태 업데이트 (화면에 즉시 반영)
+      if (profile) {
+        setUserNickname(profile.display_name || 'Player'); // 닉네임 반영
+        setUserCoins(profile.coins || 0); // 코인 반영
+        
+        // 통계 데이터 가져오기
+        const { data: statsData } = await supabase.rpc('get_user_stats', { target_user_id: userId });
+        const winRate = profile.multi_games > 0 ? Math.round((profile.multi_score / profile.multi_games) * 100) : 0;
+        
+        setStats({
+          total_games: statsData?.[0]?.total_games || 0,
+          multi_win_rate: winRate,
+          best_rank: statsData?.[0]?.best_rank || 0,
+          best_mode: statsData?.[0]?.best_mode || ''
+        });
+        
+        console.log("데이터 로드 완료:", profile.display_name);
+      }
+    } catch (err: any) {
+      console.error("데이터 불러오기 실패:", err.message);
+      // 에러가 나도 'Loading...'으로 두지 말고 기본값 표시
+      setUserNickname((prev) => prev === 'Loading...' ? 'Unknown' : prev);
     }
   };
 
   // App.tsx 의 useEffect 수정
 
-  useEffect(() => {
+ useEffect(() => {
     document.title = "just RPS";
+    
     const checkUser = async () => {
-      try {
-        // 1. 세션 가져오기 시도
-        const { data, error } = await supabase.auth.getUser();
+      // 1. 현재 세션 확인
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // 이미 로그인 상태라면
+        if (!isLoggedIn) setIsLoggedIn(true);
+        if (currentUserId !== session.user.id) setCurrentUserId(session.user.id);
         
-        // 2. 에러가 있거나 유저가 없으면 강제 로그아웃 처리
-        if (error || !data?.user) {
-          console.warn("세션이 유효하지 않습니다. 로그아웃 처리합니다.", error?.message);
-          throw new Error("Invalid Session");
-        }
-
-        // 3. 정상이면 로그인 처리
-        setIsLoggedIn(true);
-        setCurrentUserId(data.user.id);
-        fetchUserData(data.user.id);
-
-      } catch (err) {
-        // 4. 세션 문제 발생 시 확실하게 상태 초기화
-        await supabase.auth.signOut(); // 수파베이스 세션 삭제
+        // 🚀 [핵심 수정] 유저 ID가 확인되면 무조건 데이터를 다시 불러옵니다.
+        await fetchUserData(session.user.id);
+      } else {
+        // 세션이 없으면 초기화
         setIsLoggedIn(false);
         setCurrentUserId(null);
-        setUserNickname('Loading...'); // 닉네임 잔상 제거
-        localStorage.clear(); // 🚀 로컬 스토리지 강제 청소 (선택 사항)
       }
     };
 
     checkUser();
-  }, [view]);
+    
+    // 🚀 [핵심 수정] view 뿐만 아니라 'isLoggedIn' 상태가 변할 때도 실행되어야 함
+  }, [view, isLoggedIn]);
 
   // --- [액션: 닉네임 저장] ---
   const handleSaveNickname = async (newNickname: string) => {
@@ -116,6 +146,9 @@ export default function App() {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         if (data.user) setIsLoggedIn(true);
+        setCurrentUserId(data.user.id);
+          // 🚀 [추가] 로그인 성공하자마자 데이터를 강제로 긁어옵니다.
+          await fetchUserData(data.user.id);
       }
     } catch (err: any) { alert(err.message); }
     finally { setLoading(false); }
