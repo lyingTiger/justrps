@@ -12,10 +12,7 @@ import MultiGameEngine from './MultiGameEngine';
 export default function App() {
   // --- 1. 상태 관리 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  
-  // 🛠️ [START] currentUserId 상태 정의 🛠️
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  // 🛠️ [END] 🛠️
 
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle'>('lobby');
   const [round, setRound] = useState(1);
@@ -43,6 +40,7 @@ export default function App() {
   const [gameKey, setGameKey] = useState(Date.now());
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
 
+  // --- 2. 시스템 로직 ---
   useEffect(() => {
     document.title = "just RPS";
   }, []);
@@ -58,13 +56,8 @@ export default function App() {
     if (profile) {
       setUserNickname(profile.display_name || 'Player');
       setUserCoins(profile.coins || 0);
-      
       const { data: statsData } = await supabase.rpc('get_user_stats', { target_user_id: userId });
-      
-      const winRate = profile.multi_games > 0 
-        ? Math.round((profile.multi_score / profile.multi_games) * 100) 
-        : 0;
-
+      const winRate = profile.multi_games > 0 ? Math.round((profile.multi_score / profile.multi_games) * 100) : 0;
       setStats({
         total_games: statsData?.[0]?.total_games || 0,
         multi_win_rate: winRate,
@@ -102,9 +95,7 @@ export default function App() {
       const { data } = await supabase.auth.getUser();
       if (data?.user) {
         setIsLoggedIn(true);
-        // ✨ [START] 로그인 시 ID 저장 ✨
         setCurrentUserId(data.user.id);
-        // ✨ [END] ✨
         fetchUserData(data.user.id);
       }
     };
@@ -177,40 +168,26 @@ export default function App() {
     setLoading(false);
   };
 
+  // --- 3. 렌더링 영역 ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="w-full max-w-[320px]">
           <h1 className="text-5xl font-black text-[#FF9900] mb-8 text-center italic tracking-tighter uppercase">just RPS</h1>
-          
           <form onSubmit={handleSubmit} className="space-y-4">
             <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />
             {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />}
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />
-            <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all">
-              {loading ? 'Wait...' : (isSignUpMode ? 'Join Now' : 'Log In')}
-            </button>
+            <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all">{loading ? 'Wait...' : (isSignUpMode ? 'Join Now' : 'Log In')}</button>
           </form>
-
           <div className="mt-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-[1px] bg-zinc-800"></div>
-              <span className="text-zinc-600 text-[10px] font-bold uppercase">OR</span>
-              <div className="flex-1 h-[1px] bg-zinc-800"></div>
-            </div>
-
-            <button 
-              onClick={handleGoogleLogin}
-              className="w-full h-14 bg-zinc-900 text-white border border-zinc-800 font-bold rounded-xl flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-zinc-800"
-            >
+            <div className="flex items-center gap-2"><div className="flex-1 h-[1px] bg-zinc-800"></div><span className="text-zinc-600 text-[10px] font-bold uppercase">OR</span><div className="flex-1 h-[1px] bg-zinc-800"></div></div>
+            <button onClick={handleGoogleLogin} className="w-full h-14 bg-zinc-900 text-white border border-zinc-800 font-bold rounded-xl flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-zinc-800">
               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="google" />
               <span>Continue with Google</span>
             </button>
           </div>
-
-          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-4">
-            {isSignUpMode ? "이미 계정이 있으신가요? 로그인" : "처음이신가요? 회원가입"}
-          </button>
+          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-4">{isSignUpMode ? "이미 계정이 있으신가요? 로그인" : "처음이신가요? 회원가입"}</button>
         </div>
       </div>
     );
@@ -222,7 +199,7 @@ export default function App() {
         <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>just RPS</h2>
         <div className="flex items-center gap-4">
           <div className="relative">
-            {/* ✨ [UPDATE] 닉네임 대소문자 유지 ✨ */}
+            {/* 🚀 [UPDATE] 닉네임 대소문자 유지 🚀 */}
             <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 tracking-tighter">
               {userNickname} <span className="text-[10px] opacity-50">▼</span>
             </button>
@@ -241,38 +218,20 @@ export default function App() {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-start p-0">
-        {view === 'settings' && (
-          <SettingsPage 
-            userNickname={userNickname} setUserNickname={setUserNickname} onSaveNickname={handleSaveNickname} 
-            volume={volume} setVolume={setVolume} isMuted={isMuted} setIsMuted={setIsMuted} onBack={() => setView('lobby')} 
-          />
-        )}
+        {view === 'settings' && <SettingsPage userNickname={userNickname} setUserNickname={setUserNickname} onSaveNickname={handleSaveNickname} volume={volume} setVolume={setVolume} isMuted={isMuted} setIsMuted={setIsMuted} onBack={() => setView('lobby')} />}
         
         {view === 'lobby' && (
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 space-y-3 px-4">
-             <div className="flex gap-3 mb-12">
-               {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
-             </div>
-             <button onClick={() => { resetGameSession(); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_0_20_rgba(255,153,0,0.2)]">Play</button>
+             <div className="flex gap-3 mb-12">{['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}</div>
+             <button onClick={() => { resetGameSession(); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
              <button onClick={() => setView('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
              <button onClick={() => setView('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Best Records</button>
              <button onClick={() => setView('tutorial')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Tutorial</button>
 
              <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center">
-                <div className="grid grid-cols-3 w-full mb-1">
-                  <p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Total Play</p>
-                  <p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Win Rate</p>
-                  <p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Best Rank</p>
-                </div>
-                <div className="grid grid-cols-3 w-full mb-1 items-center">
-                  <p className="text-2xl font-bold font-mono text-white text-center">{stats.total_games}</p>
-                  <p className="text-2xl font-bold font-mono text-green-400 text-center">{stats.multi_win_rate > 0 ? `${stats.multi_win_rate}%` : '-'}</p>
-                  <p className="text-2xl font-bold font-mono text-[#FF9900] text-center">#{stats.best_rank > 0 ? stats.best_rank : '-'}</p>
-                </div>
-                <div className="grid grid-cols-3 w-full">
-                  <div /><div />
-                  <p className="text-[10px] text-white uppercase font-bold text-center">{stats.best_mode?.split(' ')[0]}</p>
-                </div>
+                <div className="grid grid-cols-3 w-full mb-1"><p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Total Play</p><p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Win Rate</p><p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Best Rank</p></div>
+                <div className="grid grid-cols-3 w-full mb-1 items-center"><p className="text-2xl font-bold font-mono text-white text-center">{stats.total_games}</p><p className="text-2xl font-bold font-mono text-green-400 text-center">{stats.multi_win_rate > 0 ? `${stats.multi_win_rate}%` : '-'}</p><p className="text-2xl font-bold font-mono text-[#FF9900] text-center">#{stats.best_rank > 0 ? stats.best_rank : '-'}</p></div>
+                <div className="grid grid-cols-3 w-full"><div /><div /><p className="text-[10px] text-white uppercase font-bold text-center">{stats.best_mode?.split(' ')[0]}</p></div>
              </div>
           </div>
         )}
@@ -294,57 +253,22 @@ export default function App() {
           </div>
         )}
 
-        {view === 'multiplay' && (
-          <MultiplayPage 
-            selectedMode={selectedOption} 
-            onBack={() => setView('modeSelect')} 
-            onJoin={(roomId: string) => { setCurrentRoomId(roomId); setView('waitingRoom'); }}
-          />
-        )}
-
-        {view === 'waitingRoom' && (
-          <WaitingRoom 
-            roomId={currentRoomId} 
-            onLeave={() => setView('multiplay')}
-            onStartGame={() => setView('multiBattle')} 
-          />
-        )}
-
-        {view === 'multiBattle' && currentRoomId && (
-          <MultiGameEngine 
-            roomId={currentRoomId}
-            userNickname={userNickname}
-            playClickSound={playClickSound}
-            onGameOver={(finalRound, rank) => {
-              if (currentUserId) fetchUserData(currentUserId); 
-              setView('lobby'); 
-            }}
-            onBackToLobby={() => setView('lobby')}
-          />
-        )}
-
+        {view === 'multiplay' && <MultiplayPage selectedMode={selectedOption} onBack={() => setView('modeSelect')} onJoin={(roomId: string) => { setCurrentRoomId(roomId); setView('waitingRoom'); }} />}
+        
+        {/* ✨ [UPDATE] roomId={currentRoomId} 로 수정 ✨ */}
+        {view === 'waitingRoom' && <WaitingRoom roomId={currentRoomId} onLeave={() => setView('multiplay')} onStartGame={() => setView('multiBattle')} />}
+        
+        {view === 'multiBattle' && currentRoomId && <MultiGameEngine roomId={currentRoomId} userNickname={userNickname} playClickSound={playClickSound} onGameOver={(finalRound, rank) => { if (currentUserId) fetchUserData(currentUserId); setView('lobby'); }} onBackToLobby={() => setView('lobby')} />}
+        
         {view === 'tutorial' && <TutorialPage onBack={() => setView('lobby')} />}
 
-        {view === 'battle' && (
-          <GameEngine 
-            key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} 
-            onEarnCoin={handleEarnCoin} onRoundClear={(next) => setRound(next)} 
-            onGameOver={handleGameOver} isModalOpen={showResultModal} 
-          />
-        )}
-
+        {view === 'battle' && <GameEngine key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} onEarnCoin={handleEarnCoin} onRoundClear={(next) => setRound(next)} onGameOver={handleGameOver} isModalOpen={showResultModal} />}
+        
         {view === 'ranking' && <RankingPage onBack={() => setView('lobby')} playClickSound={playClickSound} />}
         {view === 'shop' && <div className="p-20 text-white font-bold uppercase text-center animate-pulse">Shop coming soon...<button onClick={() => setView('lobby')} className="block mx-auto mt-4 text-xs underline">Back</button></div>}
       </main>
 
-      <ResultModal 
-        isOpen={showResultModal} mode={selectedOption} round={resultData.round} time={resultData.time}
-        earnedCoins={resultData.coins} userCoins={userCoins} isNewRecord={resultData.isNewRecord}
-        continueCount={continueCount} continueCost={CONTINUE_COST} onContinue={handleContinue}
-        onRetry={() => { playClickSound(); setShowResultModal(false); resetGameSession(); setView('battle'); }}
-        onLobby={() => { playClickSound(); setShowResultModal(false); resetGameSession(); setView('lobby'); }}
-        onShop={() => { playClickSound(); setShowResultModal(false); setView('shop'); }}
-      />
+      <ResultModal isOpen={showResultModal} mode={selectedOption} round={resultData.round} time={resultData.time} earnedCoins={resultData.coins} userCoins={userCoins} isNewRecord={resultData.isNewRecord} continueCount={continueCount} continueCost={CONTINUE_COST} onContinue={handleContinue} onRetry={() => { playClickSound(); setShowResultModal(false); resetGameSession(); setView('battle'); }} onLobby={() => { playClickSound(); setShowResultModal(false); resetGameSession(); setView('lobby'); }} onShop={() => { playClickSound(); setShowResultModal(false); setView('shop'); }} />
     </div>
   );
 }
