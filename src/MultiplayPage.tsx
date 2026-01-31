@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient';
 interface MultiplayPageProps {
   selectedMode: string;
   onBack: () => void;
-  onJoin: (roomId: string) => void;
+  onJoin: (roomId: string) => void; 
 }
 
 export default function MultiplayPage({ selectedMode, onBack, onJoin }: MultiplayPageProps) {

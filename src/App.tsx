@@ -6,11 +6,16 @@ import RankingPage from './RankingPage';
 import ResultModal from './ResultModal';
 import MultiplayPage from './MultiplayPage';
 import TutorialPage from './TutorialPage';
+import WaitingRoom from './WaitingRoom'; // [ADD] 대기실 컴포넌트 임포트
+import MultiGameEngine from './MultiGameEngine'; // [ADD] 멀티플레이 전용 엔진 임포트
 
 export default function App() {
   // --- 1. 상태 관리 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial'>('lobby');
+  
+  // [UPDATE] 'multiBattle' 뷰 타입 추가
+  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle'>('lobby');
+  
   const [round, setRound] = useState(1);
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
 
@@ -55,7 +60,7 @@ export default function App() {
       const { data: statsData } = await supabase.rpc('get_user_stats', { target_user_id: userId });
       setStats({
         total_games: statsData?.[0]?.total_games || 0,
-        multi_win_rate: profile.multi_games > 0 ? Math.round((profile.multi_wins / profile.multi_games) * 100) : 0,
+        multi_win_rate: profile.multi_games > 0 ? Math.round((profile.multi_score / profile.multi_games) * 100) : 0,
         best_rank: statsData?.[0]?.best_rank || 0,
         best_mode: statsData?.[0]?.best_mode || ''
       });
@@ -208,16 +213,9 @@ export default function App() {
                {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
              </div>
              <button onClick={() => { resetGameSession(); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
-             <button onClick={() => setView('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800 transition-all">Shop</button>
-             <button onClick={() => setView('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800 transition-all">Best Records</button>
-
-             {/* [UPDATE] Tutorial 버튼 디자인을 Shop/Best Records와 통일 */}
-             <button 
-               onClick={() => { playClickSound(); setView('tutorial'); }} 
-               className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800 transition-all"
-             >
-               Tutorial
-             </button>
+             <button onClick={() => setView('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
+             <button onClick={() => setView('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Best Records</button>
+             <button onClick={() => setView('tutorial')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Tutorial</button>
 
              <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center">
                 <div className="grid grid-cols-3 w-full mb-1">
@@ -241,12 +239,7 @@ export default function App() {
         {view === 'modeSelect' && (
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 gap-3 px-4">
             <button onClick={() => { resetGameSession(); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.2)]">Single Play</button>
-            <button 
-              onClick={() => { resetGameSession(); setView('multiplay'); }} 
-              className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-700 uppercase active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.1)]"
-            >
-              Multi Play
-            </button>
+            <button onClick={() => setView('multiplay')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Multi Play</button>
             <h3 className="text-[#FF9900] text-[10px] font-bold text-center mt-6 uppercase tracking-widest italic">Select Mode</h3>
             <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full shadow-inner">
               {['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'].map(opt => (
@@ -260,10 +253,6 @@ export default function App() {
           </div>
         )}
 
-        {view === 'tutorial' && (
-          <TutorialPage onBack={() => setView('lobby')} />
-        )}
-
         {view === 'multiplay' && (
           <MultiplayPage 
             selectedMode={selectedOption} 
@@ -272,12 +261,30 @@ export default function App() {
           />
         )}
 
+        {/* [UPDATE] 대기실 전환 로직: onStartGame 시 multiBattle로 이동 */}
         {view === 'waitingRoom' && (
-          <div className="p-20 text-white font-bold uppercase text-center animate-pulse">
-            Waiting for players...<br/>Room ID: {currentRoomId}
-            <button onClick={() => setView('multiplay')} className="block mx-auto mt-4 text-xs underline">Leave</button>
-          </div>
+          <WaitingRoom 
+            roomId={currentRoomId} 
+            onLeave={() => setView('multiplay')}
+            onStartGame={() => setView('multiBattle')} 
+          />
         )}
+
+        {/* [ADD] 멀티플레이 전용 엔진 연결 */}
+        {view === 'multiBattle' && currentRoomId && (
+          <MultiGameEngine 
+            roomId={currentRoomId}
+            userNickname={userNickname}
+            playClickSound={playClickSound}
+            onGameOver={(finalRound, rank) => {
+              alert(`Game Over! Rank: ${rank}`);
+              setView('lobby'); 
+            }}
+            onBackToLobby={() => setView('lobby')}
+          />
+        )}
+
+        {view === 'tutorial' && <TutorialPage onBack={() => setView('lobby')} />}
 
         {view === 'battle' && (
           <GameEngine 
