@@ -11,6 +11,11 @@ import MultiGameEngine from './MultiGameEngine';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  
+  // 🛠️ [START] currentUserId 상태 정의 🛠️
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // 🛠️ [END] 🛠️
+
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle'>('lobby');
   const [round, setRound] = useState(1);
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
@@ -52,10 +57,16 @@ export default function App() {
     if (profile) {
       setUserNickname(profile.display_name || 'Player');
       setUserCoins(profile.coins || 0);
+      
       const { data: statsData } = await supabase.rpc('get_user_stats', { target_user_id: userId });
+      
+      const winRate = profile.multi_games > 0 
+        ? Math.round((profile.multi_score / profile.multi_games) * 100) 
+        : 0;
+
       setStats({
         total_games: statsData?.[0]?.total_games || 0,
-        multi_win_rate: profile.multi_games > 0 ? Math.round((profile.multi_score / profile.multi_games) * 100) : 0,
+        multi_win_rate: winRate,
         best_rank: statsData?.[0]?.best_rank || 0,
         best_mode: statsData?.[0]?.best_mode || ''
       });
@@ -90,6 +101,9 @@ export default function App() {
       const { data } = await supabase.auth.getUser();
       if (data?.user) {
         setIsLoggedIn(true);
+        // ✨ [START] 로그인 시 ID 저장 ✨
+        setCurrentUserId(data.user.id);
+        // ✨ [END] ✨
         fetchUserData(data.user.id);
       }
     };
@@ -207,6 +221,7 @@ export default function App() {
         <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>just RPS</h2>
         <div className="flex items-center gap-4">
           <div className="relative">
+            {/* ✨ [UPDATE] 닉네임 대소문자 유지 ✨ */}
             <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 tracking-tighter">
               {userNickname} <span className="text-[10px] opacity-50">▼</span>
             </button>
@@ -300,7 +315,7 @@ export default function App() {
             userNickname={userNickname}
             playClickSound={playClickSound}
             onGameOver={(finalRound, rank) => {
-              alert(`Game Over! Rank: ${rank}`);
+              if (currentUserId) fetchUserData(currentUserId); 
               setView('lobby'); 
             }}
             onBackToLobby={() => setView('lobby')}
