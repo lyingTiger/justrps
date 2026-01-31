@@ -10,6 +10,7 @@ import WaitingRoom from './WaitingRoom';
 import MultiGameEngine from './MultiGameEngine'; 
 
 export default function App() {
+  // --- 1. 상태 관리 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   
   // 🛠️ [START] currentUserId 상태 정의 🛠️

@@ -25,15 +25,10 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
     };
 
     const fetchParticipants = async () => {
-      // 🚀 [START] 데이터 관계 로딩 및 정렬 🚀
+      // 🚀 [UPDATE] joined_at 컬럼으로 정렬 (SQL에서 추가한 이름과 동일해야 함)
       const { data, error } = await supabase
         .from('room_participants')
-        .select(`
-          *,
-          profiles (
-            display_name
-          )
-        `) // SQL에서 Foreign Key를 설정했기 때문에 이제 정상 작동합니다.
+        .select('*, profiles(display_name)')
         .eq('room_id', roomId)
         .order('joined_at', { ascending: true });
       
@@ -42,7 +37,6 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
         return;
       }
       if (data) setParticipants(data);
-      // 🚀 [END] 🚀
     };
 
     initWaitingRoom();
@@ -65,6 +59,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
   const handleExit = async () => {
     if (!currentUserId || !roomId) return;
+    // 단순히 참여자 목록에서 나를 삭제하면 DB 트리거가 나머지를 처리합니다.
     await supabase.from('room_participants').delete().eq('room_id', roomId).eq('user_id', currentUserId);
     onLeave();
   };
@@ -96,9 +91,8 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
                   <div className={`w-14 h-14 rounded-2xl mb-3 flex items-center justify-center border font-black text-xl italic ${isParticipantHost ? 'bg-zinc-800 border-[#FF9900] text-[#FF9900]' : 'bg-zinc-700 border-zinc-600 text-zinc-400'}`}>
                     {p.profiles?.display_name?.[0]}
                   </div>
-                  {/* ✨ [START] 닉네임 대소문자 유지 ✨ */}
+                  {/* 🛠️ [UPDATE] 닉네임 대소문자 유지 (uppercase 제거) */}
                   <span className="text-[11px] font-black text-white tracking-tighter line-clamp-1">{p.profiles?.display_name}</span>
-                  {/* ✨ [END] ✨ */}
                   <span className={`text-[8px] font-bold uppercase mt-1 px-2 py-0.5 rounded-full ${isParticipantHost ? 'bg-[#FF9900] text-black' : 'text-zinc-500'}`}>
                     {isParticipantHost ? 'Host' : 'Ready'}
                   </span>

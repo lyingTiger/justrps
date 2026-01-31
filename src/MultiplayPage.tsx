@@ -18,17 +18,19 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [passInput, setPassInput] = useState('');
 
-  // 🚀 [START] 실시간 방 목록 동기화 로직 🚀
+  // 🚀 [START] 실시간 방 목록 동기화 로직 보강 🚀
   useEffect(() => {
     fetchRooms();
 
-    // 'rooms' 테이블의 모든 변화(INSERT, UPDATE, DELETE)를 구독합니다.
     const subscription = supabase.channel('lobby_room_updates')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'rooms' }, 
         (payload) => {
-          console.log("Realtime Update:", payload);
-          fetchRooms(); // 변화가 감지되면 목록을 새로고침합니다.
+          // 콘솔에 찍힌 그 메시지입니다!
+          console.log("Realtime Update Received:", payload.eventType);
+          
+          // 어떤 변화(생성, 수정, 삭제)가 생기든 즉시 DB에서 최신 목록을 다시 가져옵니다.
+          fetchRooms();
         }
       )
       .subscribe();
@@ -37,15 +39,22 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
       supabase.removeChannel(subscription); 
     };
   }, []);
-  // 🚀 [END] 실시간 방 목록 동기화 로직 🚀
+  // 🚀 [END] 🚀
 
   const fetchRooms = async () => {
-    // 대기 중인(waiting) 방만 가져오며, 최신순으로 정렬합니다.
-    const { data } = await supabase
+    // 'waiting' 상태이고 참여자가 있는 방만 로비에 노출합니다.
+    const { data, error } = await supabase
       .from('rooms')
       .select('*')
       .eq('status', 'waiting')
+      .gt('current_players', 0) // 참여자가 0명인 방은 목록에서 제외 (이중 안전장치)
       .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error("Fetch Rooms Error:", error);
+      return;
+    }
+    
     if (data) setRooms(data);
   };
 
@@ -66,7 +75,6 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // 참여자 테이블에 추가 (이 작업은 DB 트리거를 통해 rooms의 인원수를 변경시킵니다)
     const { error: partError } = await supabase
       .from('room_participants')
       .insert({ room_id: roomId, user_id: user.id });
@@ -90,16 +98,15 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
       return;
     }
 
-    // ✨ [START] 방 생성 및 자동 참여 로직 ✨
     const { data: roomData, error: roomError } = await supabase.from('rooms').insert({
       name: newRoomName,
       password: password || null,
       max_players: maxPlayers,
-      current_players: 0, // 트리거가 자동으로 1로 올려줄 것이므로 0으로 시작하거나 생략 가능
+      current_players: 0,
       mode: selectedMode,
       creator_id: user.id,
       status: 'waiting',
-      seed: Math.random() // 멀티플레이 동기화를 위한 랜덤 시드 생성
+      seed: Math.random() 
     }).select().single();
 
     if (roomError) {
@@ -115,13 +122,9 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
       });
       onJoin(roomData.id);
     }
-    // ✨ [END] 방 생성 및 자동 참여 로직 ✨
   };
 
-  // 🛠️ [START] 닉네임/방이름 대소문자 유지 🛠️
-  // 검색 시에는 대소문자를 구분하지 않도록 처리합니다.
   const filteredRooms = rooms.filter(r => r.name.toLowerCase().includes(searchName.toLowerCase()));
-  // 🛠 [END] 닉네임/방이름 대소문자 유지 🛠️
 
   return (
     <div className="w-full max-w-[340px] flex flex-col items-center mt-6 px-4 animate-in fade-in duration-500 relative">
@@ -130,7 +133,6 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
         <button onClick={onBack} className="text-zinc-500 text-[10px] font-bold uppercase underline pb-1">Back</button>
       </div>
 
-      {/* 방 생성 및 검색 UI */}
       <div className="w-full space-y-3 mb-8 bg-zinc-900/30 p-4 rounded-[32px] border border-zinc-800/50">
         <div className="flex gap-2">
           <input 
@@ -168,29 +170,32 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
         </button>
       </div>
 
-      {/* 방 목록 리스트 */}
       <div className="w-full flex flex-col gap-2">
         <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1 ml-2">Active Rooms</h3>
         <div className="w-full h-[220px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-          {filteredRooms.map(room => (
-            <div key={room.id} onClick={() => handleJoinAttempt(room)} className="w-full p-4 bg-zinc-900 border border-zinc-800 rounded-[24px] flex justify-between items-center cursor-pointer hover:border-[#FF9900] group transition-all active:scale-[0.98]">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  {/* 🛠️ [UPDATE] 방 이름 대소문자 구분 유지: uppercase 제거 🛠️ */}
-                  <span className="font-black text-sm italic text-white group-hover:text-[#FF9900]">{room.name}</span>
-                  {room.password && <span className="text-[10px] opacity-40">🔒</span>}
-                </div>
-                <span className="text-[9px] text-zinc-600 font-black uppercase tracking-tighter">{room.mode}</span>
-              </div>
-              <div className="text-right">
-                <span className="text-[#FF9900] font-mono font-black text-sm italic">{room.current_players}/{room.max_players}</span>
-              </div>
+          {filteredRooms.length === 0 ? (
+            <div className="w-full py-10 text-center border border-dashed border-zinc-800 rounded-[24px]">
+              <p className="text-zinc-700 text-[10px] font-black uppercase tracking-widest">No Rooms Found</p>
             </div>
-          ))}
+          ) : (
+            filteredRooms.map(room => (
+              <div key={room.id} onClick={() => handleJoinAttempt(room)} className="w-full p-4 bg-zinc-900 border border-zinc-800 rounded-[24px] flex justify-between items-center cursor-pointer hover:border-[#FF9900] group transition-all active:scale-[0.98]">
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-sm italic text-white group-hover:text-[#FF9900]">{room.name}</span>
+                    {room.password && <span className="text-[10px] opacity-40">🔒</span>}
+                  </div>
+                  <span className="text-[9px] text-zinc-600 font-black uppercase tracking-tighter">{room.mode}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[#FF9900] font-mono font-black text-sm italic">{room.current_players}/{room.max_players}</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* 비밀번호 모달 */}
       {showPassModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
           <div className="w-full max-w-[280px] bg-zinc-900 border border-zinc-800 rounded-[32px] p-6 shadow-2xl animate-in zoom-in-95">
