@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { supabase } from './supabaseClient';
+import React from 'react';
 
+// 1. App.tsx에서 보내주는 데이터들의 '설계도'를 수정합니다.
 interface SettingsProps {
   userNickname: string;
   setUserNickname: (val: string) => void;
+  onSaveNickname: (newNickname: string) => Promise<void>; // 저장 함수 추가
   volume: number;
   setVolume: (val: number) => void;
   isMuted: boolean;
@@ -11,100 +12,70 @@ interface SettingsProps {
   onBack: () => void;
 }
 
-export default function SettingsPage({ 
-  userNickname, setUserNickname, volume, setVolume, isMuted, setIsMuted, onBack 
+export default function SettingsPage({
+  userNickname,
+  setUserNickname,
+  onSaveNickname, // 함수 받아오기
+  volume,
+  setVolume,
+  isMuted,
+  setIsMuted,
+  onBack
 }: SettingsProps) {
-  const [newNickname, setNewNickname] = useState(userNickname);
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  const handleUpdateNickname = async () => {
-    if (!newNickname.trim()) return;
-    setIsUpdating(true);
-    
-    const { error } = await supabase.auth.updateUser({
-      data: { display_name: newNickname }
-    });
-
-    if (error) {
-      alert("변경 실패: " + error.message);
-    } else {
-      setUserNickname(newNickname);
-      alert("닉네임이 성공적으로 변경되었습니다.");
-    }
-    setIsUpdating(false);
-  };
 
   return (
-    <div className="w-full max-w-[320px] mt-16 flex flex-col gap-10 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
-        <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter">Settings</h2>
-        <button onClick={onBack} className="text-xs text-zinc-500 underline hover:text-white transition-colors">BACK</button>
+    <div className="w-full max-w-[320px] flex flex-col items-center mt-12 space-y-8 p-4">
+      {/* 뒤로가기 헤더 */}
+      <div className="w-full flex items-center justify-between border-b border-zinc-800 pb-4">
+        <h3 className="text-[#FF9900] font-black text-xl italic uppercase tracking-tighter">Settings</h3>
+        <button onClick={onBack} className="text-xs text-zinc-500 underline hover:text-white uppercase font-bold">Close</button>
       </div>
 
-      {/* 닉네임 변경 섹션 */}
-      <section className="space-y-4">
-        <h3 className="text-[10px] font-bold text-[#FF9900] uppercase tracking-widest">User Profile</h3>
-        <div className="space-y-2">
-          <input 
-            type="text" 
-            value={newNickname}
-            onChange={(e) => setNewNickname(e.target.value)}
-            className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white focus:border-[#FF9900] outline-none font-bold"
-            placeholder="New Nickname"
-          />
-          <button 
-            onClick={handleUpdateNickname}
-            disabled={isUpdating || newNickname === userNickname}
-            className="w-full h-10 bg-zinc-800 text-white rounded-lg text-xs font-bold uppercase hover:bg-zinc-700 disabled:opacity-50 transition-all"
-          >
-            {isUpdating ? 'Updating...' : 'Update Nickname'}
-          </button>
-        </div>
-      </section>
-
-      {/* 사운드 설정 섹션 */}
-      <section className="space-y-4">
-        <div className="flex justify-between items-end">
-          <h3 className="text-[10px] font-bold text-[#FF9900] uppercase tracking-widest">Audio Control</h3>
-          <span className="text-xl font-mono font-bold text-white">{isMuted ? '0' : Math.round(volume * 100)}%</span>
-        </div>
+      {/* --- 닉네임 설정 구역 --- */}
+      <div className="w-full space-y-3">
+        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">User Nickname</p>
+        <input 
+          type="text" 
+          value={userNickname} 
+          onChange={(e) => setUserNickname(e.target.value)} 
+          placeholder="Enter Nickname"
+          className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white focus:border-[#FF9900] outline-none font-bold"
+        />
         
-        <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 space-y-6">
-          <div className="flex flex-col gap-4">
-            <input 
-              type="range" 
-              min="0" 
-              max="1" 
-              step="0.01"
-              value={isMuted ? 0 : volume}
-              onChange={(e) => {
-                setVolume(parseFloat(e.target.value));
-                if (isMuted) setIsMuted(false);
-              }}
-              className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#FF9900]"
-            />
-            <div className="flex justify-between text-[10px] text-zinc-600 font-bold uppercase">
-              <span>Silent</span>
-              <span>Max Volume</span>
-            </div>
-          </div>
+        {/* [위치!] 입력창 바로 아래에 저장 버튼을 배치합니다 */}
+        <button 
+          onClick={() => onSaveNickname(userNickname)}
+          className="w-full h-12 bg-[#FF9900] text-black font-black rounded-lg uppercase text-sm active:scale-95 transition-all shadow-lg shadow-orange-900/20"
+        >
+          Save Nickname
+        </button>
+      </div>
 
+      {/* --- 사운드 설정 구역 --- */}
+      <div className="w-full space-y-4 pt-4 border-t border-zinc-900">
+        <div className="flex justify-between items-center">
+          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Master Volume</p>
           <button 
             onClick={() => setIsMuted(!isMuted)}
-            className={`w-full h-10 rounded-lg text-xs font-bold uppercase transition-all border ${
-              isMuted 
-              ? 'bg-[#FF9900] text-black border-[#FF9900]' 
-              : 'bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700'
-            }`}
+            className={`text-[10px] font-bold px-2 py-1 rounded border ${isMuted ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}
           >
-            {isMuted ? 'Unmute' : 'Mute All Sound'}
+            {isMuted ? 'MUTED' : 'MUTE'}
           </button>
         </div>
-      </section>
+        <input 
+          type="range" 
+          min="0" 
+          max="1" 
+          step="0.01" 
+          value={isMuted ? 0 : volume} 
+          onChange={(e) => setVolume(parseFloat(e.target.value))}
+          className="w-full accent-[#FF9900] cursor-pointer"
+        />
+      </div>
 
-      <p className="text-[10px] text-zinc-700 text-center uppercase tracking-widest mt-10">
-        just RPS Version 1.0.0
-      </p>
+      <div className="pt-8 text-center">
+        <p className="text-[9px] text-zinc-600 font-mono">TREASURE FACTORY © 2026</p>
+      </div>
     </div>
   );
 }

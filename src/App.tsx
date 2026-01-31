@@ -11,8 +11,8 @@ export default function App() {
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
 
   const [userNickname, setUserNickname] = useState('');
-  const [userCoins, setUserCoins] = useState(0); // 전체 보유 코인
-  const [sessionCoins, setSessionCoins] = useState(0); // [추가] 이번 판에서 획득한 코인
+  const [userCoins, setUserCoins] = useState(0); 
+  const [sessionCoins, setSessionCoins] = useState(0); 
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,18 +38,43 @@ export default function App() {
     setIsCoinMenuOpen(false);
   };
 
+  // 유저 데이터(닉네임, 코인) 불러오기
   const fetchUserData = async (userId: string) => {
-    const { data: profile } = await supabase.from('profiles').select('display_name, coins').eq('id', userId).single();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name, coins') // display_name 컬럼 사용
+      .eq('id', userId)
+      .single();
+    
     if (profile) {
       setUserNickname(profile.display_name || 'Player');
       setUserCoins(profile.coins || 0);
     }
   };
 
-  // [핵심] 코인 획득 시 호출: 화면(UI)에만 즉시 반영
+  // [추가] 닉네임 저장 로직
+  const handleSaveNickname = async (newNickname: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // profiles 테이블의 display_name 업데이트
+    const { error } = await supabase
+      .from('profiles')
+      .update({ display_name: newNickname })
+      .eq('id', user.id);
+
+    if (error) {
+      console.error("저장 실패:", error.message);
+      alert("닉네임 저장 중 오류가 발생했습니다.");
+    } else {
+      setUserNickname(newNickname); // UI 상태 업데이트
+      alert("닉네임이 성공적으로 변경되었습니다!");
+    }
+  };
+
   const handleEarnCoin = () => {
-    setUserCoins(prev => prev + 1); // 헤더 숫자 업데이트
-    setSessionCoins(prev => prev + 1); // 이번 판 획득량 누적
+    setUserCoins(prev => prev + 1);
+    setSessionCoins(prev => prev + 1);
   };
 
   useEffect(() => {
@@ -63,19 +88,21 @@ export default function App() {
     checkUser();
   }, [view]);
 
-  // [핵심] 게임 종료 시 호출: 획득한 코인과 기록을 한 번에 DB 저장
   const handleGameOver = async (finalRound: number, finalTime: number) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // 1. 코인 일괄 저장 (RPC 호출)
     if (sessionCoins > 0) {
       await supabase.rpc('add_coins_batch', { row_id: user.id, amount: sessionCoins });
     }
 
-    // 2. 모드별 최고 기록 저장
     const currentMode = selectedOption;
-    const { data: record } = await supabase.from('mode_records').select('best_round, best_time').eq('user_id', user.id).eq('mode', currentMode).single();
+    const { data: record } = await supabase
+      .from('mode_records')
+      .select('best_round, best_time')
+      .eq('user_id', user.id)
+      .eq('mode', currentMode)
+      .single();
 
     const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && finalTime < record.best_time);
 
@@ -89,12 +116,16 @@ export default function App() {
       });
     }
 
-    // 3. 게임 로그 남기기
-    await supabase.from('game_logs').insert({ user_id: user.id, mode: currentMode, reached_round: finalRound, play_time: finalTime });
+    await supabase.from('game_logs').insert({ 
+      user_id: user.id, 
+      mode: currentMode, 
+      reached_round: finalRound, 
+      play_time: finalTime 
+    });
 
     alert(`GAME OVER\nEarned Coins: ${sessionCoins}\n${isNewRecord ? 'NEW RECORD! 🎉' : ''}`);
     
-    setSessionCoins(0); // 이번 판 코인 초기화
+    setSessionCoins(0);
     setView('lobby');
     setRound(1);
   };
@@ -110,9 +141,17 @@ export default function App() {
     e.preventDefault();
     setLoading(true);
     if (isSignUpMode) {
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: username } } });
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password, 
+        options: { data: { display_name: username } } 
+      });
       if (data?.user) {
-        await supabase.from('profiles').insert({ id: data.user.id, display_name: username, coins: 0 });
+        await supabase.from('profiles').insert({ 
+          id: data.user.id, 
+          display_name: username, 
+          coins: 0 
+        });
         alert("가입 확인 메일을 보냈습니다!");
       }
       if (error) alert(error.message);
@@ -127,6 +166,7 @@ export default function App() {
     setLoading(false);
   };
 
+  // --- 3. 렌더링 (로그인 화면) ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
@@ -144,6 +184,7 @@ export default function App() {
     );
   }
 
+  // --- 4. 렌더링 (메인 화면) ---
   return (
     <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={closeMenus}>
       <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50" onClick={(e) => e.stopPropagation()}>
@@ -181,7 +222,19 @@ export default function App() {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-start p-0">
-        {view === 'settings' && <SettingsPage userNickname={userNickname} setUserNickname={setUserNickname} volume={volume} setVolume={setVolume} isMuted={isMuted} setIsMuted={setIsMuted} onBack={() => setView('lobby')} />}
+        {/* SettingsPage 호출 부분 */}
+        {view === 'settings' && (
+          <SettingsPage 
+            userNickname={userNickname} 
+            setUserNickname={setUserNickname} 
+            onSaveNickname={handleSaveNickname} // 닉네임 저장 함수 전달
+            volume={volume} 
+            setVolume={setVolume} 
+            isMuted={isMuted} 
+            setIsMuted={setIsMuted} 
+            onBack={() => setView('lobby')} 
+          />
+        )}
 
         {view === 'lobby' && (
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 space-y-3">
@@ -190,8 +243,8 @@ export default function App() {
              </div>
              <button onClick={() => { setSessionCoins(0); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all">Play</button>
              <button className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
-             <button className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase text-xs hover:bg-zinc-800">Best Records</button>
-             <button className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase font-mono text-sm tracking-tighter">Tutorial</button>
+             <button className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase text-lg hover:bg-zinc-800">Best Records</button>
+             <button className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase font-mono text-lg tracking-tighter">Tutorial</button>
           </div>
         )}
 
@@ -217,9 +270,9 @@ export default function App() {
             round={round} 
             mode={selectedOption} 
             playClickSound={playClickSound}
-            onEarnCoin={handleEarnCoin} // 정답일 때 UI 코인만 증가
+            onEarnCoin={handleEarnCoin}
             onRoundClear={(next) => setRound(next)}
-            onGameOver={handleGameOver} // 종료 시 코인 일괄 저장
+            onGameOver={handleGameOver}
           />
         )}
 
