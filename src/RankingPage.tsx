@@ -28,7 +28,6 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
   const fetchRankings = async () => {
     setLoading(true);
     try {
-      // 뷰(leaderboard)에서 데이터를 가져옵니다.
       const { data, error } = await supabase
         .from('leaderboard')
         .select('*')
@@ -54,14 +53,21 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
     }
   };
 
+  // 🟠 [수정: 순위별 색상 및 폰트 스타일 정의]
+  const getRankStyle = (index: number) => {
+    if (index === 0) return "text-[#FFD700] font-bold"; // 1등: 금색 + 볼드
+    if (index === 1) return "text-[#E2E2E2] font-bold"; // 2등: 은색 + 볼드
+    if (index === 2) return "text-[#CD7F32] font-bold"; // 3등: 동색 + 볼드
+    return "text-zinc-500 font-normal"; // 4~10등: 연회색 + 기본체
+  };
+
   return (
-    <div className="w-full max-w-[360px] flex flex-col items-center mt-12 animate-in fade-in duration-700">
-      {/* 이미지와 동일한 HALL OF FAME 헤더 스타일 */}
+    <div className="w-full max-w-[360px] flex flex-col items-center mt-12 animate-in fade-in duration-700 font-sans">
       <h2 className="text-5xl font-black text-[#FF9900] italic uppercase tracking-tighter mb-10 [text-shadow:2px_2px_0_rgba(0,0,0,1)]">
         Hall of Fame
       </h2>
 
-      {/* 모드 선택 버튼 영역 (테두리 없음, Glow 효과 적용) */}
+      {/* 모드 선택 탭 */}
       <div className="w-full flex justify-center flex-wrap gap-x-5 gap-y-3 mb-10 px-4">
         {modes.map((mode) => {
           const isActive = activeMode === mode;
@@ -76,7 +82,6 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
                 }`}
             >
               {mode.replace(' MODE', '')}
-              {/* 활성화 시 하단에 작은 점 표시 (선택 사항) */}
               {isActive && (
                 <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#FF9900] rounded-full shadow-[0_0_5px_#FF9900]"></span>
               )}
@@ -85,27 +90,33 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
         })}
       </div>
 
-      {/* 리더보드 테이블 본체 (이미지 스타일 반영) */}
-      <div className="w-[90%] bg-[#121212] rounded-[40px] border border-zinc-800/50 overflow-hidden shadow-2xl">
-        <div className="grid grid-cols-4 px-6 py-5 border-b border-zinc-800/30 text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-          <span>Rank</span>
-          <span>Name</span>
-          <span className="text-center">Round</span>
-          <span className="text-right">Time</span>
-        </div>
-
-        <div className="max-h-[350px] overflow-y-auto no-scrollbar">
+      {/* 🟠 [수정: 배경 및 테두리 제거된 리스트 영역] */}
+      <div className="w-full px-2">
+        <div className="max-h-[400px] overflow-y-auto no-scrollbar">
           {loading ? (
             <div className="p-12 text-center text-zinc-700 font-bold uppercase italic animate-pulse">Loading...</div>
           ) : rankings.length > 0 ? (
             rankings.map((res, i) => (
-              <div key={i} className="grid grid-cols-4 px-6 py-5 items-center hover:bg-white/5 transition-colors">
-                <span className="text-lg">
-                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : <span className="text-xs font-mono text-zinc-600 ml-1">#{i + 1}</span>}
+              /* 🟠 [수정: 고정 비율(%) 그리드 및 스타일 적용] */
+              <div 
+                key={i} 
+                className={`grid grid-cols-[12%_43%_20%_25%] py-4 items-center text-lg ${getRankStyle(i)}`}
+              >
+                {/* 1. Rank: 가운데 정렬 */}
+                <span className="text-center">{i + 1}</span>
+
+                {/* 2. Name: 왼쪽 정렬, 최대 10자 최적화 */}
+                <span className="text-left truncate pr-2">
+                  {res.profiles?.display_name}
                 </span>
-                <span className="text-sm font-bold text-white tracking-tight truncate">{res.profiles?.display_name}</span>
-                <span className="text-center font-black text-white text-xl">{res.best_round}</span>
-                <span className="text-right font-mono text-xs text-zinc-500">{res.best_time.toFixed(2)}s</span>
+
+                {/* 3. Round: 가운데 정렬 + 'R' 추가 */}
+                <span className="text-center">{res.best_round}R</span>
+
+                {/* 4. Time: 왼쪽 정렬, 소수점 1자리 */}
+                <span className="text-left pl-2">
+                  {res.best_time.toFixed(1)}s
+                </span>
               </div>
             ))
           ) : (
@@ -114,7 +125,6 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
         </div>
       </div>
 
-      {/* 하단 돌아가기 링크 */}
       <button 
         onClick={() => { playClickSound(); onBack(); }} 
         className="mt-12 text-zinc-500 font-bold text-sm border-b border-zinc-700 pb-0.5 hover:text-white hover:border-white transition-all uppercase tracking-tighter"
@@ -122,7 +132,6 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
         Back to Lobby
       </button>
 
-      {/* 가로 스크롤바 제거를 위한 인라인 스타일 */}
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

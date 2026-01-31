@@ -4,10 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 interface GameProps {
   round: number;
   mode: string;
-  onGameOver: (finalRound: number, time: number) => void;
-  onRoundClear: (nextRound: number) => void;
   playClickSound: () => void;
-  onEarnCoin: () => void; 
+  onEarnCoin: () => void;
+  onRoundClear: (nextRound: number) => void;
+  onGameOver: (finalRound: number, entryTime: number) => void;
+  isModalOpen: boolean; // 🟠 이 줄을 반드시 추가하세요!
 }
 
 export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin }: GameProps) {

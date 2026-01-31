@@ -3,73 +3,71 @@ import { supabase } from './supabaseClient';
 import GameEngine from './GameEngine';
 import SettingsPage from './SettingsPage';
 import RankingPage from './RankingPage';
+import ResultModal from './ResultModal';
 
 export default function App() {
   // --- 1. 상태 관리 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking'>('lobby');
+  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop'>('lobby');
   const [round, setRound] = useState(1);
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
 
-  const [userNickname, setUserNickname] = useState('');
+  const [userNickname, setUserNickname] = useState('Loading...');
   const [userCoins, setUserCoins] = useState(0); 
   const [sessionCoins, setSessionCoins] = useState(0); 
+  const [stats, setStats] = useState({ total_games: 0, multi_win_rate: 0, best_rank: 0, best_mode: '' });
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
-  
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isCoinMenuOpen, setIsCoinMenuOpen] = useState(false);
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
 
+  // 결과 모달 및 이어하기 상태
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [resultData, setResultData] = useState({ round: 0, time: 0, coins: 0, isNewRecord: false });
+  const [continueCount, setContinueCount] = useState(3);
+  const CONTINUE_COST = 50;
+
+  // 🟠 게임 엔진을 완전히 초기화하기 위한 Key (Retry 시에만 변경됨)
+  const [gameKey, setGameKey] = useState(Date.now());
+
   // --- 2. 시스템 로직 ---
-  const playSound = (path: string) => {
-    const audio = new Audio(path);
+  useEffect(() => {
+    document.title = "just RPS";
+  }, []);
+
+  const playClickSound = () => {
+    const audio = new Audio('/sound/mouseClick.mp3');
     audio.volume = isMuted ? 0 : volume;
     audio.play().catch(() => {});
   };
-  const playClickSound = () => playSound('/sound/mouseClick.mp3');
 
-  const closeMenus = () => {
-    setIsUserMenuOpen(false);
-    setIsCoinMenuOpen(false);
-  };
-
-  // 유저 데이터(닉네임, 코인) 불러오기
   const fetchUserData = async (userId: string) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('display_name, coins') // display_name 컬럼 사용
-      .eq('id', userId)
-      .single();
-    
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (profile) {
       setUserNickname(profile.display_name || 'Player');
       setUserCoins(profile.coins || 0);
+      const { data: statsData } = await supabase.rpc('get_user_stats', { target_user_id: userId });
+      setStats({
+        total_games: statsData?.[0]?.total_games || 0,
+        multi_win_rate: profile.multi_games > 0 ? Math.round((profile.multi_wins / profile.multi_games) * 100) : 0,
+        best_rank: statsData?.[0]?.best_rank || 0,
+        best_mode: statsData?.[0]?.best_mode || ''
+      });
     }
   };
 
-  // [추가] 닉네임 저장 로직
   const handleSaveNickname = async (newNickname: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
-    // profiles 테이블의 display_name 업데이트
-    const { error } = await supabase
-      .from('profiles')
-      .update({ display_name: newNickname })
-      .eq('id', user.id);
-
-    if (error) {
-      console.error("저장 실패:", error.message);
-      alert("닉네임 저장 중 오류가 발생했습니다.");
-    } else {
-      setUserNickname(newNickname); // UI 상태 업데이트
-      alert("닉네임이 성공적으로 변경되었습니다!");
+    const { error } = await supabase.from('profiles').update({ display_name: newNickname }).eq('id', user.id);
+    if (!error) {
+      setUserNickname(newNickname);
+      alert("닉네임이 변경되었습니다!");
     }
   };
 
@@ -89,50 +87,50 @@ export default function App() {
     checkUser();
   }, [view]);
 
-  const handleGameOver = async (finalRound: number, finalTime: number) => {
+  const handleGameOver = async (finalRound: number, entryTime: number) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    if (sessionCoins > 0) {
-      await supabase.rpc('add_coins_batch', { row_id: user.id, amount: sessionCoins });
-    }
-
-    const currentMode = selectedOption;
-    const { data: record } = await supabase
-      .from('mode_records')
-      .select('best_round, best_time')
-      .eq('user_id', user.id)
-      .eq('mode', currentMode)
-      .single();
-
-    const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && finalTime < record.best_time);
+    const { data: record } = await supabase.from('mode_records').select('*').eq('user_id', user.id).eq('mode', selectedOption).maybeSingle();
+    const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && entryTime < record.best_time);
 
     if (isNewRecord) {
-      await supabase.from('mode_records').upsert({
-        user_id: user.id,
-        mode: currentMode,
-        best_round: finalRound,
-        best_time: finalTime,
-        updated_at: new Date().toISOString()
-      });
+      await supabase.from('mode_records').upsert({ 
+        user_id: user.id, mode: selectedOption, best_round: finalRound, best_time: entryTime, updated_at: new Date().toISOString() 
+      }, { onConflict: 'user_id, mode' });
     }
 
-    await supabase.from('game_logs').insert({ 
-      user_id: user.id, 
-      mode: currentMode, 
-      reached_round: finalRound, 
-      play_time: finalTime 
-    });
+    await Promise.all([
+      supabase.from('game_logs').insert({ user_id: user.id, mode: selectedOption, reached_round: finalRound, play_time: entryTime }),
+      sessionCoins > 0 ? supabase.rpc('add_coins_batch', { row_id: user.id, amount: sessionCoins }) : Promise.resolve()
+    ]);
 
-    alert(`GAME OVER\nEarned Coins: ${sessionCoins}\n${isNewRecord ? 'NEW RECORD! 🎉' : ''}`);
-    
-    setSessionCoins(0);
-    setView('lobby');
+    setResultData({ round: finalRound, time: entryTime, coins: sessionCoins, isNewRecord: isNewRecord });
+    setShowResultModal(true);
+  };
+
+  // 🟠 [컨티뉴 핵심]: gameKey를 건드리지 않고 모달만 닫음
+  const handleContinue = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || userCoins < CONTINUE_COST || continueCount <= 0) return;
+
+    const { error } = await supabase.rpc('add_coins_batch', { row_id: user.id, amount: -CONTINUE_COST });
+    if (!error) {
+      setUserCoins(prev => prev - CONTINUE_COST);
+      setContinueCount(prev => prev - 1);
+      setShowResultModal(false); 
+      // GameEngine이 리렌더링되지 않고(isModalOpen=false) 그대로 이어서 진행됨
+    }
+  };
+
+  const resetGameSession = () => {
     setRound(1);
+    setSessionCoins(0);
+    setContinueCount(3);
+    setGameKey(Date.now()); // 🟠 리트라이 시에만 엔진 완전 초기화
   };
 
   const handleLogout = async () => {
-    playClickSound();
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setView('lobby');
@@ -142,24 +140,14 @@ export default function App() {
     e.preventDefault();
     setLoading(true);
     if (isSignUpMode) {
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
-        password, 
-        options: { data: { display_name: username } } 
-      });
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: username } } });
       if (data?.user) {
-        await supabase.from('profiles').insert({ 
-          id: data.user.id, 
-          display_name: username, 
-          coins: 0 
-        });
+        await supabase.from('profiles').insert({ id: data.user.id, display_name: username, coins: 0 });
         alert("가입 확인 메일을 보냈습니다!");
       }
-      if (error) alert(error.message);
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) alert(error.message); 
-      else if (data.user) {
+      if (data.user) {
         setIsLoggedIn(true);
         fetchUserData(data.user.id);
       }
@@ -167,16 +155,15 @@ export default function App() {
     setLoading(false);
   };
 
-  // --- 3. 렌더링 (로그인 화면) ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="w-full max-w-[320px]">
-          <h1 className="text-5xl font-black text-[#FF9900] mb-8 text-center italic border-b-2 border-[#FF9900]/20 pb-4 tracking-tighter uppercase">just RPS</h1>
+          <h1 className="text-5xl font-black text-[#FF9900] mb-8 text-center italic tracking-tighter uppercase">just RPS</h1>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white focus:border-[#FF9900] outline-none" required />
-            {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white focus:border-[#FF9900] outline-none" required />}
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white focus:border-[#FF9900] outline-none" required />
+            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />
+            {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />}
+            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none" required />
             <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all">{loading ? 'Wait...' : (isSignUpMode ? 'Join Now' : 'Log In')}</button>
             <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-2">{isSignUpMode ? "로그인하기" : "회원가입하기"}</button>
           </form>
@@ -185,50 +172,35 @@ export default function App() {
     );
   }
 
-  // --- 4. 렌더링 (메인 화면) ---
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={closeMenus}>
-      <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-6">
-          <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter cursor-pointer uppercase" onClick={() => setView('lobby')}>just RPS</h2>
-        </div>
-
+    <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => setIsUserMenuOpen(false)}>
+      <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50">
+        <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>just RPS</h2>
         <div className="flex items-center gap-4">
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); setIsCoinMenuOpen(false); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 uppercase tracking-tighter">
-              {userNickname || 'Player'} <span className="text-[10px] opacity-50">▼</span>
+            <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 uppercase tracking-tighter">
+              {userNickname} <span className="text-[10px] opacity-50">▼</span>
             </button>
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-1 z-[100] shadow-2xl">
-                <button onClick={() => { setView('settings'); setIsUserMenuOpen(false); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold">Settings</button>
-                <div className="border-t border-zinc-800 my-1"></div>
-                <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800">Logout</button>
+              <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-1 z-[100] shadow-2xl overflow-hidden">
+                <button onClick={() => setView('settings')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">Settings</button>
+                <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800 uppercase">Logout</button>
               </div>
             )}
           </div>
-
-          <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setIsCoinMenuOpen(!isCoinMenuOpen); setIsUserMenuOpen(false); }} className="flex items-center gap-2 bg-zinc-900 px-4 py-2 rounded-full border border-zinc-800 hover:bg-zinc-800 transition-colors">
-              <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
-              <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">{userCoins.toLocaleString()}</span>
-              <span className="text-[10px] opacity-50 ml-1">▼</span>
-            </button>
-            {isCoinMenuOpen && (
-              <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-1 z-[100] shadow-2xl text-center">
-                <button className="w-full px-4 py-2 text-xs hover:bg-zinc-800 font-bold text-[#FF9900]">Buy Coins</button>
-              </div>
-            )}
+          <div className="flex items-center gap-2 bg-zinc-900 px-4 py-2 rounded-full border border-zinc-800">
+            <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
+            <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">{userCoins.toLocaleString()}</span>
           </div>
         </div>
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-start p-0">
-        {/* SettingsPage 호출 부분 */}
         {view === 'settings' && (
           <SettingsPage 
             userNickname={userNickname} 
             setUserNickname={setUserNickname} 
-            onSaveNickname={handleSaveNickname} // 닉네임 저장 함수 전달
+            onSaveNickname={handleSaveNickname} 
             volume={volume} 
             setVolume={setVolume} 
             isMuted={isMuted} 
@@ -236,69 +208,88 @@ export default function App() {
             onBack={() => setView('lobby')} 
           />
         )}
-
+        
         {view === 'lobby' && (
-          <div className="w-full max-w-[320px] flex flex-col items-center mt-16 space-y-3">
-
+          <div className="w-full max-w-[320px] flex flex-col items-center mt-16 space-y-3 px-4">
              <div className="flex gap-3 mb-12">
-               {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl shadow-orange-900/10"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
+               {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
              </div>
+             <button onClick={() => { resetGameSession(); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
+             <button onClick={() => setView('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
+             <button onClick={() => setView('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Best Records</button>
 
-             <button onClick={() => { setSessionCoins(0); setView('modeSelect'); }} 
-             className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all">Play</button>
-
-             <button className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
-            
-             <button onClick={() => { playClickSound(); setView('ranking'); }} 
-              className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase text-lg hover:bg-zinc-800">Best Records</button>
-
-             <button className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase font-mono text-lg tracking-tighter">Tutorial</button>
+             <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center">
+                <div className="grid grid-cols-3 w-full mb-1">
+                  <p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Total Play</p>
+                  <p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Win Rate</p>
+                  <p className="text-[10px] text-zinc-500 uppercase font-bold text-center">Best Rank</p>
+                </div>
+                <div className="grid grid-cols-3 w-full mb-1 items-center">
+                  <p className="text-2xl font-bold font-mono text-white text-center">{stats.total_games}</p>
+                  <p className="text-2xl font-bold font-mono text-green-400 text-center">{stats.multi_win_rate > 0 ? `${stats.multi_win_rate}%` : '-'}</p>
+                  <p className="text-2xl font-bold font-mono text-[#FF9900] text-center">#{stats.best_rank > 0 ? stats.best_rank : '-'}</p>
+                </div>
+                <div className="grid grid-cols-3 w-full">
+                  <div /><div />
+                  <p className="text-[10px] text-white uppercase font-bold text-center">{stats.best_mode?.split(' ')[0]}</p>
+                </div>
+             </div>
           </div>
         )}
 
         {view === 'modeSelect' && (
-          <div className="w-full max-w-[320px] flex flex-col items-center mt-16 gap-3">
-            <button onClick={() => alert('Coming Soon!')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-700 uppercase opacity-50 cursor-not-allowed">Multiplay</button>
-            <button onClick={() => { setRound(1); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all">Single Play</button>
-            <h3 className="text-[#FF9900] text-[10px] font-bold text-center mt-4 uppercase tracking-widest">Select Mode</h3>
-            <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full">
+          <div className="w-full max-w-[320px] flex flex-col items-center mt-16 gap-3 px-4">
+            <button onClick={() => { resetGameSession(); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.2)]">Single Play</button>
+            <h3 className="text-[#FF9900] text-[10px] font-bold text-center mt-6 uppercase tracking-widest italic">Select Mode</h3>
+            <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full shadow-inner">
               {['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'].map(opt => (
-                <label key={opt} className="flex items-center gap-2 cursor-pointer text-[10px] font-bold group">
-                  <input type="radio" checked={selectedOption === opt} onChange={() => { playClickSound(); setSelectedOption(opt); }} className="accent-[#FF9900]" />
+                <label key={opt} className="flex items-center gap-2 cursor-pointer text-[10px] font-bold">
+                  <input type="radio" checked={selectedOption === opt} onChange={() => setSelectedOption(opt)} className="accent-[#FF9900]" />
                   <span className={selectedOption === opt ? 'text-[#FF9900]' : 'text-zinc-500 uppercase'}>{opt}</span>
                 </label>
               ))}
             </div>
-            <button onClick={() => setView('lobby')} className="text-xs text-zinc-500 text-center underline uppercase mt-4 hover:text-white transition-colors">Back to Lobby</button>
+            <button onClick={() => setView('lobby')} className="text-[10px] text-zinc-600 underline uppercase mt-8 font-bold">Back to Lobby</button>
           </div>
         )}
 
         {view === 'battle' && (
           <GameEngine 
+            key={gameKey} 
             round={round} 
             mode={selectedOption} 
-            playClickSound={playClickSound}
-            onEarnCoin={handleEarnCoin}
-            onRoundClear={(next) => setRound(next)}
-            onGameOver={handleGameOver}
-          />
-        )}
-
-        {(view === 'lobby' || view === 'modeSelect') && (
-          <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 flex gap-10 backdrop-blur-sm shadow-xl">
-            <div className="text-center"><p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Total Games</p><p className="text-2xl font-bold font-mono tracking-tighter text-white">42</p></div>
-            <div className="text-center"><p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Win Rate</p><p className="text-green-400 text-2xl font-bold font-mono tracking-tighter">67%</p></div>
-            <div className="text-center"><p className="text-[10px] text-zinc-500 uppercase mb-1 font-bold tracking-tighter">Rank</p><p className="text-[#FF9900] text-2xl font-bold font-mono tracking-tighter">#156</p></div>
-          </div>
-        )}
-
-        {view === 'ranking' && (
-          <RankingPage 
-            onBack={() => setView('lobby')} 
             playClickSound={playClickSound} 
+            onEarnCoin={handleEarnCoin} 
+            onRoundClear={(next) => setRound(next)} 
+            onGameOver={handleGameOver} 
+            isModalOpen={showResultModal} 
           />
         )}
+
+        {view === 'ranking' && <RankingPage onBack={() => setView('lobby')} playClickSound={playClickSound} />}
+        {view === 'shop' && <div className="p-20 text-white font-bold uppercase text-center animate-pulse">Shop coming soon...<button onClick={() => setView('lobby')} className="block mx-auto mt-4 text-xs underline">Back</button></div>}
       </main>
+
+      <ResultModal 
+        isOpen={showResultModal}
+        mode={selectedOption}
+        round={resultData.round}
+        time={resultData.time}
+        earnedCoins={resultData.coins}
+        userCoins={userCoins}
+        isNewRecord={resultData.isNewRecord}
+        continueCount={continueCount}
+        continueCost={CONTINUE_COST}
+        onContinue={handleContinue}
+        onRetry={() => { 
+          playClickSound(); 
+          setShowResultModal(false); 
+          resetGameSession(); 
+          setView('battle'); 
+        }}
+        onLobby={() => { playClickSound(); setShowResultModal(false); resetGameSession(); setView('lobby'); }}
+        onShop={() => { playClickSound(); setShowResultModal(false); setView('shop'); }}
+      />
     </div>
   );
 }
