@@ -66,34 +66,49 @@ const fetchRooms = async () => {
   };
 
   // 🛠️ [복구] 방 생성 로직 🛠️
-  const handleCreateRoom = async () => {
-    if (!newRoomName.trim()) {
-      alert("방 이름을 입력해주세요!");
-      return;
-    }
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+const handleCreateRoom = async () => {
+  if (!newRoomName.trim()) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
 
-const { data: room } = await supabase.from('rooms').insert({
+  // 🚀 [에러 추적을 위한 수정]
+  const { data: room, error: roomError } = await supabase.from('rooms').insert({
     name: newRoomName,
     password: password || null,
     max_players: maxPlayers,
-    current_players: 1, // 👈 0 대신 1로 시작하면 리스트에서 즉시 보입니다.
+    current_players: 1,
     mode: selectedMode,
     creator_id: user.id,
     status: 'waiting',
     seed: Math.random()
   }).select().single();
 
+  console.log("방 생성 결과 room:", room); 
+  console.log("방 생성 에러 roomError:", roomError);
+
+  if (!room) {
+    console.error("방이 만들어졌지만 데이터를 받아오지 못했습니다. (SELECT 권한 문제)");
+    return;
+  }
+
+  if (roomError) {
+    console.error("방 생성 실패:", roomError.message); // 👈 여기서 에러 메시지를 확인하세요!
+    alert("방 생성 실패: " + roomError.message);
+    return;
+  }
+
   if (room) {
-  // 🚀 [중요] await를 붙여서 참가가 확실히 완료된 후 화면을 넘깁니다.
-  await supabase.from('room_participants').insert({ 
-    room_id: room.id, 
-    user_id: user.id 
-  });
-  
-  onJoin(room.id);
-}   
+    const { error: partError } = await supabase.from('room_participants').insert({ 
+      room_id: room.id, 
+      user_id: user.id 
+    });
+    
+    if (partError) {
+      console.error("참가자 등록 실패:", partError.message);
+    }
+    
+    onJoin(room.id);
+  }
 };
 
   // 🛠️ [복구] 랜덤 입장 (Quick Match) 🛠️
