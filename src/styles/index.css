@@ -1,3 +1,68 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+/* index.css 에 추가 */
+
+/* 1. 왼쪽에서 등장 */
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-left {
+  animation: slideInLeft 0.6s ease-out forwards;
+}
+
+/* 2. 오른쪽에서 등장 (딜레이 포함) */
+@keyframes slideInRightDelayed {
+  0%, 50% { opacity: 0; transform: translateX(20px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-right-delayed {
+  animation: slideInRightDelayed 1.2s ease-out forwards;
+}
+
+/* 3. 성공 시 강조 플래시 */
+@keyframes flashSuccess {
+  0%, 100% { border-color: rgba(39, 39, 42, 1); /* zinc-800 */ box-shadow: none; }
+  50% { border-color: #FF9900; box-shadow: 0 0 20px rgba(255, 153, 0, 0.5); scale: 1.05; }
+}
+.animate-flash-success {
+  animation: flashSuccess 2s infinite 1.5s; /* 1.5초 딜레이 후 반복 */
+}
+
+/* 4. 텍스트 셔플 효과 (Shuffle Mode용) */
+@keyframes shuffleText {
+  0% { content: 'WIN'; color: #FF9900; }
+  33% { content: 'LOSE'; color: #ef4444; }
+  66% { content: 'DRAW'; color: #a1a1aa; }
+  100% { content: 'WIN'; color: #FF9900; }
+}
+.animate-shuffle::after {
+  content: 'WIN';
+  animation: shuffleText 0.8s steps(1) infinite;
+}
+
+
+/* --- 커스텀 스크롤바 디자인 --- */
+/* 스크롤바 전체 폭 설정 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px; /* 얇고 세련되게 */
+}
+
+/* 스크롤바 트랙 (배경) */
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent; /* 배경은 투명하게 해서 콘텐츠와 자연스럽게 */
+  margin-block: 10px; /* 위아래 약간 여백 */
+}
+
+/* 스크롤바 썸 (움직이는 손잡이) */
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 153, 0, 0.4); /* 오렌지색, 반투명 */
+  border-radius: 10px; /* 둥글게 */
+}
+
+/* 마우스 올렸을 때 썸 색상 강조 */
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 153, 0, 0.8); /* 더 진한 오렌지색 */
+}

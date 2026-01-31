@@ -4,11 +4,13 @@ import GameEngine from './GameEngine';
 import SettingsPage from './SettingsPage';
 import RankingPage from './RankingPage';
 import ResultModal from './ResultModal';
+import MultiplayPage from './MultiplayPage';
+import TutorialPage from './TutorialPage';
 
 export default function App() {
   // --- 1. 상태 관리 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop'>('lobby');
+  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial'>('lobby');
   const [round, setRound] = useState(1);
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
 
@@ -26,14 +28,13 @@ export default function App() {
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
 
-  // 결과 모달 및 이어하기 상태
   const [showResultModal, setShowResultModal] = useState(false);
   const [resultData, setResultData] = useState({ round: 0, time: 0, coins: 0, isNewRecord: false });
   const [continueCount, setContinueCount] = useState(3);
   const CONTINUE_COST = 50;
 
-  // 🟠 게임 엔진을 완전히 초기화하기 위한 Key (Retry 시에만 변경됨)
   const [gameKey, setGameKey] = useState(Date.now());
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
 
   // --- 2. 시스템 로직 ---
   useEffect(() => {
@@ -109,7 +110,6 @@ export default function App() {
     setShowResultModal(true);
   };
 
-  // 🟠 [컨티뉴 핵심]: gameKey를 건드리지 않고 모달만 닫음
   const handleContinue = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || userCoins < CONTINUE_COST || continueCount <= 0) return;
@@ -119,7 +119,6 @@ export default function App() {
       setUserCoins(prev => prev - CONTINUE_COST);
       setContinueCount(prev => prev - 1);
       setShowResultModal(false); 
-      // GameEngine이 리렌더링되지 않고(isModalOpen=false) 그대로 이어서 진행됨
     }
   };
 
@@ -127,7 +126,7 @@ export default function App() {
     setRound(1);
     setSessionCoins(0);
     setContinueCount(3);
-    setGameKey(Date.now()); // 🟠 리트라이 시에만 엔진 완전 초기화
+    setGameKey(Date.now());
   };
 
   const handleLogout = async () => {
@@ -198,14 +197,8 @@ export default function App() {
       <main className="flex-1 flex flex-col items-center justify-start p-0">
         {view === 'settings' && (
           <SettingsPage 
-            userNickname={userNickname} 
-            setUserNickname={setUserNickname} 
-            onSaveNickname={handleSaveNickname} 
-            volume={volume} 
-            setVolume={setVolume} 
-            isMuted={isMuted} 
-            setIsMuted={setIsMuted} 
-            onBack={() => setView('lobby')} 
+            userNickname={userNickname} setUserNickname={setUserNickname} onSaveNickname={handleSaveNickname} 
+            volume={volume} setVolume={setVolume} isMuted={isMuted} setIsMuted={setIsMuted} onBack={() => setView('lobby')} 
           />
         )}
         
@@ -215,8 +208,16 @@ export default function App() {
                {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
              </div>
              <button onClick={() => { resetGameSession(); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
-             <button onClick={() => setView('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
-             <button onClick={() => setView('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Best Records</button>
+             <button onClick={() => setView('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800 transition-all">Shop</button>
+             <button onClick={() => setView('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800 transition-all">Best Records</button>
+
+             {/* [UPDATE] Tutorial 버튼 디자인을 Shop/Best Records와 통일 */}
+             <button 
+               onClick={() => { playClickSound(); setView('tutorial'); }} 
+               className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800 transition-all"
+             >
+               Tutorial
+             </button>
 
              <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center">
                 <div className="grid grid-cols-3 w-full mb-1">
@@ -240,6 +241,12 @@ export default function App() {
         {view === 'modeSelect' && (
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 gap-3 px-4">
             <button onClick={() => { resetGameSession(); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.2)]">Single Play</button>
+            <button 
+              onClick={() => { resetGameSession(); setView('multiplay'); }} 
+              className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-700 uppercase active:scale-95 transition-all shadow-[0_0_20px_rgba(255,153,0,0.1)]"
+            >
+              Multi Play
+            </button>
             <h3 className="text-[#FF9900] text-[10px] font-bold text-center mt-6 uppercase tracking-widest italic">Select Mode</h3>
             <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full shadow-inner">
               {['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'].map(opt => (
@@ -253,16 +260,30 @@ export default function App() {
           </div>
         )}
 
+        {view === 'tutorial' && (
+          <TutorialPage onBack={() => setView('lobby')} />
+        )}
+
+        {view === 'multiplay' && (
+          <MultiplayPage 
+            selectedMode={selectedOption} 
+            onBack={() => setView('modeSelect')} 
+            onJoin={(roomId: string) => { setCurrentRoomId(roomId); setView('waitingRoom'); }}
+          />
+        )}
+
+        {view === 'waitingRoom' && (
+          <div className="p-20 text-white font-bold uppercase text-center animate-pulse">
+            Waiting for players...<br/>Room ID: {currentRoomId}
+            <button onClick={() => setView('multiplay')} className="block mx-auto mt-4 text-xs underline">Leave</button>
+          </div>
+        )}
+
         {view === 'battle' && (
           <GameEngine 
-            key={gameKey} 
-            round={round} 
-            mode={selectedOption} 
-            playClickSound={playClickSound} 
-            onEarnCoin={handleEarnCoin} 
-            onRoundClear={(next) => setRound(next)} 
-            onGameOver={handleGameOver} 
-            isModalOpen={showResultModal} 
+            key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} 
+            onEarnCoin={handleEarnCoin} onRoundClear={(next) => setRound(next)} 
+            onGameOver={handleGameOver} isModalOpen={showResultModal} 
           />
         )}
 
@@ -271,22 +292,10 @@ export default function App() {
       </main>
 
       <ResultModal 
-        isOpen={showResultModal}
-        mode={selectedOption}
-        round={resultData.round}
-        time={resultData.time}
-        earnedCoins={resultData.coins}
-        userCoins={userCoins}
-        isNewRecord={resultData.isNewRecord}
-        continueCount={continueCount}
-        continueCost={CONTINUE_COST}
-        onContinue={handleContinue}
-        onRetry={() => { 
-          playClickSound(); 
-          setShowResultModal(false); 
-          resetGameSession(); 
-          setView('battle'); 
-        }}
+        isOpen={showResultModal} mode={selectedOption} round={resultData.round} time={resultData.time}
+        earnedCoins={resultData.coins} userCoins={userCoins} isNewRecord={resultData.isNewRecord}
+        continueCount={continueCount} continueCost={CONTINUE_COST} onContinue={handleContinue}
+        onRetry={() => { playClickSound(); setShowResultModal(false); resetGameSession(); setView('battle'); }}
         onLobby={() => { playClickSound(); setShowResultModal(false); resetGameSession(); setView('lobby'); }}
         onShop={() => { playClickSound(); setShowResultModal(false); setView('shop'); }}
       />
