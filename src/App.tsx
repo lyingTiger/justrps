@@ -13,8 +13,8 @@ export default function App() {
   // --- 1. 유저 및 세션 상태 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [userNickname, setUserNickname] = useState('Loading...');
-  const [userCoins, setUserCoins] = useState(0); 
+const [userNickname, setUserNickname] = useState(localStorage.getItem('cached_nickname') || 'Loading...');
+const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached_coins') || '0'));
 
   // --- 2. 게임 및 뷰 제어 ---
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle'>('lobby');
@@ -23,8 +23,16 @@ export default function App() {
   const [round, setRound] = useState(1);
   const [gameKey, setGameKey] = useState(Date.now());
 
-  // --- 3. 통계 및 설정 ---
-  const [stats, setStats] = useState({ total_games: 0, multi_win_rate: 0, best_rank: 0, best_mode: '' });
+// --- 3. 통계 및 설정 ---
+  // [통계] 새로고침 시에도 저장된 데이터를 바로 보여주도록 localStorage 값 우선 사용
+  const [stats, setStats] = useState({ 
+    total_games: parseInt(localStorage.getItem('cached_total_games') || '0'), 
+    multi_win_rate: parseInt(localStorage.getItem('cached_win_rate') || '0'), 
+    best_rank: parseInt(localStorage.getItem('cached_best_rank') || '0'), 
+    best_mode: localStorage.getItem('cached_best_mode') || '' 
+  });
+
+  // [복구] 지워진 볼륨 및 음소거 상태 변수 다시 추가
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
 
@@ -61,44 +69,62 @@ export default function App() {
 
 // --- [시스템: 데이터 로드 함수 개선] ---
 // --- [디버깅 강화된 데이터 로드 함수] ---
+// --- [수정] 자가 치유(Self-Healing) 기능이 추가된 데이터 로드 함수 ---
   const fetchUserData = async (userId: string) => {
     console.log(`🚀 [1] fetchUserData 시작 - ID: ${userId}`);
-
-    if (!userId) {
-      console.error("❌ [오류] userId가 없습니다. 함수를 종료합니다.");
-      return;
-    }
+    if (!userId) return;
 
     try {
-      // 1. 프로필 쿼리 시도
-      const { data: profile, error } = await supabase
+      // 1. 프로필 조회 시도 (maybeSingle 사용: 데이터가 없어도 에러 안 내고 null 반환)
+      let { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      // 2. 에러 발생 시 로그 출력
-      if (error) {
-        console.error("❌ [Supabase 에러] 프로필 조회 실패:", error.message);
-        // 에러 발생 시에도 UI가 멈추지 않도록 기본값 설정
-        setUserNickname('Unknown User');
+      // 2. [자가 치유] 데이터가 없다면? -> 즉시 생성 (이메일 로그인 문제 해결)
+      if (!profile && !error) {
+        console.warn("⚠️ 프로필이 없습니다. 자동으로 생성합니다.");
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({ 
+            id: userId, 
+            display_name: 'Player', // 기본 닉네임
+            coins: 0 
+          })
+          .select()
+          .single();
+          
+        if (!insertError) {
+            profile = newProfile; // 방금 만든 데이터로 교체
+            console.log("✅ 프로필 자동 생성 완료!");
+        } else {
+            console.error("❌ 프로필 생성 실패:", insertError.message);
+        }
+      }
+
+      // 3. 여전히 실패했다면 기본값 표시 (Loading... 멈춤 해결)
+      if (error || !profile) {
+        console.error("❌ 데이터 로드 최종 실패. 기본값 사용.");
+        setUserNickname('Unknown');
         setUserCoins(0);
         return;
       }
 
-      // 3. 데이터 수신 확인
-      if (!profile) {
-        console.warn("⚠️ [경고] 에러는 없지만 프로필 데이터가 null입니다. (데이터가 비어있음)");
-        return;
-      }
-
-      console.log("✅ [성공] 프로필 데이터를 받았습니다:", profile);
+      console.log("✅ [성공] 데이터 로드 완료:", profile);
 
       // 4. 상태 업데이트
-      setUserNickname(profile.display_name || '익명 Player');
-      setUserCoins(profile.coins || 0);
+      const newName = profile.display_name || 'Player';
+      const newCoins = profile.coins || 0;
+      
+      setUserNickname(newName);
+      setUserCoins(newCoins);
 
-      // 5. 통계 데이터 로드 시도
+      // 🚀 [추가] 브라우저에 데이터 박제 (새로고침 대비)
+      localStorage.setItem('cached_nickname', newName);
+      localStorage.setItem('cached_coins', newCoins.toString());  
+
+  // 5. 통계 데이터 로드 시도
       const { data: statsData, error: statsError } = await supabase.rpc('get_user_stats', { target_user_id: userId });
       
       if (statsError) {
@@ -109,62 +135,104 @@ export default function App() {
         const winRate = profile.multi_games > 0 
           ? Math.round((profile.multi_score / profile.multi_games) * 100) 
           : 0;
-
-        setStats({
+        
+        const newStats = {
           total_games: statsData?.[0]?.total_games || 0,
           multi_win_rate: winRate,
           best_rank: statsData?.[0]?.best_rank || 0,
           best_mode: statsData?.[0]?.best_mode || ''
-        });
-      }
+        };
+
+        setStats(newStats);
+
+        // 🚀 [추가] 통계 데이터도 브라우저에 저장 (새로고침 대비)
+        localStorage.setItem('cached_total_games', newStats.total_games.toString());
+        localStorage.setItem('cached_win_rate', newStats.multi_win_rate.toString());
+        localStorage.setItem('cached_best_rank', newStats.best_rank.toString());
+        localStorage.setItem('cached_best_mode', newStats.best_mode);
+      };
 
     } catch (err: any) {
-      console.error("❌ [치명적 에러] 코드 실행 중 예외 발생:", err.message);
+      console.error(err);
     }
   };
 
-  // --- [수정: 로그인 및 세션 관리 로직 통합] ---
+ // ... (상단 state 선언부 생략)
+
+  // ------------------------------------------------------------------
+  // ✨ [신규] 자동 로그아웃 기능 (10분 미활동 시)
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    let timer: NodeJS.Timeout;
+    const LIMIT = 10 * 60 * 1000; // 10분 (원하는 시간으로 조절 가능)
+
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        console.log("💤 장시간 미활동으로 자동 로그아웃됩니다.");
+        handleLogout();
+      }, LIMIT);
+    };
+
+    // 활동 감지 이벤트 등록
+    window.addEventListener('mousemove', resetTimer);
+    window.addEventListener('click', resetTimer);
+    window.addEventListener('keydown', resetTimer);
+    
+    resetTimer(); // 초기화
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('click', resetTimer);
+      window.removeEventListener('keydown', resetTimer);
+    };
+  }, [isLoggedIn]); // 로그인 상태일 때만 동작
+
+  // ------------------------------------------------------------------
+  // 🔥 [수정] 통합된 세션 체크 및 데이터 로드 (새로고침 문제 해결)
+  // ------------------------------------------------------------------
   useEffect(() => {
     document.title = "just RPS";
     
-    // 초기 세션 확인 (새로고침 시 데이터 로드 보장)
+    // 1. [새로고침 대응] 초기 세션 확인 및 데이터 즉시 로드
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         console.log("✅ 세션 복구됨:", session.user.email);
         setCurrentUserId(session.user.id);
         setIsLoggedIn(true);
-        fetchUserData(session.user.id); // 🔥 즉시 로드
+        // 🚀 [핵심] 세션 복구 직후 0.5초 딜레이를 주어 RLS 권한 문제 회피
+        setTimeout(() => fetchUserData(session.user.id), 500);
       }
     });
 
-    // Auth 상태 변경 감지 리스너
+    // 2. Auth 상태 변경 감지
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth Event:", event); // 디버깅용 로그
+      console.log("Auth Event:", event);
 
       if (event === 'SIGNED_OUT' || !session) {
-        resetUserState(); // 로그아웃 시 초기화
+        resetUserState();
       } 
       else if (session?.user) {
-        // 로그인 성공 또는 토큰 갱신
         const user = session.user;
         
-        // 상태가 아직 업데이트 안 됐을 수 있으므로 변수값으로 직접 전달
+        // 상태 동기화
         if (currentUserId !== user.id) {
             setCurrentUserId(user.id);
             setIsLoggedIn(true);
         }
 
-        // 프로필 확인 및 생성 로직
+        // 프로필 존재 여부 확인 (없으면 생성)
         const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
-
         if (!profile) {
-          // 프로필이 없으면 생성
-          const displayName = user.user_metadata.display_name || user.user_metadata.full_name || user.email?.split('@')[0] || 'Player';
+          const displayName = user.user_metadata.display_name || user.email?.split('@')[0] || 'Player';
           await supabase.from('profiles').insert({ id: user.id, display_name: displayName, coins: 0 });
         }
         
-        // 🔥 중요: 이벤트가 발생할 때마다 데이터 최신화 (중복 호출되어도 안전함)
-        fetchUserData(user.id);
+        // 🔥 이벤트 발생 시에도 딜레이를 주어 안정적으로 데이터 로드
+        setTimeout(() => fetchUserData(user.id), 500);
       }
     });
 
@@ -172,17 +240,15 @@ export default function App() {
   }, []);
 
   // ------------------------------------------------------------------
-  // 🔥 [수정 핵심 2] 데이터 로드 트리거 최적화
-  // 로그인 상태이고 뷰가 로비/설정일 때만 데이터를 가져와 중복 호출 방지
+  // 🔥 [보완] 뷰 변경(로고 클릭 등) 시 데이터 재로드
   // ------------------------------------------------------------------
-// [수정 코드] ▼ (setTimeout으로 미세한 딜레이 추가)
   useEffect(() => {
     if (isLoggedIn && currentUserId && (view === 'lobby' || view === 'settings')) {
-      // 🚀 [수정] RLS 권한 동기화 시간을 벌기 위해 0.5초 딜레이 후 데이터 요청
+      // 로고 클릭 등으로 로비에 돌아왔을 때 데이터 최신화
+      // 이미 닉네임이 로드된 상태라면 'Loading...'으로 되돌리지 않고 조용히 업데이트만 수행
       const timer = setTimeout(() => {
         fetchUserData(currentUserId);
       }, 500);
-
       return () => clearTimeout(timer);
     }
   }, [view, isLoggedIn, currentUserId]);
@@ -194,20 +260,73 @@ export default function App() {
     if (!error) { setUserNickname(newNickname); alert("닉네임이 성공적으로 변경되었습니다."); }
   };
 
+// --- [수정] 초심자용 심플 로그인/회원가입 (역할 완전 분리) ---
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       if (isSignUpMode) {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: username } } });
+        // [A] 회원가입 모드: "계정 만들고 -> 데이터 넣고 -> 끝"
+        console.log("📝 회원가입 시도:", email);
+
+        // 1. 계정 생성
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { display_name: username } }
+        });
         if (error) throw error;
-        if (data?.user) await supabase.from('profiles').insert({ id: data.user.id, display_name: username, coins: 0 });
+
+        // 2. 프로필 데이터 생성 (가입 시 1회 필수)
+        if (data.user) {
+          await supabase.from('profiles').insert({
+            id: data.user.id,
+            display_name: username,
+            coins: 0
+          });
+        }
+
+        alert("가입 성공! 이제 '로그인' 해주세요.");
+        setIsSignUpMode(false); // 로그인 화면으로 자동 전환
+
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        // [B] 로그인 모드: "로그인 하고 -> 프로필 없으면 만들고 -> 끝"
+        console.log("🔑 로그인 시도:", email);
+
+        // 1. 로그인 요청
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
         if (error) throw error;
+
+        // 2. (안전장치) 프로필 없는 유령회원 방지
+        if (data.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', data.user.id)
+            .maybeSingle();
+
+          if (!profile) {
+            console.warn("⚠️ 프로필이 없어서 자동 생성합니다.");
+            await supabase.from('profiles').insert({
+              id: data.user.id,
+              display_name: 'Player', // 닉네임 몰라서 기본값
+              coins: 0
+            });
+          }
+        }
+        
+        // 성공하면 useEffect가 감지해서 자동으로 로비로 넘어감
       }
-    } catch (err: any) { alert(err.message); }
-    finally { setLoading(false); }
+    } catch (err: any) {
+      console.error("❌ 인증 에러:", err.message);
+      alert("오류: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = async () => {
@@ -219,23 +338,26 @@ export default function App() {
     } catch (error: any) { console.error("Google Login Error:", error.message); }
   };
 
-  // ------------------------------------------------------------------
-  // 🔥 [수정 핵심 3] 로그아웃 함수 로직 변경
-  // 서버 응답을 기다리기 전에 UI를 먼저 초기화(resetUserState)하여 즉각적인 반응성 확보
-  // ------------------------------------------------------------------
-  const handleLogout = async () => {
-    // 1. UI 및 로컬 상태 먼저 초기화 (사용자 경험 향상)
+
+// --- [수정] 강력한 로그아웃 (멈춤 현상 해결) ---
+  const handleLogout = () => {
+    console.log("🚪 로그아웃 버튼 클릭됨!"); // 이 로그가 찍혀야 함
+
+    // 1. 브라우저 저장소(캐시) 싹 비우기
+    localStorage.clear();
+
+    // 2. 서버에 로그아웃 요청 던지기 (응답 기다리지 않음: await 제거)
+    // 서버가 죽었든 살았든 우리는 신경 쓰지 않고 나갑니다.
+    supabase.auth.signOut().catch(err => console.warn("로그아웃 에러(무시):", err));
+
+    // 3. UI 즉시 초기화
     resetUserState();
 
-    try {
-      if (currentUserId && currentRoomId) {
-        await supabase.from('room_participants').delete().eq('room_id', currentRoomId).eq('user_id', currentUserId);
-      }
-      // 2. 그 다음 실제 서버 로그아웃 요청
-      await supabase.auth.signOut(); 
-    } catch (err) { 
-      console.error("Logout error:", err); 
-    }
+    // 4. 0.1초 뒤 강제 새로고침 (가장 확실한 방법)
+    setTimeout(() => {
+      console.log("🔄 브라우저 새로고침 실행");
+      window.location.reload();
+    }, 100);
   };
 
   const resetGameSession = () => {
