@@ -161,22 +161,25 @@ useEffect(() => {
   };
 
   // 🚀 [추가] 구글 로그인 핸들러 🚀
-  const handleGoogleLogin = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
+ const handleGoogleLogin = async () => {
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // 아이폰/모바일 환경에서 팝업 차단을 피하기 위해 리다이렉트 경로를 명시
+        redirectTo: window.location.origin, 
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
         },
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      alert("Google 로그인 에러: " + error.message);
-    }
-  };
+      },
+    });
+    if (error) throw error;
+  } catch (error: any) {
+    // 사용자가 팝업을 차단했거나 취소했을 때의 에러 처리
+    console.error("Google Login Error:", error.message);
+  }
+};
 
 const handleLogout = async () => {
   try {
