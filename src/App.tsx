@@ -192,7 +192,7 @@ const handleLogout = async () => {
     }
     
     // 2. Supabase 세션 종료
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
   } catch (err) {
     console.error("Logout error:", err);
   } finally {
