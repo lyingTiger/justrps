@@ -8,7 +8,7 @@ interface GameProps {
   onEarnCoin: () => void;
   onRoundClear: (nextRound: number) => void;
   onGameOver: (finalRound: number, entryTime: number) => void;
-  isModalOpen: boolean; // 🟠 이 줄을 반드시 추가하세요!
+  isModalOpen: boolean; 
 }
 
 export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin }: GameProps) {
@@ -16,11 +16,12 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
   const [aiSelect, setAiSelect] = useState<number[]>([]); 
   const [targetConditions, setTargetConditions] = useState<string[]>([]); 
   const [questionTurn, setQuestionTurn] = useState(0);    
-  const [solvedIndices, setSolvedIndices] = useState<number[]>([]); // 셔플용: 해결된 슬롯 인덱스
-  const [satisfiedConditions, setSatisfiedConditions] = useState<string[]>([]); // 셔플용: 해결된 조건 목록
+  const [solvedIndices, setSolvedIndices] = useState<number[]>([]); 
+  const [satisfiedConditions, setSatisfiedConditions] = useState<string[]>([]); 
   const [isMemoryPhase, setIsMemoryPhase] = useState(true); 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 라운드 초기화 및 타이머 시작
   useEffect(() => {
     const questionNum = round + 2; 
     const newAiSelect = Array.from({ length: questionNum }, () => Math.floor(Math.random() * 3));
@@ -38,12 +39,15 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
     setSolvedIndices([]);
     setSatisfiedConditions([]);
     setIsMemoryPhase(true); 
+    setPlayTime(0); // 라운드 시작 시 시간 초기화
 
+    // 기존 타이머가 있다면 제거 후 새로 시작
+    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => setPlayTime(prev => prev + 0.01), 10);
+
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [round, mode]);
 
-  // 상단/하단 카운트 UI용 헬퍼
   const getCounts = (list: string[]) => {
     const counts = { WIN: 0, DRAW: 0, LOSE: 0 };
     list.forEach(c => { if (c in counts) counts[c as keyof typeof counts]++; });
@@ -69,16 +73,25 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
 
         if (needed > current) {
           onEarnCoin();
-          setSolvedIndices(prev => [...prev, i]);
-          setSatisfiedConditions(prev => [...prev, result]);
-          if (satisfiedConditions.length + 1 === aiSelect.length) {
+          const newSolvedIndices = [...solvedIndices, i];
+          const newSatisfiedConditions = [...satisfiedConditions, result];
+          setSolvedIndices(newSolvedIndices);
+          setSatisfiedConditions(newSatisfiedConditions);
+
+          if (newSatisfiedConditions.length === aiSelect.length) {
             if (timerRef.current) clearInterval(timerRef.current);
             onRoundClear(round + 1);
           }
-          foundMatch = true; break;
+          foundMatch = true; 
+          break;
         }
       }
-      if (!foundMatch) { if (timerRef.current) clearInterval(timerRef.current); onGameOver(round, playTime); }
+      
+      // 틀렸을 때 처리
+      if (!foundMatch) { 
+        if (timerRef.current) clearInterval(timerRef.current); 
+        onGameOver(round, parseFloat(playTime.toFixed(2))); 
+      }
       return;
     }
 
@@ -86,17 +99,23 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
     const aiHand = aiSelect[questionTurn];
     const condition = targetConditions[questionTurn];
     let isCorrect = false;
+    
     if (condition === 'DRAW') isCorrect = idx === aiHand;
     else if (condition === 'WIN') isCorrect = (aiHand === 0 && idx === 1) || (aiHand === 1 && idx === 2) || (aiHand === 2 && idx === 0);
     else if (condition === 'LOSE') isCorrect = (aiHand === 0 && idx === 2) || (aiHand === 1 && idx === 0) || (aiHand === 2 && idx === 1);
 
     if (isCorrect) {
       onEarnCoin();
-      if (questionTurn + 1 === aiSelect.length) onRoundClear(round + 1);
-      else setQuestionTurn(prev => prev + 1);
+      if (questionTurn + 1 === aiSelect.length) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        onRoundClear(round + 1);
+      } else {
+        setQuestionTurn(prev => prev + 1);
+      }
     } else {
+      // 틀렸을 때 처리
       if (timerRef.current) clearInterval(timerRef.current);
-      onGameOver(round, playTime);
+      onGameOver(round, parseFloat(playTime.toFixed(2)));
     }
   };
 
