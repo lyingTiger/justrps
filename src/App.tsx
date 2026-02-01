@@ -79,9 +79,10 @@ export default function App() {
 
       // 2. 에러 발생 시 로그 출력
       if (error) {
-        console.error("❌ [Supabase 에러] 프로필 조회 실패:", error.message, error.details);
-        // RLS 문제라면 "permission denied"가 뜹니다.
-        // 데이터가 없으면 "JSON object requested, multiple (or no) rows returned"가 뜹니다.
+        console.error("❌ [Supabase 에러] 프로필 조회 실패:", error.message);
+        // 에러 발생 시에도 UI가 멈추지 않도록 기본값 설정
+        setUserNickname('Unknown User');
+        setUserCoins(0);
         return;
       }
 
@@ -170,21 +171,19 @@ export default function App() {
     return () => { subscription.unsubscribe(); };
   }, []);
 
-  // --- [보조: 뷰 변경 시 데이터 갱신] ---
-  // 로비로 돌아올 때마다 데이터를 갱신하여 코인/전적 변화 반영
-  useEffect(() => {
-    if (isLoggedIn && currentUserId && (view === 'lobby' || view === 'settings')) {
-      fetchUserData(currentUserId);
-    }
-  }, [view]); // 의존성 배열 간소화
-
   // ------------------------------------------------------------------
   // 🔥 [수정 핵심 2] 데이터 로드 트리거 최적화
   // 로그인 상태이고 뷰가 로비/설정일 때만 데이터를 가져와 중복 호출 방지
   // ------------------------------------------------------------------
+// [수정 코드] ▼ (setTimeout으로 미세한 딜레이 추가)
   useEffect(() => {
     if (isLoggedIn && currentUserId && (view === 'lobby' || view === 'settings')) {
-      fetchUserData(currentUserId);
+      // 🚀 [수정] RLS 권한 동기화 시간을 벌기 위해 0.5초 딜레이 후 데이터 요청
+      const timer = setTimeout(() => {
+        fetchUserData(currentUserId);
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
   }, [view, isLoggedIn, currentUserId]);
 
