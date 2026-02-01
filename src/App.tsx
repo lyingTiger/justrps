@@ -59,22 +59,52 @@ export default function App() {
     setIsUserMenuOpen(false);
   };
 
-  // --- [시스템: 데이터 로드] ---
+// --- [시스템: 데이터 로드 함수 개선] ---
+// --- [디버깅 강화된 데이터 로드 함수] ---
   const fetchUserData = async (userId: string) => {
+    console.log(`🚀 [1] fetchUserData 시작 - ID: ${userId}`);
+
+    if (!userId) {
+      console.error("❌ [오류] userId가 없습니다. 함수를 종료합니다.");
+      return;
+    }
+
     try {
+      // 1. 프로필 쿼리 시도
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      // 2. 에러 발생 시 로그 출력
+      if (error) {
+        console.error("❌ [Supabase 에러] 프로필 조회 실패:", error.message, error.details);
+        // RLS 문제라면 "permission denied"가 뜹니다.
+        // 데이터가 없으면 "JSON object requested, multiple (or no) rows returned"가 뜹니다.
+        return;
+      }
 
-      if (profile) {
-        setUserNickname(profile.display_name || 'Player');
-        setUserCoins(profile.coins || 0);
+      // 3. 데이터 수신 확인
+      if (!profile) {
+        console.warn("⚠️ [경고] 에러는 없지만 프로필 데이터가 null입니다. (데이터가 비어있음)");
+        return;
+      }
 
-        const { data: statsData } = await supabase.rpc('get_user_stats', { target_user_id: userId });
+      console.log("✅ [성공] 프로필 데이터를 받았습니다:", profile);
+
+      // 4. 상태 업데이트
+      setUserNickname(profile.display_name || '익명 Player');
+      setUserCoins(profile.coins || 0);
+
+      // 5. 통계 데이터 로드 시도
+      const { data: statsData, error: statsError } = await supabase.rpc('get_user_stats', { target_user_id: userId });
+      
+      if (statsError) {
+        console.error("❌ [통계 에러] get_user_stats 함수 에러:", statsError.message);
+      } else {
+        console.log("✅ [성공] 통계 데이터:", statsData);
+        
         const winRate = profile.multi_games > 0 
           ? Math.round((profile.multi_score / profile.multi_games) * 100) 
           : 0;
@@ -86,42 +116,67 @@ export default function App() {
           best_mode: statsData?.[0]?.best_mode || ''
         });
       }
-    } catch (err) {
-      console.error("Error fetching user data:", err);
+
+    } catch (err: any) {
+      console.error("❌ [치명적 에러] 코드 실행 중 예외 발생:", err.message);
     }
   };
 
-  // ------------------------------------------------------------------
-  // 🔥 [수정 핵심 1] Auth 감지 로직 강화
-  // 이벤트 타입(SIGNED_OUT)을 명시적으로 체크하여 로그아웃 타이밍을 놓치지 않도록 수정
-  // ------------------------------------------------------------------
+  // --- [수정: 로그인 및 세션 관리 로직 통합] ---
   useEffect(() => {
     document.title = "just RPS";
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // 1. 로그아웃 이벤트가 발생했거나 세션이 사라진 경우 -> 무조건 리셋
-      if (event === 'SIGNED_OUT' || !session) {
-        resetUserState();
-      } 
-      // 2. 로그인 관련 이벤트이고 세션이 있는 경우 -> 로그인 처리
-      else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session?.user) {
-        const user = session.user;
-        setCurrentUserId(user.id);
+    // 초기 세션 확인 (새로고침 시 데이터 로드 보장)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        console.log("✅ 세션 복구됨:", session.user.email);
+        setCurrentUserId(session.user.id);
         setIsLoggedIn(true);
+        fetchUserData(session.user.id); // 🔥 즉시 로드
+      }
+    });
 
-        // 프로필 체크 (신규 유저 생성 로직)
+    // Auth 상태 변경 감지 리스너
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth Event:", event); // 디버깅용 로그
+
+      if (event === 'SIGNED_OUT' || !session) {
+        resetUserState(); // 로그아웃 시 초기화
+      } 
+      else if (session?.user) {
+        // 로그인 성공 또는 토큰 갱신
+        const user = session.user;
+        
+        // 상태가 아직 업데이트 안 됐을 수 있으므로 변수값으로 직접 전달
+        if (currentUserId !== user.id) {
+            setCurrentUserId(user.id);
+            setIsLoggedIn(true);
+        }
+
+        // 프로필 확인 및 생성 로직
         const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
 
         if (!profile) {
+          // 프로필이 없으면 생성
           const displayName = user.user_metadata.display_name || user.user_metadata.full_name || user.email?.split('@')[0] || 'Player';
           await supabase.from('profiles').insert({ id: user.id, display_name: displayName, coins: 0 });
-          fetchUserData(user.id); // 신규 유저는 바로 로드
         }
+        
+        // 🔥 중요: 이벤트가 발생할 때마다 데이터 최신화 (중복 호출되어도 안전함)
+        fetchUserData(user.id);
       }
     });
 
     return () => { subscription.unsubscribe(); };
   }, []);
+
+  // --- [보조: 뷰 변경 시 데이터 갱신] ---
+  // 로비로 돌아올 때마다 데이터를 갱신하여 코인/전적 변화 반영
+  useEffect(() => {
+    if (isLoggedIn && currentUserId && (view === 'lobby' || view === 'settings')) {
+      fetchUserData(currentUserId);
+    }
+  }, [view]); // 의존성 배열 간소화
 
   // ------------------------------------------------------------------
   // 🔥 [수정 핵심 2] 데이터 로드 트리거 최적화
@@ -197,49 +252,70 @@ export default function App() {
     audio.play().catch(() => {});
   };
 
+ // --- [수정: 게임 오버 로직 개선] ---
   const handleGameOver = async (finalRound: number, entryTime: number) => {
-    if (!currentUserId) return;
-
-    const { data: record } = await supabase
-      .from('mode_records')
-      .select('*')
-      .eq('user_id', currentUserId)
-      .eq('mode', selectedOption)
-      .maybeSingle();
-
-    const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && entryTime < record.best_time);
-
+    // 1. [UI 우선] DB 조회 전에 모달부터 띄워서 사용자에게 결과를 즉시 보여줍니다.
+    // 'isNewRecord'는 일단 false로 보여주고, 아래에서 비동기로 확인 후 업데이트합니다.
     setResultData({ 
       round: finalRound, 
       time: entryTime, 
       coins: sessionCoins, 
-      isNewRecord: isNewRecord 
+      isNewRecord: false 
     });
+    setRound(finalRound); // 배경 라운드 UI 맞춤
+    setShowResultModal(true); // 🔥 모달 즉시 오픈!
 
-    setRound(finalRound);
-    setShowResultModal(true);
-
-    if (isNewRecord) {
-      await supabase.from('mode_records').upsert({ 
-        user_id: currentUserId, 
-        mode: selectedOption, 
-        best_round: finalRound, 
-        best_time: entryTime, 
-        updated_at: new Date().toISOString() 
-      }, { onConflict: 'user_id, mode' });
+    // 2. [방어 코드] 유저 ID가 없으면 DB 저장은 건너뛰되, 게임은 멈추지 않게 함
+    if (!currentUserId) {
+        console.warn("로그인 정보가 없어 기록이 저장되지 않습니다.");
+        return;
     }
 
-    await Promise.all([
-      supabase.from('game_logs').insert({ 
-        user_id: currentUserId, 
-        mode: selectedOption, 
-        reached_round: finalRound, 
-        play_time: entryTime 
-      }),
-      sessionCoins > 0 ? supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: sessionCoins }) : Promise.resolve()
-    ]);
-    
-    fetchUserData(currentUserId);
+    try {
+      // 3. [비동기] 최고 기록 확인 및 DB 저장 (백그라운드 처리)
+      const { data: record, error } = await supabase
+        .from('mode_records')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .eq('mode', selectedOption)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      // 신기록 여부 판단
+      const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && entryTime < record.best_time);
+
+      // 4. [상태 업데이트] 신기록이라면 모달 내용을 갱신해서 "NEW RECORD" 배지 표시
+      if (isNewRecord) {
+        setResultData(prev => ({ ...prev, isNewRecord: true })); // 모달이 떠 있는 상태에서 내용만 갱신됨
+        
+        await supabase.from('mode_records').upsert({ 
+          user_id: currentUserId, 
+          mode: selectedOption, 
+          best_round: finalRound, 
+          best_time: entryTime, 
+          updated_at: new Date().toISOString() 
+        }, { onConflict: 'user_id, mode' });
+      }
+
+      // 5. 로그 저장 및 코인 지급
+      await Promise.all([
+        supabase.from('game_logs').insert({ 
+          user_id: currentUserId, 
+          mode: selectedOption, 
+          reached_round: finalRound, 
+          play_time: entryTime 
+        }),
+        sessionCoins > 0 ? supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: sessionCoins }) : Promise.resolve()
+      ]);
+      
+      // 유저 데이터(코인 등) 최신화
+      fetchUserData(currentUserId);
+
+    } catch (err) {
+      console.error("게임 결과 저장 실패:", err);
+      // 에러가 나도 이미 모달은 떠 있으므로 사용자는 당황하지 않음
+    }
   };
 
   // ------------------------------------------------------------------
