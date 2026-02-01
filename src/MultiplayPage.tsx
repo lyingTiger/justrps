@@ -128,6 +128,9 @@ const handleCreateRoom = async () => {
     <div className="w-full max-w-[340px] flex flex-col items-center mt-6 px-4 animate-in fade-in relative">
       <div className="w-full flex justify-between items-end mb-6">
         <h2 className="text-4xl font-black italic uppercase tracking-tighter text-[#FF9900]">Multi</h2>
+        {/* <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 mb-1">
+           Creating: <span className="text-white">{selectedMode}</span>
+        </span> */}
         <button onClick={onBack} className="text-zinc-500 text-[10px] font-bold uppercase underline pb-1">Back</button>
       </div>
 

@@ -78,15 +78,26 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     const questionNum = round + 2;
     const newAiSelect = Array.from({ length: questionNum }, () => Math.floor(rng() * 3));
     const conditions = ['WIN', 'DRAW', 'LOSE'];
-    const newConditions = Array.from({ length: questionNum }, () => conditions[Math.floor(rng() * 3)]);
+    let newConditions: string[] = [];
+    const currentMode = roomData.mode || 'WIN MODE'; // 방어 코드
+
+    if (currentMode === 'SHUFFLE MODE' || currentMode === 'EXPERT MODE') {
+        // 셔플, 익스퍼트 모드일 때는 기존처럼 랜덤 섞기
+        newConditions = Array.from({ length: questionNum }, () => conditions[Math.floor(rng() * 3)]);
+    } else {
+        // WIN, DRAW, LOSE 모드일 때는 해당 조건으로 통일
+        // 예: "DRAW MODE" -> "DRAW"만 가득 채움
+        const target = currentMode.split(' ')[0];
+        newConditions = Array(questionNum).fill(target);
+    }
 
     setAiSelect(newAiSelect);
-    setTargetConditions(newConditions);
+    setTargetConditions(newConditions); // 생성된 조건 적용
     setQuestionTurn(0);
     setIsMemoryPhase(true);
     setIsCleared(false);
     setPlayTime(0);
-  }, [round, roomData?.seed]);
+  }, [round, roomData?.seed, roomData?.mode]);
 
   // --- 3. 로컬 타이머 및 타임아웃 감지 ---
   useEffect(() => {
