@@ -43,6 +43,22 @@ export default function App() {
   const [sessionCoins, setSessionCoins] = useState(0); 
   const CONTINUE_COST = 50;
 
+  // ------------------------------------------------------------------
+  // ✨ [신규 추가] 상태 초기화 함수 (로그아웃 시 잔여 데이터 제거용)
+  // ------------------------------------------------------------------
+  const resetUserState = () => {
+    setIsLoggedIn(false);         // 로그인 상태 해제
+    setCurrentUserId(null);       // 유저 ID 초기화
+    setCurrentRoomId(null);
+    setUserNickname('Loading...'); 
+    setUserCoins(0);
+    setStats({ total_games: 0, multi_win_rate: 0, best_rank: 0, best_mode: '' });
+    setEmail('');
+    setPassword('');
+    setView('lobby');             // 뷰를 로비로 초기화하지만 isLoggedIn이 false라 로그인창이 뜸
+    setIsUserMenuOpen(false);
+  };
+
   // --- [시스템: 데이터 로드] ---
   const fetchUserData = async (userId: string) => {
     try {
@@ -75,34 +91,48 @@ export default function App() {
     }
   };
 
+  // ------------------------------------------------------------------
+  // 🔥 [수정 핵심 1] Auth 감지 로직 강화
+  // 이벤트 타입(SIGNED_OUT)을 명시적으로 체크하여 로그아웃 타이밍을 놓치지 않도록 수정
+  // ------------------------------------------------------------------
   useEffect(() => {
     document.title = "just RPS";
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
+      // 1. 로그아웃 이벤트가 발생했거나 세션이 사라진 경우 -> 무조건 리셋
+      if (event === 'SIGNED_OUT' || !session) {
+        resetUserState();
+      } 
+      // 2. 로그인 관련 이벤트이고 세션이 있는 경우 -> 로그인 처리
+      else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session?.user) {
         const user = session.user;
+        setCurrentUserId(user.id);
+        setIsLoggedIn(true);
+
+        // 프로필 체크 (신규 유저 생성 로직)
         const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
 
         if (!profile) {
           const displayName = user.user_metadata.display_name || user.user_metadata.full_name || user.email?.split('@')[0] || 'Player';
           await supabase.from('profiles').insert({ id: user.id, display_name: displayName, coins: 0 });
+          fetchUserData(user.id); // 신규 유저는 바로 로드
         }
-
-        setCurrentUserId(user.id);
-        setIsLoggedIn(true);
-        fetchUserData(user.id); 
-      } else {
-        setIsLoggedIn(false);
-        setCurrentUserId(null);
       }
     });
+
     return () => { subscription.unsubscribe(); };
   }, []);
 
+  // ------------------------------------------------------------------
+  // 🔥 [수정 핵심 2] 데이터 로드 트리거 최적화
+  // 로그인 상태이고 뷰가 로비/설정일 때만 데이터를 가져와 중복 호출 방지
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (isLoggedIn && currentUserId && (view === 'lobby' || view === 'settings')) {
       fetchUserData(currentUserId);
     }
   }, [view, isLoggedIn, currentUserId]);
+
 
   const handleSaveNickname = async (newNickname: string) => {
     if (!currentUserId) return;
@@ -135,19 +165,22 @@ export default function App() {
     } catch (error: any) { console.error("Google Login Error:", error.message); }
   };
 
+  // ------------------------------------------------------------------
+  // 🔥 [수정 핵심 3] 로그아웃 함수 로직 변경
+  // 서버 응답을 기다리기 전에 UI를 먼저 초기화(resetUserState)하여 즉각적인 반응성 확보
+  // ------------------------------------------------------------------
   const handleLogout = async () => {
+    // 1. UI 및 로컬 상태 먼저 초기화 (사용자 경험 향상)
+    resetUserState();
+
     try {
       if (currentUserId && currentRoomId) {
         await supabase.from('room_participants').delete().eq('room_id', currentRoomId).eq('user_id', currentUserId);
       }
-      await supabase.auth.signOut({ scope: 'local' });
-    } catch (err) { console.error("Logout error:", err); }
-    finally {
-      setIsLoggedIn(false);
-      setCurrentUserId(null);
-      setCurrentRoomId(null);
-      setView('lobby');
-      localStorage.removeItem('supabase.auth.token');
+      // 2. 그 다음 실제 서버 로그아웃 요청
+      await supabase.auth.signOut(); 
+    } catch (err) { 
+      console.error("Logout error:", err); 
     }
   };
 
@@ -164,11 +197,9 @@ export default function App() {
     audio.play().catch(() => {});
   };
 
-  // --- [핵심 수정: 싱글 플레이 게임 종료 처리] ---
   const handleGameOver = async (finalRound: number, entryTime: number) => {
     if (!currentUserId) return;
 
-    // 1. 최고 기록 확인
     const { data: record } = await supabase
       .from('mode_records')
       .select('*')
@@ -178,7 +209,6 @@ export default function App() {
 
     const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && entryTime < record.best_time);
 
-    // 2. 결과 데이터 상태 업데이트 (모달에 전달될 데이터)
     setResultData({ 
       round: finalRound, 
       time: entryTime, 
@@ -186,13 +216,9 @@ export default function App() {
       isNewRecord: isNewRecord 
     });
 
-    // 3. 현재 라운드 상태 동기화 (UI 표시용)
     setRound(finalRound);
-
-    // 4. 모달 표시
     setShowResultModal(true);
 
-    // 5. DB 비동기 업데이트 (백그라운드 처리)
     if (isNewRecord) {
       await supabase.from('mode_records').upsert({ 
         user_id: currentUserId, 
@@ -213,10 +239,13 @@ export default function App() {
       sessionCoins > 0 ? supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: sessionCoins }) : Promise.resolve()
     ]);
     
-    // 코인 반영을 위해 유저 데이터 리프레시
     fetchUserData(currentUserId);
   };
 
+  // ------------------------------------------------------------------
+  // 🔥 [화면 분기] isLoggedIn이 false면 로그인 화면을 리턴
+  // resetUserState()가 호출되면 isLoggedIn이 false가 되어 이 화면이 보여야 함
+  // ------------------------------------------------------------------
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
@@ -247,6 +276,7 @@ export default function App() {
     );
   }
 
+  // --- 로그인 후 메인 화면 ---
   return (
     <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => setIsUserMenuOpen(false)}>
       <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50">
