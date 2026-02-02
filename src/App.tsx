@@ -533,7 +533,7 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
              {/* 🔥 [수정] 버튼들이 이제 handleLobbyNavigation을 통해 검문 후 이동합니다 */}
              <button onClick={() => handleLobbyNavigation('modeSelect')} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
              <button onClick={() => handleLobbyNavigation('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
-             <button onClick={() => handleLobbyNavigation('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Records</button>
+             <button onClick={() => handleLobbyNavigation('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">rank board</button>
              <button onClick={() => handleLobbyNavigation('tutorial')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Tutorial</button>
 
              <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center text-center">

@@ -64,7 +64,7 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
   return (
     <div className="w-full max-w-[360px] flex flex-col items-center mt-12 animate-in fade-in duration-700 font-sans">
       <h2 className="text-5xl font-black text-[#FF9900] italic uppercase tracking-tighter mb-10 [text-shadow:2px_2px_0_rgba(0,0,0,1)]">
-        Hall of Fame
+        rankers
       </h2>
 
       {/* 모드 선택 탭 */}
@@ -100,7 +100,7 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
               /* 🟠 [수정: 고정 비율(%) 그리드 및 스타일 적용] */
               <div 
                 key={i} 
-                className={`grid grid-cols-[12%_43%_20%_25%] py-4 items-center text-lg ${getRankStyle(i)}`}
+                className={`grid grid-cols-[12%_43%_20%_25%] py-0 items-center text-lg ${getRankStyle(i)}`}
               >
                 {/* 1. Rank: 가운데 정렬 */}
                 <span className="text-center">{i + 1}</span>

@@ -7,12 +7,15 @@ interface GameProps {
   playClickSound: () => void;
   onEarnCoin: () => void;
   onRoundClear: (nextRound: number) => void;
-  onGameOver: (finalRound: number, entryTime: number) => void;
+  onGameOver: (finalRound: number, entryTime: number) => void; // entryTime 전달 확인
   isModalOpen: boolean; 
 }
 
 export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin }: GameProps) {
   const [playTime, setPlayTime] = useState(0);      
+  // ✨ [추가] 이번 라운드에 '진입했을 때'의 시간을 기억하는 변수
+  const [entryTime, setEntryTime] = useState(0);
+
   const [aiSelect, setAiSelect] = useState<number[]>([]); 
   const [targetConditions, setTargetConditions] = useState<string[]>([]); 
   const [questionTurn, setQuestionTurn] = useState(0);    
@@ -23,6 +26,20 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
 
   // 라운드 초기화 및 타이머 시작
   useEffect(() => {
+    // -----------------------------------------------------------
+    // ✨ [수정] 시간 초기화 및 진입 시간 기록 로직
+    // -----------------------------------------------------------
+    if (round === 1) {
+      // 첫 게임 시작 시에만 시간을 0으로 리셋
+      setPlayTime(0);
+      setEntryTime(0);
+    } else {
+      // 2라운드부터는 시간을 리셋하지 않음 (누적)
+      // 대신, 현재까지 흐른 시간을 '이번 라운드 진입 시간'으로 저장
+      setEntryTime(playTime);
+    }
+    // -----------------------------------------------------------
+
     const questionNum = round + 2; 
     const newAiSelect = Array.from({ length: questionNum }, () => Math.floor(Math.random() * 3));
     setAiSelect(newAiSelect);
@@ -39,14 +56,16 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
     setSolvedIndices([]);
     setSatisfiedConditions([]);
     setIsMemoryPhase(true); 
-    setPlayTime(0); // 라운드 시작 시 시간 초기화
+    
+    // 🔥 [삭제] setPlayTime(0); <- 이 코드가 매 라운드 시간을 리셋시키고 있었음. 삭제함.
 
-    // 기존 타이머가 있다면 제거 후 새로 시작
+    // 기존 타이머가 있다면 제거 후 새로 시작 (누적된 playTime에 계속 더함)
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => setPlayTime(prev => prev + 0.01), 10);
 
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [round, mode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round, mode]); // playTime을 의존성 배열에 넣지 않음 (라운드 전환 시점의 값만 필요)
 
   const getCounts = (list: string[]) => {
     const counts = { WIN: 0, DRAW: 0, LOSE: 0 };
@@ -60,7 +79,7 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
   const handleSelect = (idx: number) => {
     playClickSound();
     
-    // [1] 셔플 모드: 전체 조건 풀 매칭 로직
+    // [1] 셔플 모드
     if (mode === 'SHUFFLE MODE') {
       let foundMatch = false;
       for (let i = 0; i < aiSelect.length; i++) {
@@ -90,12 +109,13 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
       // 틀렸을 때 처리
       if (!foundMatch) { 
         if (timerRef.current) clearInterval(timerRef.current); 
-        onGameOver(round, parseFloat(playTime.toFixed(2))); 
+        // ✨ [수정] playTime 대신 entryTime을 전달하여 '해당 라운드 진입 시간'을 기록으로 사용
+        onGameOver(round, parseFloat(entryTime.toFixed(2))); 
       }
       return;
     }
 
-    // [2] 익스퍼트 및 기타 모드: 순차적 매칭 로직
+    // [2] 익스퍼트 및 기타 모드
     const aiHand = aiSelect[questionTurn];
     const condition = targetConditions[questionTurn];
     let isCorrect = false;
@@ -115,7 +135,8 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
     } else {
       // 틀렸을 때 처리
       if (timerRef.current) clearInterval(timerRef.current);
-      onGameOver(round, parseFloat(playTime.toFixed(2)));
+      // ✨ [수정] playTime 대신 entryTime 전달
+      onGameOver(round, parseFloat(entryTime.toFixed(2)));
     }
   };
 
@@ -123,7 +144,8 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
     <div className="w-full max-w-[320px] flex flex-col min-h-[550px] justify-start py-6 animate-in fade-in duration-500">
       <div className="w-full text-left mt-0">
         <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {round}</h2>
-        <p className="text-zinc-500 text-[10px] font-mono tracking-tighter mt-0">Play Time: {playTime.toFixed(2)} sec</p>
+        {/* 화면에는 계속 흐르는 누적 시간(playTime)을 보여줌 */}
+        <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">Play Time: {playTime.toFixed(2)} sec</p>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center">
