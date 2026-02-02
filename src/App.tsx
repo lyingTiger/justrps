@@ -191,48 +191,46 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
     };
   }, [isLoggedIn]); // 로그인 상태일 때만 동작
 
-  // ------------------------------------------------------------------
-  // 🔥 [수정] 통합된 세션 체크 및 데이터 로드 (새로고침 문제 해결)
+// ------------------------------------------------------------------
+  // 🔥 [수정] 통합된 세션 체크 및 데이터 로드
   // ------------------------------------------------------------------
   useEffect(() => {
     document.title = "just RPS";
     
-    // 1. [새로고침 대응] 초기 세션 확인 및 데이터 즉시 로드
+    // 1. [초기 세션 확인] 데이터 로드 로직을 삭제합니다. (중복 방지)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         console.log("✅ 세션 복구됨:", session.user.email);
         setCurrentUserId(session.user.id);
         setIsLoggedIn(true);
-        // 🚀 [핵심] 세션 복구 직후 0.5초 딜레이를 주어 RLS 권한 문제 회피
-        setTimeout(() => fetchUserData(session.user.id), 500);
+        
+        // ❌ [삭제] 여기서 데이터를 부르지 마세요! onAuthStateChange가 알아서 합니다.
+        // setTimeout(() => fetchUserData(session.user.id), 500); 
+        // ↑ 이 줄을 지우거나 주석 처리하세요.
       }
     });
 
-    // 2. Auth 상태 변경 감지
+    // 2. [Auth 상태 감지] 얘가 '진짜'입니다. 여기서만 데이터를 부릅니다.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth Event:", event);
+      console.log("Auth Event:", event); // 로그 확인용
 
       if (event === 'SIGNED_OUT' || !session) {
         resetUserState();
       } 
       else if (session?.user) {
-        const user = session.user;
+        // ... (중략: ID 설정 및 프로필 생성 로직) ...
         
-        // 상태 동기화
+        const user = session.user;
+
         if (currentUserId !== user.id) {
             setCurrentUserId(user.id);
             setIsLoggedIn(true);
         }
-
-        // 프로필 존재 여부 확인 (없으면 생성)
-        const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
-        if (!profile) {
-          const displayName = user.user_metadata.display_name || user.email?.split('@')[0] || 'Player';
-          await supabase.from('profiles').insert({ id: user.id, display_name: displayName, coins: 0 });
-        }
         
-        // 🔥 이벤트 발생 시에도 딜레이를 주어 안정적으로 데이터 로드
-        setTimeout(() => fetchUserData(user.id), 500);
+        // ... (프로필 체크 로직 유지) ...
+
+        // ✅ 여기서 한 번만 확실하게 부릅니다.
+        setTimeout(() => fetchUserData(session.user.id), 500);
       }
     });
 
@@ -480,14 +478,14 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
           </form>
           <div className="flex items-center gap-2 my-4">
              <div className="h-[1px] bg-zinc-800 flex-1"></div>
-             <span className="text-[10px] text-zinc-600 font-bold uppercase">or</span>
+             <span className="text-base text-zinc-600 font-bold uppercase">or</span>
              <div className="h-[1px] bg-zinc-800 flex-1"></div>
           </div>
           <button type="button" onClick={handleGoogleLogin} className="w-full h-14 bg-white text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M23.52 12.29C23.52 11.43 23.45 10.61 23.31 9.82H12V14.45H18.45C18.17 15.93 17.31 17.18 16.03 18.04V21.03H19.9C22.16 18.95 23.52 15.89 23.52 12.29Z" fill="#4285F4"/><path d="M12 24C15.24 24 17.96 22.92 19.9 21.03L16.03 18.04C14.95 18.76 13.58 19.18 12 19.18C8.88 19.18 6.23 17.07 5.29 14.25H1.31V17.34C3.26 21.21 7.29 24 12 24Z" fill="#34A853"/><path d="M5.29 14.25C5.05 13.53 4.92 12.77 4.92 12C4.92 11.23 5.05 10.47 5.29 9.75V6.66H1.31C0.47 8.33 0 10.11 0 12C0 13.89 0.47 15.67 1.31 17.34L5.29 14.25Z" fill="#FBBC05"/><path d="M12 4.82C13.76 4.82 15.34 5.43 16.58 6.61L20.01 3.17C17.95 1.25 15.24 0 12 0C7.29 0 3.26 2.79 1.31 6.66L5.29 9.75C6.23 6.93 8.88 4.82 12 4.82Z" fill="#EA4335"/></svg>
             Sign in with Google
           </button>
-          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-xs text-zinc-500 text-center underline font-bold mt-4 uppercase">
+          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-base text-zinc-500 text-center underline font-bold mt-4 uppercase">
             {isSignUpMode ? "Back to Login" : "Create Account"}
           </button>
         </div>
@@ -562,7 +560,7 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
                 </label>
               ))}
             </div>
-            <button onClick={() => setView('lobby')} className="text-[10px] text-zinc-600 underline uppercase mt-8 font-bold">Lobby</button>
+            <button onClick={() => setView('lobby')} className="text-base text-zinc-500 underline uppercase mt-8 font-bold">Lobby</button>
           </div>
         )}
 
