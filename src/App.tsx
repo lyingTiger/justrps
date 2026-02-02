@@ -360,6 +360,28 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
     }, 100);
   };
 
+  // ------------------------------------------------------------------
+  // ✨ [신규] 로비 이동 전 세션 생존 확인 (좀비 세션 방지)
+  // 플레이나 랭킹 버튼을 누를 때, 실제 로그인이 유지되고 있는지 검사합니다.
+  // ------------------------------------------------------------------
+  const handleLobbyNavigation = async (targetView: 'modeSelect' | 'ranking' | 'shop' | 'tutorial') => {
+    // 1. Supabase 서버에 "나 진짜 로그인 맞아?" 하고 물어봄
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      // 2. 세션이 죽어있다면 -> 즉시 쫓아냄
+      alert("세션이 만료되었습니다. 다시 로그인해 주세요.");
+      handleLogout(); // 강제 로그아웃 및 새로고침 실행
+      return;
+    }
+
+    // 3. 세션이 살아있으면 -> 정상적으로 이동
+    if (targetView === 'modeSelect') {
+      resetGameSession(); // 게임 시작 전 상태 초기화
+    }
+    setView(targetView);
+  };
+
   const resetGameSession = () => {
     setRound(1);
     setSessionCoins(0);
@@ -509,10 +531,12 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
         {view === 'lobby' && (
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 space-y-3 px-4">
              <div className="flex gap-3 mb-12">{['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}</div>
-             <button onClick={() => { resetGameSession(); setView('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
-             <button onClick={() => setView('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
-             <button onClick={() => setView('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Records</button>
-             <button onClick={() => setView('tutorial')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Tutorial</button>
+
+             {/* 🔥 [수정] 버튼들이 이제 handleLobbyNavigation을 통해 검문 후 이동합니다 */}
+             <button onClick={() => handleLobbyNavigation('modeSelect')} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
+             <button onClick={() => handleLobbyNavigation('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
+             <button onClick={() => handleLobbyNavigation('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Records</button>
+             <button onClick={() => handleLobbyNavigation('tutorial')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Tutorial</button>
 
              <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center text-center">
                 <div className="grid grid-cols-3 w-full mb-1"><p className="text-[10px] text-zinc-500 uppercase font-bold">Total Play</p><p className="text-[10px] text-zinc-500 uppercase font-bold">Win Rate</p><p className="text-[10px] text-zinc-500 uppercase font-bold">Best Rank</p></div>
