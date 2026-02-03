@@ -131,7 +131,7 @@ const handleCreateRoom = async () => {
         {/* <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 mb-1">
            Creating: <span className="text-white">{selectedMode}</span>
         </span> */}
-        <button onClick={onBack} className="text-zinc-500 text-[10px] font-bold uppercase underline pb-1">Back to lobby</button>
+        <button onClick={onBack} className="text-zinc-500 text-[10px] font-bold uppercase underline pb-1">Back</button>
       </div>
 
       {/* 🛠️ [UI 복구] 방 생성 및 옵션 영역 🛠️ */}

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
-// 랭킹 데이터 인터페이스 (rank 추가)
+// 랭킹 데이터 인터페이스
 interface RankingRecord {
-  id: string; // 본인 확인용 ID 추가
+  id: string; 
   best_round: number;
   best_time: number;
-  rank: number; // 실제 등수
+  rank: number;
   profiles: {
     display_name: string;
   };
@@ -34,18 +34,18 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
 
   // 2. 모드가 바뀌거나 ID가 로드되면 랭킹 갱신
   useEffect(() => {
-    if (myUserId) {
-      fetchRankings();
-    }
+    // 내 ID 로드가 안 끝났어도 랭킹은 보여줘야 하므로 조건 완화
+    fetchRankings();
   }, [activeMode, myUserId]);
 
   const fetchRankings = async () => {
     setLoading(true);
     try {
-      // [Step 1] 전체 TOP 10 가져오기
+      // [Step 1] 전체 TOP 10 가져오기 (조인 문법 제거)
+      // 400 에러 해결: leaderboard 뷰에 이미 display_name이 있다고 가정하고 '*'만 조회
       const { data: top10Data, error: top10Error } = await supabase
         .from('leaderboard')
-        .select('*, profiles:display_name') // profiles 테이블의 display_name 가져오기
+        .select('*') 
         .eq('mode', activeMode)
         .order('best_round', { ascending: false })
         .order('best_time', { ascending: true })
@@ -53,31 +53,30 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
 
       if (top10Error) throw top10Error;
 
-      // 데이터 포맷팅 (순위 매기기)
+      // 데이터 포맷팅
       let formattedRankings: RankingRecord[] = (top10Data || []).map((item, index) => ({
-        id: item.id, // DB에 id 컬럼이 있다고 가정 (유저 구분용)
+        id: item.id || item.user_id, // 뷰 컬럼명에 따라 다를 수 있음 (보통 id 아니면 user_id)
         best_round: item.best_round,
         best_time: item.best_time,
-        rank: index + 1, // 1~10등
-        profiles: { display_name: item.display_name || 'Player' } // 뷰(View) 구조에 따라 수정 필요할 수 있음
-        // 만약 item.profiles.display_name 구조라면 item.profiles?.display_name || 'Player' 로 변경
+        rank: index + 1,
+        // 중요: 뷰에 있는 display_name을 바로 가져와서 구조를 맞춰줌
+        profiles: { display_name: item.display_name || 'Player' } 
       }));
 
       // [Step 2] 내가 TOP 10에 없다면? 내 등수 찾아서 붙이기
       const isMeInTop10 = formattedRankings.some(r => r.id === myUserId);
 
       if (myUserId && !isMeInTop10) {
-        // 2-1. 내 기록 가져오기
+        // 2-1. 내 기록 가져오기 (여기도 select('*')로 수정)
         const { data: myRecord } = await supabase
           .from('leaderboard')
-          .select('*, profiles:display_name')
+          .select('*')
           .eq('mode', activeMode)
           .eq('id', myUserId)
           .maybeSingle();
 
         if (myRecord) {
           // 2-2. 내 등수 계산 (나보다 잘한 사람 수 세기)
-          // 조건: (라운드가 나보다 높거나) OR (라운드는 같은데 시간이 나보다 짧은 사람)
           const { count } = await supabase
             .from('leaderboard')
             .select('*', { count: 'exact', head: true })
@@ -88,7 +87,7 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
 
           // 2-3. 리스트 끝에 추가
           formattedRankings.push({
-            id: myRecord.id,
+            id: myRecord.id || myRecord.user_id,
             best_round: myRecord.best_round,
             best_time: myRecord.best_time,
             rank: myRank,
@@ -99,16 +98,20 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
 
       setRankings(formattedRankings);
 
-    } catch (err) {
-      console.error("랭킹 로드 실패:", err);
+    } catch (err: any) {
+      console.error("랭킹 로드 실패:", err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const getRankStyle = (rank: number, isMe: boolean) => {
-    if (isMe) return "text-[#FF9900] font-black bg-zinc-800/50 rounded-lg border border-[#FF9900]/30"; // 본인 강조
-    if (rank === 1) return "text-[#FFD700] font-bold";
+const getRankStyle = (rank: number, isMe: boolean) => {
+    // 🟠 [수정] 본인 기록 색상 변경 (주황 -> 금색)
+    // text-[#FF9900] -> text-[#FFD700] (텍스트 금색)
+    // border-[#FF9900]/30 -> border-[#FFD700]/30 (테두리도 은은한 금색)
+    if (isMe) return "text-[#FFD700] font-black bg-zinc-800/50 rounded-lg border border-[#FFD700]/30"; 
+    
+    if (rank === 1) return "text-[#FFD700] font-bold"; // 1등과 같은 금색 코드 사용
     if (rank === 2) return "text-[#E2E2E2] font-bold";
     if (rank === 3) return "text-[#CD7F32] font-bold";
     return "text-zinc-500 font-normal";
@@ -151,9 +154,9 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
           ) : rankings.length > 0 ? (
             <>
               {rankings.map((res, i) => {
-                const isMe = res.id === myUserId;
-                // 본인이 10위 밖이라서 11번째로 붙은 경우, 시각적 분리선 추가 (선택사항)
-                const isFloatingUser = i === 10; 
+                // 내 아이디와 일치하는지 확인
+                const isMe = myUserId && res.id === myUserId;
+                const isFloatingUser = i === 10; // 11번째 항목은 내 기록
 
                 return (
                   <div key={i}>
@@ -161,11 +164,11 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
                         <div className="text-center text-zinc-700 text-[10px] my-1">...</div>
                     )}
                     <div 
-                      className={`grid grid-cols-[12%_43%_20%_25%] py-0 items-center text-lg transition-colors ${getRankStyle(res.rank, isMe)}`}
+                      className={`grid grid-cols-[12%_43%_20%_25%] py-0 items-center text-lg transition-colors ${getRankStyle(res.rank, !!isMe)}`}
                     >
                       <span className="text-center">{res.rank}</span>
                       <span className="text-left truncate pr-2">
-                        {res.profiles?.display_name} {isMe && "(Me)"}
+                        {res.profiles?.display_name} {isMe}
                       </span>
                       <span className="text-center">{res.best_round}R</span>
                       <span className="text-left pl-2">

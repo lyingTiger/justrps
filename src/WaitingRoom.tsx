@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface WaitingRoomProps {
   roomId: string | null;
@@ -11,19 +12,35 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
   const [roomInfo, setRoomInfo] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
   const isExiting = useRef(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  
+  // 🔄 [NEW] 실시간 데이터 비교를 위해 최신 방장 정보를 Ref에 담아둠 (클로저 문제 해결)
+  const isCreatorRef = useRef(false);
+
+  // 🔊 사운드 재생 함수
+  const playBeep = () => {
+    try {
+      const audio = new Audio('/sound/beepbeep.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(e => console.error("Sound play failed:", e));
+    } catch (err) {
+      console.error("Audio error:", err);
+    }
+  };
 
   useEffect(() => {
     if (!roomId) return;
     
-    // 유저 정보 가져오기
+    // 1. 내 정보 가져오기
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setCurrentUserId(user.id);
     };
     fetchUser();
 
-    // 참가자 목록 가져오기 (약간의 지연 처리로 DB 트리거 완료 대기)
+    // 2. 참가자 목록 가져오기
     const fetchParticipants = async () => {
       const { data } = await supabase
         .from('room_participants')
@@ -31,121 +48,300 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
         .eq('room_id', roomId)
         .order('joined_at', { ascending: true });
       
-      // 데이터가 있으면 업데이트
       if (data) setParticipants(data);
     };
 
-    // 방 정보 초기화
+    // 3. 방 정보 및 실시간 구독
     const initRoom = async () => {
       const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single();
       setRoomInfo(room);
-      // 방 정보를 가져온 후 참가자 목록 로드 (0.2초 지연)
-      setTimeout(fetchParticipants, 200); 
+      
+      // Ref 업데이트 (나중에 Presence에서 사용)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (room && user) {
+          isCreatorRef.current = (room.creator_id === user.id);
+      }
+
+      setTimeout(fetchParticipants, 200);
+
+      const channel = supabase.channel(`room_${roomId}`, {
+        config: {
+          broadcast: { self: true },
+          // 📡 [핵심] Presence 기능 활성화
+          presence: { key: user?.id }, 
+        },
+      });
+
+      channel
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload) => {
+          setRoomInfo(payload.new);
+          // 방 정보가 바뀔 때마다 내가 방장인지 Ref 업데이트
+          if (user) isCreatorRef.current = (payload.new.creator_id === user.id);
+          if (payload.new.status === 'playing') onStartGame();
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, () => {
+          if (!isExiting.current) onLeave(); 
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` }, (payload) => {
+          if (payload.eventType === 'DELETE' && payload.old.user_id === currentUserId) {
+             alert("방에서 나갔거나 추방되었습니다.");
+             onLeave();
+             return;
+          }
+          setTimeout(fetchParticipants, 100);
+        })
+        .on('broadcast', { event: 'alert_unready' }, (payload) => {
+          if (payload.payload?.targetIds?.includes(currentUserId)) {
+            playBeep();
+          }
+        })
+        // 👻 [핵심] Presence: 누군가 연결이 끊김(새로고침/탭닫기) 감지
+        .on('presence', { event: 'leave' }, async ({ leftPresences }) => {
+            // 내가 방장(Host)일 때만 청소부 역할을 수행함 (중복 삭제 방지)
+            if (isCreatorRef.current) {
+                for (const leftUser of leftPresences) {
+                    // console.log("유령 유저 감지됨, 삭제 시도:", leftUser.user_id);
+                    await supabase
+                        .from('room_participants')
+                        .delete()
+                        .eq('room_id', roomId)
+                        .eq('user_id', leftUser.user_id);
+                }
+            }
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+             channelRef.current = channel;
+             // ✅ 구독 완료 시 "나 여기 있어(Track)" 신호 보냄
+             if (user) {
+                 await channel.track({ user_id: user.id, online_at: new Date().toISOString() });
+             }
+          }
+        });
     };
 
     initRoom();
 
-    // 🚀 [실시간 구독]
-    const channel = supabase.channel(`room_${roomId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload) => {
-        setRoomInfo(payload.new);
-        if (payload.new.status === 'playing') onStartGame();
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, () => {
-        // 누군가 방을 삭제했거나(오류 등), 방장이 나가서 방이 터진 경우 로비로 이동
-        if (!isExiting.current) onLeave(); 
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` }, () => {
-        // 참가자가 들어오거나 나갈 때 목록 갱신 (0.1초 지연)
-        setTimeout(fetchParticipants, 100);
-      })
-      .subscribe();
-
-    // ✨ [수정된 클린업] ✨
-    return () => {
-      // ⚠️ React Strict Mode 때문에 여기서 자동으로 나가기(delete)를 하면 안 됩니다!
-      // 오직 채널 구독만 해제합니다.
-      supabase.removeChannel(channel);
+// 🛡️ [보너스] 새로고침 시 최대한 빨리 삭제 요청을 보내는 브라우저 이벤트
+    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+        // 비동기지만 요청을 던져두고 브라우저가 닫히길 기대함
+        if (currentUserId && roomId) {
+            await supabase.from('room_participants').delete().eq('room_id', roomId).eq('user_id', currentUserId);
+        }
     };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, onLeave, onStartGame]);
 
-  // 🚪 [수동 퇴장] 버튼 클릭 시에만 실행
+  
+
+  // 🚪 [퇴장/나가기]
   const handleManualExit = async () => {
     if (isExiting.current || !currentUserId || !roomId) return;
-    isExiting.current = true; // 중복 클릭 방지
+    isExiting.current = true;
     
     try {
-      // 🚀 [단순화] 참가자 명단에서 나를 지우기만 하면 됩니다.
-      // (DB 트리거가 인원수 감소, 방장 위임, 빈 방 삭제를 자동으로 처리합니다)
       await supabase.from('room_participants')
         .delete()
         .eq('room_id', roomId)
         .eq('user_id', currentUserId);
-        
     } catch (error) {
-      console.error("퇴장 처리 중 오류:", error);
+      console.error("퇴장 에러:", error);
     } finally {
-      onLeave(); // 로비 화면으로 이동
+      onLeave();
     }
   };
 
+  // 🦵 [강퇴 기능] 방장 전용
+  const handleKickUser = async (targetUserId: string) => {
+    if (!confirm("이 플레이어를 내보내시겠습니까?\n(재입장이 불가능합니다)")) return;
+
+    try {
+      // 1. Ban 리스트에 추가 (재입장 불가 처리)
+      await supabase.from('room_bans').insert({
+        room_id: roomId,
+        user_id: targetUserId
+      });
+
+      // 2. 참가자 목록에서 삭제 (강제 퇴장)
+      await supabase.from('room_participants')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('user_id', targetUserId);
+        
+    } catch (err) {
+      console.error("강퇴 실패:", err);
+      alert("강퇴 처리 중 오류가 발생했습니다.");
+    }
+  };
+
+  // ✅ [준비/취소] 일반 참가자 전용
+  const handleToggleReady = async () => {
+    if (!currentUserId || !roomId) return;
+    
+    // 현재 내 상태 찾기
+    const me = participants.find(p => p.user_id === currentUserId);
+    if (!me) return;
+
+    // 상태 토글 DB 업데이트
+    await supabase.from('room_participants')
+      .update({ is_ready: !me.is_ready })
+      .eq('room_id', roomId)
+      .eq('user_id', currentUserId);
+  };
+
+  // 🎮 [게임 시작] 방장 전용
   const handleStart = async () => {
-    if (!roomId) return;
+    if (!roomId || !channelRef.current) return;
+
+    // 1. 준비 안 된 사람 찾기 (방장 제외)
+    const unreadyUsers = participants.filter(p => p.user_id !== roomInfo.creator_id && !p.is_ready);
+
+    // 2. 준비 안 된 사람이 있다면 -> 경고음 발사
+    if (unreadyUsers.length > 0) {
+      const targetIds = unreadyUsers.map(p => p.user_id);
+      
+      // 나 자신(방장)에게도 알림용으로 소리 재생 (선택사항, 필요 없으면 삭제 가능)
+      // playBeep(); 
+
+      // 해당 유저들에게 브로드캐스트 전송
+      await channelRef.current.send({
+        type: 'broadcast',
+        event: 'alert_unready',
+        payload: { targetIds }
+      });
+      return; // 시작하지 않음
+    }
+
+    // 3. 모두 준비됨 -> 게임 시작 상태 변경
     await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId);
   };
 
-  // 현재 내가 방장인지 확인 (참가자 리스트가 로딩 중일 때도 creator_id로 1차 확인)
   const isCreator = roomInfo?.creator_id === currentUserId;
 
+  // [정렬 로직] 방장 1순위, 나머지 입장순
+  const sortedParticipants = [...participants].sort((a, b) => {
+    if (a.user_id === roomInfo?.creator_id) return -1;
+    if (b.user_id === roomInfo?.creator_id) return 1;
+    return 0;
+  });
+
   return (
-    <div className="w-full max-w-[340px] flex flex-col items-center py-10 px-4 animate-in fade-in">
-      <div className="text-center mb-10">
-        <h2 className="text-4xl font-black italic uppercase tracking-tighter text-[#FF9900] leading-none mb-2">Lobby</h2>
-        <p className="text-zinc-500 text-[10px] font-black uppercase italic">{roomInfo?.name || 'Loading...'}</p>
+    <div className="w-full max-w-[340px] flex flex-col items-center py-10 px-4 animate-in fade-in select-none">
+      {/* 1. 상단: 방 이름 */}
+      <div className="w-full text-center mb-8 px-4">
+        <h2 className="text-4xl font-black italic uppercase tracking-tighter text-[#FF9900] leading-tight truncate overflow-hidden whitespace-nowrap" title={roomInfo?.name}>
+          {roomInfo?.name || 'Loading...'}
+        </h2>
+        <p className="text-zinc-500 text-[10px] font-bold uppercase mt-2">
+          {participants.length} / {roomInfo?.max_players || 2} Players
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 w-full mb-12">
-        {[...Array(roomInfo?.max_players || 2)].map((_, i) => {
-          const p = participants[i];
-          
-          // 🚀 [UI 보정] 데이터가 로딩 중이어도 내가 방장이면 첫 칸에 내 모습 미리 보여주기 (Blinking 방지)
-          // 참가자 목록이 비어있고(로딩중), 내가 방장이고, 첫 번째 칸(i===0)이라면 나라고 가정함
-          const isTemporaryMe = i === 0 && participants.length === 0 && isCreator;
-          
-          const displayUser = p || (isTemporaryMe ? { user_id: currentUserId, profiles: { display_name: 'Me' } } : null);
-          const isHostUser = roomInfo?.creator_id === displayUser?.user_id;
+      {/* 2. 중단: 참가자 리스트 */}
+      <div className="w-full flex flex-col gap-3 mb-12 min-h-[240px]">
+        {sortedParticipants.length > 0 ? (
+          sortedParticipants.map((p) => {
+            const isHost = p.user_id === roomInfo?.creator_id;
+            const isMe = p.user_id === currentUserId;
+            // 준비 완료 여부 (방장은 항상 준비된 것으로 간주)
+            const isReady = isHost || p.is_ready; 
 
-          return (
-            <div key={i} className={`aspect-square rounded-[40px] border-2 flex flex-col items-center justify-center p-5 transition-all 
-                ${displayUser ? (isHostUser ? 'bg-zinc-900 border-[#FF9900]' : 'bg-zinc-900 border-zinc-700') : 'bg-transparent border-zinc-800 border-dashed opacity-30'}`}>
-              {displayUser ? (
-                <>
-                  <div className={`w-14 h-14 rounded-2xl mb-3 flex items-center justify-center border font-black text-xl italic ${isHostUser ? 'bg-zinc-800 border-[#FF9900] text-[#FF9900]' : 'bg-zinc-700 border-zinc-600 text-zinc-400'}`}>
-                    {displayUser.profiles?.display_name?.[0] || '?'}
-                  </div>
-                  <span className="text-[11px] font-black text-white tracking-tighter line-clamp-1">{displayUser.profiles?.display_name}</span>
-                  <span className={`text-[8px] font-bold uppercase mt-1 px-2 py-0.5 rounded-full ${isHostUser ? 'bg-[#FF9900] text-black' : 'text-zinc-500'}`}>
-                    {isHostUser ? 'Host' : 'Ready'}
-                  </span>
-                </>
-              ) : (
-                <span className="text-[9px] text-zinc-800 font-bold uppercase">Waiting</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            return (
+              <div 
+                key={p.user_id} 
+                className={`relative w-full flex items-center px-5 py-4 rounded-2xl border transition-all duration-300
+                  ${isMe ? 'bg-zinc-800' : 'bg-zinc-900'}
+                  ${isReady 
+                    ? (isHost ? 'border-[#FF9900]/50 shadow-[0_0_15px_rgba(255,153,0,0.1)]' : 'border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.1)]') 
+                    : 'border-zinc-800 opacity-80'}
+                `}
+              >
+                {/* 2-1. 역할/준비 배지 */}
+                <span className={`text-[9px] font-black uppercase tracking-wider mr-3 w-12 text-center py-1 rounded-md transition-colors
+                  ${isHost 
+                    ? 'bg-[#FF9900] text-black' 
+                    : (isReady ? 'bg-green-600 text-white' : 'bg-zinc-700 text-zinc-400')}`}>
+                  {isHost ? 'Host' : (isReady ? 'Ready' : 'Wait')}
+                </span>
 
-      <div className="w-full space-y-3">
-        {isCreator ? (
-          // 방장: 시작 버튼 활성화 (2명 이상일 때만)
-          // 테스트를 위해 혼자서도 시작하고 싶다면 disabled 조건을 (participants.length < 1)로 바꾸세요.
-          <button onClick={handleStart} disabled={participants.length < 2} className="w-full h-16 bg-white text-black font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 disabled:opacity-30 disabled:active:scale-100 transition-all">Start Game</button>
+                {/* 2-2. 닉네임 */}
+                <span className={`text-sm font-bold truncate flex-1 mr-2 ${isMe ? 'text-white' : 'text-zinc-400'}`}>
+                  {p.profiles?.display_name || 'Unknown'} 
+                </span>
+
+                {/* 2-3. 상태 아이콘 (호스트는 펄스, 게스트는 레디 시 초록불) */}
+                <div className={`w-2 h-2 rounded-full mr-2 transition-colors
+                   ${isHost 
+                     ? 'bg-[#FF9900] animate-pulse' 
+                     : (isReady ? 'bg-green-500 shadow-[0_0_5px_#22c55e]' : 'bg-zinc-700')}`} 
+                ></div>
+
+                {/* 2-4. [NEW] 강퇴 버튼 (방장만 보임, 본인 제외) */}
+                {isCreator && !isHost && (
+                  <button 
+                    onClick={() => handleKickUser(p.user_id)}
+                    className="w-6 h-6 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-red-900/80 text-zinc-600 hover:text-red-500 transition-colors ml-1"
+                    title="Kick user"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            );
+          })
         ) : (
-          // 일반 참가자: 대기 메시지
-          <div className="w-full h-16 flex items-center justify-center bg-zinc-900 rounded-2xl text-zinc-500 font-black uppercase italic border border-zinc-800 animate-pulse">Wait for Host</div>
+          <div className="w-full h-14 bg-zinc-900/50 rounded-2xl animate-pulse"></div>
         )}
-        <button onClick={handleManualExit} className="w-full h-12 text-zinc-600 font-bold uppercase tracking-widest text-[10px] hover:text-[#FF9900] transition-colors">Exit Lobby</button>
+
+        {/* 빈 슬롯 표시 */}
+        {[...Array(Math.max(0, (roomInfo?.max_players || 2) - participants.length))].map((_, i) => (
+          <div key={`empty-${i}`} className="w-full h-[58px] rounded-2xl border border-dashed border-zinc-800 flex items-center justify-center opacity-30">
+            <span className="text-[10px] uppercase font-bold text-zinc-600">Waiting...</span>
+          </div>
+        ))}
+      </div>
+
+      {/* 3. 하단: 버튼 영역 */}
+      <div className="w-full space-y-3 mt-auto">
+        {isCreator ? (
+          // --- [방장] Start Game 버튼 ---
+          <button 
+            onClick={handleStart} 
+            // 방장은 2명 이상일 때 항상 누를 수 있음 (누르면 준비 안 된 사람 체크)
+            disabled={participants.length < 2} 
+            className="w-full h-16 bg-white text-black font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 disabled:opacity-30 disabled:active:scale-100 transition-all hover:bg-gray-100"
+          >
+            Start Game
+          </button>
+        ) : (
+          // --- [게스트] Ready 버튼 ---
+          <button 
+            onClick={handleToggleReady}
+            className={`w-full h-16 font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 transition-all
+              ${participants.find(p => p.user_id === currentUserId)?.is_ready 
+                ? 'bg-green-600 text-white hover:bg-green-500' // 준비 완료 상태
+                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' // 준비 안 된 상태
+              }`}
+          >
+            {participants.find(p => p.user_id === currentUserId)?.is_ready ? 'Ready!' : 'Ready?'}
+          </button>
+        )}
+        
+        <button 
+          onClick={handleManualExit} 
+          className="w-full h-12 text-zinc-600 font-bold uppercase tracking-widest text-[14px] hover:text-[#FF9900] transition-colors"
+        >
+          Exit
+        </button>
       </div>
     </div>
   );

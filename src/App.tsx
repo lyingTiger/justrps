@@ -560,7 +560,7 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
                 </label>
               ))}
             </div>
-            <button onClick={() => setView('lobby')} className="text-base text-zinc-500 underline uppercase mt-8 font-bold">Lobby</button>
+            <button onClick={() => setView('lobby')} className="text-base text-zinc-500 underline uppercase mt-8 font-bold">Main</button>
           </div>
         )}
 
