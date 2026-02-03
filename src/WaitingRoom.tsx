@@ -139,7 +139,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, onLeave, onStartGame]);
 
-  
+
 
   // 🚪 [퇴장/나가기]
   const handleManualExit = async () => {
@@ -196,31 +196,28 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
       .eq('user_id', currentUserId);
   };
 
-  // 🎮 [게임 시작] 방장 전용
+// 🎮 [게임 시작] 방장 전용 (수정됨: 시드 랜덤화 추가)
   const handleStart = async () => {
     if (!roomId || !channelRef.current) return;
 
-    // 1. 준비 안 된 사람 찾기 (방장 제외)
+    // 1. 준비 안 된 사람 찾기 (기존 로직 유지)
     const unreadyUsers = participants.filter(p => p.user_id !== roomInfo.creator_id && !p.is_ready);
-
-    // 2. 준비 안 된 사람이 있다면 -> 경고음 발사
     if (unreadyUsers.length > 0) {
       const targetIds = unreadyUsers.map(p => p.user_id);
-      
-      // 나 자신(방장)에게도 알림용으로 소리 재생 (선택사항, 필요 없으면 삭제 가능)
-      // playBeep(); 
-
-      // 해당 유저들에게 브로드캐스트 전송
       await channelRef.current.send({
         type: 'broadcast',
         event: 'alert_unready',
         payload: { targetIds }
       });
-      return; // 시작하지 않음
+      return; 
     }
 
-    // 3. 모두 준비됨 -> 게임 시작 상태 변경
-    await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId);
+    // 2. 모두 준비됨 -> 게임 시작 상태 변경 + 🔥[핵심] 시드 랜덤 변경
+    // seed에 Math.random()을 넣어 매 판마다 문제가 달라지게 함
+    await supabase.from('rooms').update({ 
+        status: 'playing',
+        seed: Math.random() 
+    }).eq('id', roomId);
   };
 
   const isCreator = roomInfo?.creator_id === currentUserId;
