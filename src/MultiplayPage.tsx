@@ -36,7 +36,7 @@ const fetchRooms = async () => {
   const { data } = await supabase
     .from('rooms')
     .select('*')
-    .eq('status', 'waiting')
+    .in('status', ['waiting', 'playing'])
     // .gt('current_players', 0) // 👈 이 줄이 있으면 인원수 갱신 전까지 방이 안 보입니다. 과감히 지우세요!
     .order('created_at', { ascending: false });
   if (data) setRooms(data);
@@ -173,7 +173,7 @@ const handleCreateRoom = async () => {
         </button>
       </div>
 
-      {/* 🛠️ [UI 복구] 방 목록 영역 🛠️ */}
+    {/* 🛠️ [UI 복구] 방 목록 영역 (뱃지 추가됨) 🛠️ */}
       <div className="w-full flex flex-col gap-2">
         <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1 ml-2">Active Rooms</h3>
         <div className="w-full h-[220px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
@@ -186,13 +186,24 @@ const handleCreateRoom = async () => {
               <div key={room.id} onClick={() => handleJoinAttempt(room)} className="w-full p-4 bg-zinc-900 border border-zinc-800 rounded-[24px] flex justify-between items-center cursor-pointer hover:border-[#FF9900] group transition-all active:scale-[0.98]">
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    {/* 대소문자 그대로 출력 */}
+                    {/* 방 이름 */}
                     <span className="font-black text-sm italic text-white group-hover:text-[#FF9900]">{room.name}</span>
                     {room.password && <span className="text-[10px] opacity-40">🔒</span>}
                   </div>
                   <span className="text-[9px] text-zinc-600 font-black uppercase tracking-tighter">{room.mode}</span>
                 </div>
-                <div className="text-right">
+                
+                {/* 🔥 [수정됨] 우측 영역: 상태 뱃지 + 인원수 */}
+                <div className="flex flex-col items-end gap-1">
+                  {room.status === 'playing' ? (
+                    <span className="text-[8px] font-black text-red-500 border border-red-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider animate-pulse">
+                      Playing
+                    </span>
+                  ) : (
+                    <span className="text-[8px] font-black text-green-500 border border-green-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                      Waiting
+                    </span>
+                  )}
                   <span className="text-[#FF9900] font-mono font-black text-sm italic">{room.current_players}/{room.max_players}</span>
                 </div>
               </div>

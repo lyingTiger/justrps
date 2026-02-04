@@ -12,35 +12,42 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
   const [roomInfo, setRoomInfo] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // 🔥 [추가] 강퇴 대상 ID 저장용 (null이면 모달 닫힘)
+  const [kickTargetId, setKickTargetId] = useState<string | null>(null);
+
+  // 🔥 [추가] 실시간 구독 함수 안에서 내 아이디를 정확히 알기 위한 Ref
+  const userIdRef = useRef<string | null>(null);
   
   const isExiting = useRef(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  
-  // 🔄 [NEW] 실시간 데이터 비교를 위해 최신 방장 정보를 Ref에 담아둠 (클로저 문제 해결)
   const isCreatorRef = useRef(false);
 
-  // 🔊 사운드 재생 함수
+  // 🔊 효과음 (비프음)
   const playBeep = () => {
     try {
       const audio = new Audio('/sound/beepbeep.mp3');
       audio.volume = 0.5;
       audio.play().catch(e => console.error("Sound play failed:", e));
-    } catch (err) {
-      console.error("Audio error:", err);
-    }
+      console.log("Beep!")
+    } catch (err) { console.error(err); }
   };
 
   useEffect(() => {
     if (!roomId) return;
     
-    // 1. 내 정보 가져오기
+// 1. 내 정보 및 초기 설정
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setCurrentUserId(user.id);
+      
+      // user가 null이 아닐 때만 실행
+      if (user) {
+          setCurrentUserId(user.id);
+          userIdRef.current = user.id; 
+      }
     };
     fetchUser();
 
-    // 2. 참가자 목록 가져오기
+    // 2. 데이터 가져오기 (참가자들의 current_round 포함)
     const fetchParticipants = async () => {
       const { data } = await supabase
         .from('room_participants')
@@ -51,12 +58,10 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
       if (data) setParticipants(data);
     };
 
-    // 3. 방 정보 및 실시간 구독
     const initRoom = async () => {
       const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single();
       setRoomInfo(room);
       
-      // Ref 업데이트 (나중에 Presence에서 사용)
       const { data: { user } } = await supabase.auth.getUser();
       if (room && user) {
           isCreatorRef.current = (room.creator_id === user.id);
@@ -64,55 +69,58 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
       setTimeout(fetchParticipants, 200);
 
+      // 3. 실시간 구독
       const channel = supabase.channel(`room_${roomId}`, {
         config: {
           broadcast: { self: true },
-          // 📡 [핵심] Presence 기능 활성화
           presence: { key: user?.id }, 
         },
       });
 
       channel
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload) => {
-          setRoomInfo(payload.new);
-          // 방 정보가 바뀔 때마다 내가 방장인지 Ref 업데이트
-          if (user) isCreatorRef.current = (payload.new.creator_id === user.id);
-          if (payload.new.status === 'playing') onStartGame();
-        })
-        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, () => {
-          if (!isExiting.current) onLeave(); 
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` }, (payload) => {
-          if (payload.eventType === 'DELETE' && payload.old.user_id === currentUserId) {
-             alert("방에서 나갔거나 추방되었습니다.");
-             onLeave();
-             return;
+        // 🔥 [수정] 참가자 변경 감지 (강퇴 당했을 때 나가는 로직 강화)
+       // 🔥 [수정] 필터(filter)를 제거하여 DELETE 이벤트를 확실하게 수신함
+        // 🔥 [수정] TypeScript 에러 해결을 위해 타입 단언(as any) 추가
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants' }, (payload) => {
+          
+          console.log('Realtime Event:', payload);
+
+          // TS 에러 해결: payload.new와 payload.old를 any로 캐스팅하여 속성 접근 허용
+          const newRecord = payload.new as any;
+          const oldRecord = payload.old as any;
+
+          // 1. 내 방에서 일어난 일이 아니면 무시
+          const eventRoomId = newRecord?.room_id || oldRecord?.room_id;
+          
+          // 방 ID가 다르면 무시 (단, 삭제 이벤트는 oldRecord에 room_id가 없을 수도 있으므로 주의 필요하지만, 
+          // replica identity full 설정을 했다면 들어옵니다.)
+          if (eventRoomId && eventRoomId !== roomId) return;
+
+          // 2. 삭제(DELETE) 이벤트이고, 삭제된 사람이 '나(Ref)'라면? -> 즉시 퇴장
+          if (payload.eventType === 'DELETE' && oldRecord.user_id === userIdRef.current) {
+             alert("방장에 의해 강퇴되었습니다."); 
+             onLeave(); 
+             return; 
           }
-          setTimeout(fetchParticipants, 100);
+          
+          // 3. 그 외(다른 사람이 들어오거나 나감) -> 리스트 갱신
+          fetchParticipants();
         })
         .on('broadcast', { event: 'alert_unready' }, (payload) => {
           if (payload.payload?.targetIds?.includes(currentUserId)) {
             playBeep();
           }
         })
-        // 👻 [핵심] Presence: 누군가 연결이 끊김(새로고침/탭닫기) 감지
         .on('presence', { event: 'leave' }, async ({ leftPresences }) => {
-            // 내가 방장(Host)일 때만 청소부 역할을 수행함 (중복 삭제 방지)
             if (isCreatorRef.current) {
                 for (const leftUser of leftPresences) {
-                    // console.log("유령 유저 감지됨, 삭제 시도:", leftUser.user_id);
-                    await supabase
-                        .from('room_participants')
-                        .delete()
-                        .eq('room_id', roomId)
-                        .eq('user_id', leftUser.user_id);
+                    await supabase.from('room_participants').delete().eq('room_id', roomId).eq('user_id', leftUser.user_id);
                 }
             }
         })
         .subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
              channelRef.current = channel;
-             // ✅ 구독 완료 시 "나 여기 있어(Track)" 신호 보냄
              if (user) {
                  await channel.track({ user_id: user.id, online_at: new Date().toISOString() });
              }
@@ -121,13 +129,34 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
     };
 
     initRoom();
-
-// 🛡️ [보너스] 새로고침 시 최대한 빨리 삭제 요청을 보내는 브라우저 이벤트
+    
+    // 🛡️ [수정 1] 강력한 유령 방 방지 (새로고침/닫기 시 삭제)
     const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
-        e.preventDefault();
-        // 비동기지만 요청을 던져두고 브라우저가 닫히길 기대함
+        // 표준 경고 메시지 (브라우저 정책상 커스텀 메시지는 무시됨)
+        e.preventDefault(); 
+        
         if (currentUserId && roomId) {
-            await supabase.from('room_participants').delete().eq('room_id', roomId).eq('user_id', currentUserId);
+            // 내가 방장이고(isCreatorRef) + 나 혼자만 남았다면(participants.length <= 1) -> 방 폭파
+            // 주의: participants 상태는 클로저 때문에 최신이 아닐 수 있으므로 안전하게 조건 없이
+            // "내가 방장이면 방 삭제 시도" 로직을 넣되, 트리거가 없다면 최선은 '참가자 삭제'임.
+            // 여기서는 "방장이고 혼자"라는 가정하에 방 삭제를 요청함.
+            
+            if (isCreatorRef.current) {
+                // 혼자 남은 상태에서 나가면 방 삭제
+                const { count } = await supabase.from('room_participants')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('room_id', roomId);
+                
+                if (count !== null && count <= 1) {
+                    await supabase.from('rooms').delete().eq('id', roomId);
+                } else {
+                    // 남은 사람이 있으면 방장 권한 위임 로직이 필요하나, 일단 나만 나감
+                    await supabase.from('room_participants').delete().eq('room_id', roomId).eq('user_id', currentUserId);
+                }
+            } else {
+                // 방장이 아니면 그냥 나감
+                await supabase.from('room_participants').delete().eq('room_id', roomId).eq('user_id', currentUserId);
+            }
         }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -139,208 +168,236 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, onLeave, onStartGame]);
 
-
-
-  // 🚪 [퇴장/나가기]
+  // --- 핸들러 함수들 ---
   const handleManualExit = async () => {
-    if (isExiting.current || !currentUserId || !roomId) return;
     isExiting.current = true;
+    if (currentUserId && roomId) {
+       // 내가 방장이고 혼자면 방 삭제
+       if (isCreator && participants.length <= 1) {
+           await supabase.from('rooms').delete().eq('id', roomId);
+       } else {
+           await supabase.from('room_participants').delete().eq('room_id', roomId).eq('user_id', currentUserId);
+       }
+    }
+    onLeave();
+  };
+
+// 1. 강퇴 버튼 클릭 시 -> 모달만 띄움
+  const openKickModal = (targetUserId: string) => {
+    setKickTargetId(targetUserId);
+  };
+
+  // 2. 모달에서 'Confirm' 클릭 시 -> 진짜 강퇴 실행
+  const executeKick = async () => {
+    if (!roomId || !kickTargetId) return;
     
-    try {
-      await supabase.from('room_participants')
-        .delete()
-        .eq('room_id', roomId)
-        .eq('user_id', currentUserId);
-    } catch (error) {
-      console.error("퇴장 에러:", error);
-    } finally {
-      onLeave();
+    const { error } = await supabase
+      .from('room_participants')
+      .delete()
+      .eq('room_id', roomId)
+      .eq('user_id', kickTargetId);
+
+    if (error) {
+        console.error("Kick failed:", error);
+        alert("강퇴에 실패했습니다. (DB 권한 확인 필요)");
     }
+    
+    // 모달 닫기 및 타겟 초기화
+    setKickTargetId(null);
   };
 
-  // 🦵 [강퇴 기능] 방장 전용
-  const handleKickUser = async (targetUserId: string) => {
-    if (!confirm("이 플레이어를 내보내시겠습니까?\n(재입장이 불가능합니다)")) return;
-
-    try {
-      // 1. Ban 리스트에 추가 (재입장 불가 처리)
-      await supabase.from('room_bans').insert({
-        room_id: roomId,
-        user_id: targetUserId
-      });
-
-      // 2. 참가자 목록에서 삭제 (강제 퇴장)
-      await supabase.from('room_participants')
-        .delete()
-        .eq('room_id', roomId)
-        .eq('user_id', targetUserId);
-        
-    } catch (err) {
-      console.error("강퇴 실패:", err);
-      alert("강퇴 처리 중 오류가 발생했습니다.");
-    }
-  };
-
-  // ✅ [준비/취소] 일반 참가자 전용
   const handleToggleReady = async () => {
     if (!currentUserId || !roomId) return;
-    
-    // 현재 내 상태 찾기
     const me = participants.find(p => p.user_id === currentUserId);
     if (!me) return;
 
-    // 상태 토글 DB 업데이트
     await supabase.from('room_participants')
       .update({ is_ready: !me.is_ready })
-      .eq('room_id', roomId)
-      .eq('user_id', currentUserId);
+      .eq('room_id', roomId).eq('user_id', currentUserId);
   };
 
-// 🎮 [게임 시작] 방장 전용 (수정됨: 시드 랜덤화 추가)
-const handleStart = async () => {
+    const handleStart = async () => {
     if (!roomId || !channelRef.current) return;
 
+    // 1. 준비 안 된 사람 찾기 (방장 제외)
     const unreadyUsers = participants.filter(p => p.user_id !== roomInfo.creator_id && !p.is_ready);
+    
+    // 2. 안 된 사람이 한 명이라도 있으면 -> 경고 신호(broadcast) 발송 후 함수 종료(return)
     if (unreadyUsers.length > 0) {
       const targetIds = unreadyUsers.map(p => p.user_id);
       await channelRef.current.send({
         type: 'broadcast',
         event: 'alert_unready',
-        payload: { targetIds }
+        payload: { targetIds } // 누구한테 울릴지 명단 전송
       });
-      return; 
+      return; // ⛔ 여기서 멈추므로 게임이 시작되지 않고 경고만 날아갑니다.
     }
 
-    // 🔥 [수정] 시드를 0~1 사이 소수가 아니라, 1~10000 사이의 '큰 정수'로 생성
-    // DB 컬럼이 int여도 랜덤성이 보장되도록 함
+    // 3. 모두 준비되었으면 -> 게임 시작 & 시드 변경
     const randomSeed = Math.floor(Math.random() * 10000); 
-
-    await supabase.from('rooms').update({ 
-        status: 'playing',
-        seed: randomSeed 
-    }).eq('id', roomId);
+    await supabase.from('rooms').update({ status: 'playing', seed: randomSeed }).eq('id', roomId);
   };
 
+  // --- 렌더링 준비 ---
   const isCreator = roomInfo?.creator_id === currentUserId;
-
-  // [정렬 로직] 방장 1순위, 나머지 입장순
-  const sortedParticipants = [...participants].sort((a, b) => {
-    if (a.user_id === roomInfo?.creator_id) return -1;
-    if (b.user_id === roomInfo?.creator_id) return 1;
-    return 0;
-  });
+  // 방장 제외 전원 레디 상태인지 확인
+  const isAllReady = participants.length > 1 && participants.every(p => p.user_id === roomInfo?.creator_id || p.is_ready);
+  const myInfo = participants.find(p => p.user_id === currentUserId);
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col items-center py-10 px-4 animate-in fade-in select-none">
-      {/* 1. 상단: 방 이름 */}
-      <div className="w-full text-center mb-8 px-4">
-        <h2 className="text-4xl font-black italic uppercase tracking-tighter text-[#FF9900] leading-tight truncate overflow-hidden whitespace-nowrap" title={roomInfo?.name}>
-          {roomInfo?.name || 'Loading...'}
-        </h2>
-        <p className="text-zinc-500 text-[10px] font-bold uppercase mt-2">
-          {participants.length} / {roomInfo?.max_players || 2} Players
-        </p>
+    <div className="w-full max-w-[340px] flex flex-col items-center mt-6 px-4 animate-in fade-in select-none">
+      {/* 상단: 방 정보 */}
+      <div className="w-full flex justify-between items-end mb-6">
+        <div>
+           <h2 className="text-3xl font-black italic uppercase tracking-tighter text-white leading-none">
+             {roomInfo?.name || "Loading..."}
+           </h2>
+           <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
+             Code: <span className="text-[#FF9900] select-text">{roomId?.slice(0,4).toUpperCase()}</span>
+           </p>
+        </div>
+        <button onClick={handleManualExit} className="text-zinc-500 text-[10px] font-bold uppercase underline pb-1 hover:text-white">
+          Leave
+        </button>
       </div>
 
-      {/* 2. 중단: 참가자 리스트 */}
-      <div className="w-full flex flex-col gap-3 mb-12 min-h-[240px]">
-        {sortedParticipants.length > 0 ? (
-          sortedParticipants.map((p) => {
-            const isHost = p.user_id === roomInfo?.creator_id;
-            const isMe = p.user_id === currentUserId;
-            // 준비 완료 여부 (방장은 항상 준비된 것으로 간주)
-            const isReady = isHost || p.is_ready; 
+        {/* 참가자 리스트 */}
+      <div className="w-full space-y-2 mb-8">
+        {participants.map((p) => {
+           const isHost = p.user_id === roomInfo?.creator_id;
+           const isMe = p.user_id === currentUserId;
+           
+           return (
+             <div key={p.user_id} className={`w-full p-3 rounded-2xl border flex justify-between items-center transition-all
+               ${isMe ? 'bg-zinc-800 border-zinc-700' : 'bg-zinc-900 border-zinc-800'}
+             `}>
+               <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-black italic ${isHost ? 'text-[#FF9900]' : 'text-white'}`}>
+                      {p.profiles?.display_name || "Unknown"}
+                    </span>
+                    {isHost && <span className="text-[8px] bg-[#FF9900] text-black font-bold px-1 rounded">HOST</span>}
+                    {/* 🔥 [수정 1] 'ME' 뱃지 삭제됨 */}
+                  </div>
+                  
+                  {/* 진행 상황 표시 */}
+                  {isHost && roomInfo?.status === 'playing' && (
+                      <span className="text-[10px] text-green-500 font-bold uppercase animate-pulse">
+                          ▶ Playing Round {p.current_round || 1}
+                      </span>
+                  )}
+               </div>
 
-            return (
-              <div 
-                key={p.user_id} 
-                className={`relative w-full flex items-center px-5 py-4 rounded-2xl border transition-all duration-300
-                  ${isMe ? 'bg-zinc-800' : 'bg-zinc-900'}
-                  ${isReady 
-                    ? (isHost ? 'border-[#FF9900]/50 shadow-[0_0_15px_rgba(255,153,0,0.1)]' : 'border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.1)]') 
-                    : 'border-zinc-800 opacity-80'}
-                `}
-              >
-                {/* 2-1. 역할/준비 배지 */}
-                <span className={`text-[9px] font-black uppercase tracking-wider mr-3 w-12 text-center py-1 rounded-md transition-colors
-                  ${isHost 
-                    ? 'bg-[#FF9900] text-black' 
-                    : (isReady ? 'bg-green-600 text-white' : 'bg-zinc-700 text-zinc-400')}`}>
-                  {isHost ? 'Host' : (isReady ? 'Ready' : 'Wait')}
-                </span>
-
-                {/* 2-2. 닉네임 */}
-                <span className={`text-sm font-bold truncate flex-1 mr-2 ${isMe ? 'text-white' : 'text-zinc-400'}`}>
-                  {p.profiles?.display_name || 'Unknown'} 
-                </span>
-
-                {/* 2-3. 상태 아이콘 (호스트는 펄스, 게스트는 레디 시 초록불) */}
-                <div className={`w-2 h-2 rounded-full mr-2 transition-colors
-                   ${isHost 
-                     ? 'bg-[#FF9900] animate-pulse' 
-                     : (isReady ? 'bg-green-500 shadow-[0_0_5px_#22c55e]' : 'bg-zinc-700')}`} 
-                ></div>
-
-                {/* 2-4. [NEW] 강퇴 버튼 (방장만 보임, 본인 제외) */}
-                {isCreator && !isHost && (
-                  <button 
-                    onClick={() => handleKickUser(p.user_id)}
-                    className="w-6 h-6 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-red-900/80 text-zinc-600 hover:text-red-500 transition-colors ml-1"
-                    title="Kick user"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            );
-          })
-        ) : (
-          <div className="w-full h-14 bg-zinc-900/50 rounded-2xl animate-pulse"></div>
-        )}
-
-        {/* 빈 슬롯 표시 */}
-        {[...Array(Math.max(0, (roomInfo?.max_players || 2) - participants.length))].map((_, i) => (
-          <div key={`empty-${i}`} className="w-full h-[58px] rounded-2xl border border-dashed border-zinc-800 flex items-center justify-center opacity-30">
-            <span className="text-[10px] uppercase font-bold text-zinc-600">Waiting...</span>
-          </div>
+               <div className="flex items-center gap-2">
+                 {!isHost ? (
+                    p.is_ready ? (
+                      <span className="text-green-500 font-black text-xs uppercase">READY</span>
+                    ) : (
+                      <span className="text-zinc-600 font-black text-xs uppercase">WAITING</span>
+                    )
+                 ) : null}
+                 
+                 {/* 🔥 [수정 2] 강퇴 버튼: 윈도우 닫기 버튼 스타일 (빨간 사각형 + X) */}
+                 {isCreator && !isMe && (
+                   <button 
+                     onClick={() => openKickModal(p.user_id)} 
+                     className="w-5 h-5 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded shadow-md active:scale-90 transition-all ml-2"
+                     title="Kick User"
+                   >
+                     <span className="text-[10px] font-bold leading-none pb-[1px]">✕</span>
+                   </button>
+                 )}
+               </div>
+             </div>
+           );
+        })}
+        
+        {/* 빈 자리 표시 */}
+        {Array.from({ length: Math.max(0, (roomInfo?.max_players || 2) - participants.length) }).map((_, i) => (
+           <div key={`empty-${i}`} className="w-full p-3 rounded-2xl border border-dashed border-zinc-800 bg-transparent flex justify-center items-center opacity-30">
+              <span className="text-[10px] font-black uppercase text-zinc-500">Waiting...</span>
+           </div>
         ))}
       </div>
 
-      {/* 3. 하단: 버튼 영역 */}
-      <div className="w-full space-y-3 mt-auto">
+      {/* 하단 버튼 영역 */}
+      <div className="w-full mt-auto">
         {isCreator ? (
-          // --- [방장] Start Game 버튼 ---
+          // --- 방장 버튼 ---
           <button 
             onClick={handleStart} 
-            // 방장은 2명 이상일 때 항상 누를 수 있음 (누르면 준비 안 된 사람 체크)
-            disabled={participants.length < 2} 
-            className="w-full h-16 bg-white text-black font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 disabled:opacity-30 disabled:active:scale-100 transition-all hover:bg-gray-100"
+            disabled={participants.length < 1} // 1명이면 연습모드 가능
+            className={`w-full h-16 text-black font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 transition-all
+               ${
+                 // 🔥 [수정 3] 방장 버튼 색상 로직
+                 participants.length < 2 
+                    ? 'bg-[#FF9900] hover:bg-[#ffad33]' // 연습 게임 (주황색)
+                    : !isAllReady 
+                        ? 'bg-green-600 opacity-80' // 미준비 유저 있음 (어두운 녹색, 깜빡임 X)
+                        : 'bg-[#22c55e] animate-pulse hover:bg-green-400' // 전원 준비 완료 (밝은 녹색 + 깜빡임)
+               }
+            `}
           >
-            Start Game
+            {participants.length < 2 
+                ? 'Practice Start'        // 혼자일 때
+                : isAllReady 
+                ? 'Start Game'          // 모두 준비됨 -> 시작 가능
+                : 'Wait to Ready'       // 아직 준비 안 됨 -> 대기
+            }
           </button>
         ) : (
-          // --- [게스트] Ready 버튼 ---
+          // --- 참가자 버튼 ---
           <button 
             onClick={handleToggleReady}
             className={`w-full h-16 font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 transition-all
-              ${participants.find(p => p.user_id === currentUserId)?.is_ready 
-                ? 'bg-green-600 text-white hover:bg-green-500' // 준비 완료 상태
-                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' // 준비 안 된 상태
-              }`}
+              ${
+                // 🔥 [수정 4] 참가자 레디 버튼 색상 로직
+                myInfo?.is_ready
+                   ? 'bg-[#22c55e] text-black hover:bg-green-400' // 레디 완료 (밝은 녹색, 정지)
+                   : 'bg-[#4ade80]/50 text-white/80 animate-pulse hover:bg-[#4ade80]/70' // 레디 전 (연한 녹색, 깜빡임)
+              }
+            `}
           >
-            {participants.find(p => p.user_id === currentUserId)?.is_ready ? 'Ready!' : 'Ready?'}
+            {myInfo?.is_ready ? 'Ready!' : 'Press to Ready'}
           </button>
         )}
-        
-        <button 
-          onClick={handleManualExit} 
-          className="w-full h-12 text-zinc-600 font-bold uppercase tracking-widest text-[14px] hover:text-[#FF9900] transition-colors"
-        >
-          Exit
-        </button>
       </div>
+      {/* 🛠️ [추가] 강퇴 확인 모달 (Custom UI) 🛠️ */}
+      {kickTargetId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-in fade-in duration-200">
+          <div className="w-full max-w-[280px] bg-zinc-900 border border-zinc-800 rounded-[32px] p-6 shadow-2xl animate-in zoom-in-95 border-t-red-500/50 border-t-4">
+            
+            <div className="text-center mb-6">
+               <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-xl">🚨</span>
+               </div>
+               <h3 className="text-white text-lg font-black uppercase italic tracking-tighter">Kick User?</h3>
+               <p className="text-zinc-500 text-[11px] font-bold mt-2 leading-relaxed">
+                 Are you sure you want to remove <br/>
+                 <span className="text-red-500">
+                    {participants.find(p => p.user_id === kickTargetId)?.profiles?.display_name}
+                 </span> 
+                 from this room?
+               </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => setKickTargetId(null)} 
+                className="h-12 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={executeKick} 
+                className="h-12 bg-red-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-red-500 shadow-lg shadow-red-900/20 active:scale-95 transition-all"
+              >
+                Confirm Kick
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
