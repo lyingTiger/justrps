@@ -5,7 +5,6 @@ interface MultiGameProps {
   roomId: string;
   userNickname: string;
   playClickSound: () => void;
-  // 🔥 [수정] onGameOver에 '누적 시간'도 같이 전달하도록 변경
   onGameOver: (finalRound: number, totalTime: number) => void;
   onBackToLobby: () => void;
 }
@@ -19,6 +18,9 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   const [participants, setParticipants] = useState<any[]>([]);
   const [roomData, setRoomData] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  // 🔥 [수정 1] 로딩 상태 추가 (초기값 true)
+  const [isLoading, setIsLoading] = useState(true);
 
   // 게임 로직 관련
   const [aiSelect, setAiSelect] = useState<number[]>([]);
@@ -46,7 +48,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, 
         (payload) => {
            setRoomData(payload.new);
-           if (payload.new.status === 'ended') finalizeGame(); // 강제 종료 시
+           if (payload.new.status === 'ended') finalizeGame(); 
         })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` }, 
         () => fetchParticipants())
@@ -60,34 +62,40 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   }, [roomId]);
 
   const fetchRoomAndParticipants = async () => {
-    const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single();
-    if (room) {
-        setRoomData(room);
-        const safeSeed = room.seed || 1234;
-        const safeMode = room.mode || 'WIN MODE';
-        
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            const { data: me } = await supabase.from('room_participants')
-                .select('current_round, is_cleared, is_dead, play_time')
-                .eq('room_id', roomId)
-                .eq('user_id', user.id)
-                .single();
+    try {
+        const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single();
+        if (room) {
+            setRoomData(room);
+            const safeSeed = room.seed || 1234;
+            const safeMode = room.mode || 'WIN MODE';
             
-            if (me) {
-                const savedRound = me.current_round || 1;
-                myRoundRef.current = savedRound;
-                // 🔥 [중요] 새로고침 해도 누적 시간이 유지되도록 DB 값 불러오기
-                setPlayTime(me.play_time || 0);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: me } = await supabase.from('room_participants')
+                    .select('current_round, is_cleared, is_dead, play_time')
+                    .eq('room_id', roomId)
+                    .eq('user_id', user.id)
+                    .single();
+                
+                if (me) {
+                    const savedRound = me.current_round || 1;
+                    myRoundRef.current = savedRound;
+                    setPlayTime(me.play_time || 0);
 
-                if (me.is_dead) setIsEliminated(true);
-                else startNewRound(savedRound, safeSeed, safeMode, true); // true = 초기 로드
-            } else {
-                startNewRound(1, safeSeed, safeMode);
+                    if (me.is_dead) setIsEliminated(true);
+                    else startNewRound(savedRound, safeSeed, safeMode, true); 
+                } else {
+                    startNewRound(1, safeSeed, safeMode);
+                }
             }
         }
+        await fetchParticipants();
+    } catch (e) {
+        console.error(e);
+    } finally {
+        // 🔥 [수정 2] 데이터 로드 및 초기화가 다 끝난 후 로딩 해제
+        setIsLoading(false); 
     }
-    fetchParticipants();
   };
 
   const fetchParticipants = async () => {
@@ -101,7 +109,6 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     myRoundRef.current = newRound;
     setCurrentRound(newRound);
     
-    // 문제 생성 (방 시드 + 라운드 조합)
     const roundSeed = seed + newRound; 
     const seededRandom = (s: number) => {
       return () => {
@@ -135,9 +142,6 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     setSatisfiedConditions([]);
     setIsMemoryPhase(true);
     setIsCleared(false);
-    
-    // 🔥 [수정 1] 시간 초기화 코드 삭제! (누적 시간 유지를 위해)
-    // if (!isEliminated) setPlayTime(0);  <-- 삭제됨
   };
 
   const getCounts = (list: string[]) => {
@@ -152,10 +156,9 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
       ? getCounts(satisfiedConditions) 
       : getCounts(targetConditions.slice(0, questionTurn));
 
-  // --- 3. 타이머 (누적) ---
+  // --- 3. 타이머 ---
   useEffect(() => {
-    // 깼거나 죽었을 때는 멈춤 (순수 플레이 시간만 측정)
-    if (!isMemoryPhase && !isCleared && !isEliminated) {
+    if (!isCleared && !isEliminated) {
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setPlayTime(prev => prev + 0.01);
@@ -164,9 +167,9 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
       if (timerRef.current) clearInterval(timerRef.current);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isMemoryPhase, isCleared, isEliminated]);
+  }, [isCleared, isEliminated]);
 
-  // 타임아웃 체크 (30초)
+  // 타임아웃
   useEffect(() => {
     if (roomData?.first_cleared_at && !isCleared && !isEliminated) {
       const firstClearedTime = new Date(roomData.first_cleared_at).getTime();
@@ -181,14 +184,13 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     }
   }, [roomData?.first_cleared_at, isCleared, isEliminated]);
 
-  // --- 4. 입력 및 클리어 처리 ---
+  // --- 4. 입력 처리 ---
   const handleSelect = async (idx: number) => {
     if (isEliminated || isCleared) return;
     playClickSound();
 
     let isRoundClear = false;
 
-    // (셔플 모드)
     if (mode === 'SHUFFLE MODE') {
         let foundMatch = false;
         for (let i = 0; i < aiSelect.length; i++) {
@@ -211,7 +213,6 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
         }
         if (!foundMatch) { handleElimination("WRONG"); return; }
     }
-    // (일반 모드)
     else {
         const aiHand = aiSelect[questionTurn];
         const condition = targetConditions[questionTurn];
@@ -229,13 +230,11 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
         }
     }
 
-    // [라운드 클리어 시]
     if (isRoundClear) {
         setIsCleared(true);
         if (timerRef.current) clearInterval(timerRef.current);
         
         const nextRound = myRoundRef.current + 1;
-        // 🔥 playTime은 초기화되지 않았으므로 누적 시간이 저장됨
         await updateMyStatus(nextRound, false, playTime, false);
 
         setTimeout(() => {
@@ -248,34 +247,22 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     setIsEliminated(true);
     if (timerRef.current) clearInterval(timerRef.current);
     await updateMyStatus(myRoundRef.current, false, playTime, true); 
-    
-    // 🔥 게임 오버 시 기록 저장 (랭킹용)
     saveRecordToLeaderboard(myRoundRef.current, playTime);
-    
-    // 잠시 후 결과창 이동
-    setTimeout(() => {
-        finalizeGame();
-    }, 2000);
+    setTimeout(() => finalizeGame(), 2000);
   };
 
-  // 🔥 [수정 3] 영구 기록 저장 함수 (랭킹에 반영되기 위함)
   const saveRecordToLeaderboard = async (finalRound: number, totalTime: number) => {
       if (!currentUserId) return;
-      
-      // 'leaderboard' 테이블에 기록 삽입 (실패 시 무시)
-      // 만약 랭킹 테이블 이름이 다르다면 여기를 수정해야 합니다.
       try {
-          await supabase.from('leaderboard').insert({
+          await supabase.from('game_records').insert({
               user_id: currentUserId,
-              best_round: finalRound,
-              best_time: totalTime,
-              mode: mode,
-              created_at: new Date().toISOString()
+              round: finalRound,
+              play_time: totalTime,
+              mode: mode
           });
+          console.log("기록 저장 성공");
       } catch (err) {
-          console.error("랭킹 저장 실패(뷰일 가능성 있음):", err);
-          // 만약 leaderboard가 뷰라면, 실제 테이블인 'records' 등에 넣어야 함
-          // await supabase.from('records').insert({...});
+          console.error("기록 저장 실패:", err);
       }
   };
 
@@ -295,9 +282,23 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   };
 
   const finalizeGame = () => {
-     // 부모 컴포넌트에게 누적 시간을 전달
      onGameOver(myRoundRef.current, playTime); 
   };
+
+// 🔥 [수정 3] 로딩 UI (화면 중앙 정렬 및 디자인 적용)
+  if (isLoading) {
+      return (
+          // min-h-screen으로 화면 전체 높이를 잡고 중앙 정렬
+          <div className="w-full min-h-screen flex flex-col items-center justify-center animate-in fade-in select-none">
+              <div className="text-[#FF9900] text-3xl font-black uppercase italic tracking-tighter animate-pulse">
+                  Loading...
+              </div>
+              <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-2">
+                  Preparing Game Context
+              </p>
+          </div>
+      );
+  }
 
   return (
     <div className="w-full max-w-[340px] flex flex-col items-center py-6 animate-in fade-in select-none">
@@ -325,8 +326,6 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
                ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : 'text-zinc-500'}`}>
                {p.is_dead && "💀"} {p.profiles?.display_name}
             </span>
-            
-            {/* 🔥 [수정 2] 시간 표시는 제거하고 라운드만 표시 */}
             <span className={`text-xs font-mono font-bold ${p.is_dead ? 'text-red-900' : 'text-white'}`}>
               {p.is_dead ? "FAIL" : `Round ${p.current_round || 1}`}
             </span>
@@ -334,7 +333,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
         ))}
       </div>
 
-      {/* 3. 게임 인터페이스 (변경 없음) */}
+      {/* 3. 게임 인터페이스 */}
       <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] w-full">
          {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
             <div className="text-center mb-10 select-none">

@@ -38,11 +38,10 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
     fetchRankings();
   }, [activeMode, myUserId]);
 
-  const fetchRankings = async () => {
+const fetchRankings = async () => {
     setLoading(true);
     try {
-      // [Step 1] 전체 TOP 10 가져오기 (조인 문법 제거)
-      // 400 에러 해결: leaderboard 뷰에 이미 display_name이 있다고 가정하고 '*'만 조회
+      // [Step 1] 전체 TOP 10 가져오기
       const { data: top10Data, error: top10Error } = await supabase
         .from('leaderboard')
         .select('*') 
@@ -55,28 +54,33 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
 
       // 데이터 포맷팅
       let formattedRankings: RankingRecord[] = (top10Data || []).map((item, index) => ({
-        id: item.id || item.user_id, // 뷰 컬럼명에 따라 다를 수 있음 (보통 id 아니면 user_id)
+        // 🔥 id가 없으면 user_id를 id로 사용 (View/Table 호환성)
+        id: item.user_id || item.id, 
         best_round: item.best_round,
         best_time: item.best_time,
         rank: index + 1,
-        // 중요: 뷰에 있는 display_name을 바로 가져와서 구조를 맞춰줌
-        profiles: { display_name: item.display_name || 'Player' } 
+        profiles: { display_name: item.display_name || item.profiles?.display_name || 'Player' } 
       }));
 
       // [Step 2] 내가 TOP 10에 없다면? 내 등수 찾아서 붙이기
+      // 🔥 여기도 id 비교가 아니라 user_id로 비교해야 안전함
       const isMeInTop10 = formattedRankings.some(r => r.id === myUserId);
 
       if (myUserId && !isMeInTop10) {
-        // 2-1. 내 기록 가져오기 (여기도 select('*')로 수정)
+        // 2-1. 내 기록 가져오기 (수정된 부분)
         const { data: myRecord } = await supabase
           .from('leaderboard')
           .select('*')
           .eq('mode', activeMode)
-          .eq('id', myUserId)
+          .eq('user_id', myUserId) // 👈 [수정] id -> user_id 로 변경!
+          // 혹시 기록이 여러 개일 수 있으니 가장 좋은 기록 1개만 가져오도록 정렬 추가
+          .order('best_round', { ascending: false })
+          .order('best_time', { ascending: true })
+          .limit(1)
           .maybeSingle();
 
         if (myRecord) {
-          // 2-2. 내 등수 계산 (나보다 잘한 사람 수 세기)
+          // 2-2. 내 등수 계산
           const { count } = await supabase
             .from('leaderboard')
             .select('*', { count: 'exact', head: true })
@@ -87,11 +91,11 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
 
           // 2-3. 리스트 끝에 추가
           formattedRankings.push({
-            id: myRecord.id || myRecord.user_id,
+            id: myRecord.user_id || myRecord.id, // 👈 user_id 우선 사용
             best_round: myRecord.best_round,
             best_time: myRecord.best_time,
             rank: myRank,
-            profiles: { display_name: myRecord.display_name || 'Me' }
+            profiles: { display_name: myRecord.display_name || myRecord.profiles?.display_name || 'Me' }
           });
         }
       }
