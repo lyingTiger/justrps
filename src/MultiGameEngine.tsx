@@ -5,7 +5,8 @@ interface MultiGameProps {
   roomId: string;
   userNickname: string;
   playClickSound: () => void;
-  onGameOver: (finalRound: number, myRank: number) => void;
+  // 🔥 [수정] onGameOver에 '누적 시간'도 같이 전달하도록 변경
+  onGameOver: (finalRound: number, totalTime: number) => void;
   onBackToLobby: () => void;
 }
 
@@ -22,15 +23,15 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   // 게임 로직 관련
   const [aiSelect, setAiSelect] = useState<number[]>([]);
   const [targetConditions, setTargetConditions] = useState<string[]>([]);
-  const [questionTurn, setQuestionTurn] = useState(0); // 순차 모드용
+  const [questionTurn, setQuestionTurn] = useState(0);
   const [isMemoryPhase, setIsMemoryPhase] = useState(true);
 
-  // ✨ [셔플 모드용 상태 추가]
-  const [solvedIndices, setSolvedIndices] = useState<number[]>([]); // 해결된 카드 인덱스
-  const [satisfiedConditions, setSatisfiedConditions] = useState<string[]>([]); // 해결된 조건들
+  // 셔플/싱글 로직용 상태
+  const [solvedIndices, setSolvedIndices] = useState<number[]>([]); 
+  const [satisfiedConditions, setSatisfiedConditions] = useState<string[]>([]); 
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const roundSyncRef = useRef(1);
+  const myRoundRef = useRef(1);
 
   // --- 1. 초기 설정 ---
   useEffect(() => {
@@ -45,10 +46,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, 
         (payload) => {
            setRoomData(payload.new);
-           if (payload.new.round > roundSyncRef.current) {
-              startNewRound(payload.new.round, payload.new.seed, payload.new.mode);
-           }
-           if (payload.new.status === 'ended') finalizeGame(payload.new);
+           if (payload.new.status === 'ended') finalizeGame(); // 강제 종료 시
         })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` }, 
         () => fetchParticipants())
@@ -65,11 +63,29 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single();
     if (room) {
         setRoomData(room);
-        const safeRound = room.round || 1;
-        const safeSeed = room.seed || Math.random();
+        const safeSeed = room.seed || 1234;
         const safeMode = room.mode || 'WIN MODE';
-        roundSyncRef.current = safeRound;
-        startNewRound(safeRound, safeSeed, safeMode);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data: me } = await supabase.from('room_participants')
+                .select('current_round, is_cleared, is_dead, play_time')
+                .eq('room_id', roomId)
+                .eq('user_id', user.id)
+                .single();
+            
+            if (me) {
+                const savedRound = me.current_round || 1;
+                myRoundRef.current = savedRound;
+                // 🔥 [중요] 새로고침 해도 누적 시간이 유지되도록 DB 값 불러오기
+                setPlayTime(me.play_time || 0);
+
+                if (me.is_dead) setIsEliminated(true);
+                else startNewRound(savedRound, safeSeed, safeMode, true); // true = 초기 로드
+            } else {
+                startNewRound(1, safeSeed, safeMode);
+            }
+        }
     }
     fetchParticipants();
   };
@@ -80,11 +96,13 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   };
 
   // --- 2. 새 라운드 시작 ---
-  const startNewRound = (newRound: number, seed: number, mode: string) => {
-    console.log(`Starting Round ${newRound} / Mode: ${mode}`);
-    roundSyncRef.current = newRound;
+  const startNewRound = (newRound: number, seed: number, mode: string, isInitialLoad = false) => {
+    console.log(`Starting Round ${newRound}`);
+    myRoundRef.current = newRound;
     setCurrentRound(newRound);
     
+    // 문제 생성 (방 시드 + 라운드 조합)
+    const roundSeed = seed + newRound; 
     const seededRandom = (s: number) => {
       return () => {
         s |= 0; s = s + 0x6D2B79F5 | 0;
@@ -94,7 +112,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
       };
     };
 
-    const rng = seededRandom(seed + newRound);
+    const rng = seededRandom(roundSeed);
     const questionNum = newRound + 2;
     const newAiSelect = Array.from({ length: questionNum }, () => Math.floor(rng() * 3));
     
@@ -112,45 +130,43 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     setAiSelect(newAiSelect);
     setTargetConditions(newConditions);
     
-    // 상태 초기화
     setQuestionTurn(0);
-    setSolvedIndices([]);      // ✨ 초기화
-    setSatisfiedConditions([]); // ✨ 초기화
+    setSolvedIndices([]);
+    setSatisfiedConditions([]);
     setIsMemoryPhase(true);
     setIsCleared(false);
-
-    if (!isEliminated) {
-        setPlayTime(0);
-    }
+    
+    // 🔥 [수정 1] 시간 초기화 코드 삭제! (누적 시간 유지를 위해)
+    // if (!isEliminated) setPlayTime(0);  <-- 삭제됨
   };
 
-  // --- 3. 셔플 모드용 헬퍼 함수 (카운트 계산) ---
   const getCounts = (list: string[]) => {
     const counts = { WIN: 0, DRAW: 0, LOSE: 0 };
     list.forEach(c => { if (c in counts) counts[c as keyof typeof counts]++; });
     return counts;
   };
 
-  // 현재 모드 확인
   const mode = roomData?.mode || 'WIN MODE';
-  // 카운트 계산
   const totalTargetCounts = getCounts(targetConditions);
   const currentSolvedCounts = mode === 'SHUFFLE MODE' 
       ? getCounts(satisfiedConditions) 
       : getCounts(targetConditions.slice(0, questionTurn));
 
-  // --- 4. 타이머 및 타임아웃 ---
+  // --- 3. 타이머 (누적) ---
   useEffect(() => {
+    // 깼거나 죽었을 때는 멈춤 (순수 플레이 시간만 측정)
     if (!isMemoryPhase && !isCleared && !isEliminated) {
+      if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
-        setPlayTime(prev => prev + 1);
-      }, 1000);
+        setPlayTime(prev => prev + 0.01);
+      }, 10);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isMemoryPhase, isCleared, isEliminated]);
 
+  // 타임아웃 체크 (30초)
   useEffect(() => {
     if (roomData?.first_cleared_at && !isCleared && !isEliminated) {
       const firstClearedTime = new Date(roomData.first_cleared_at).getTime();
@@ -165,228 +181,235 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     }
   }, [roomData?.first_cleared_at, isCleared, isEliminated]);
 
-  // --- 5. 플레이어 입력 처리 (로직 분기) ---
+  // --- 4. 입력 및 클리어 처리 ---
   const handleSelect = async (idx: number) => {
     if (isEliminated || isCleared) return;
     playClickSound();
 
-    // 🔥 [로직 1] 셔플 모드 (순서 무관, 개수 매칭)
+    let isRoundClear = false;
+
+    // (셔플 모드)
     if (mode === 'SHUFFLE MODE') {
         let foundMatch = false;
-        
-        // 전체 카드를 돌면서 "내가 낸 손으로 해결 가능한 미해결 카드"가 있는지 찾음
         for (let i = 0; i < aiSelect.length; i++) {
-            if (solvedIndices.includes(i)) continue; // 이미 푼 건 패스
-
+            if (solvedIndices.includes(i)) continue;
             const hand = aiSelect[i];
             const result = idx === hand ? 'DRAW' : ((hand === 0 && idx === 1) || (hand === 1 && idx === 2) || (hand === 2 && idx === 0) ? 'WIN' : 'LOSE');
             
             const needed = totalTargetCounts[result as keyof typeof totalTargetCounts];
             const current = satisfiedConditions.filter(c => c === result).length;
 
-            // 아직 이 조건(WIN/DRAW/LOSE)이 더 필요하다면 -> 매칭 성공!
             if (needed > current) {
                 const newSolvedIndices = [...solvedIndices, i];
                 const newSatisfiedConditions = [...satisfiedConditions, result];
                 setSolvedIndices(newSolvedIndices);
                 setSatisfiedConditions(newSatisfiedConditions);
                 foundMatch = true;
-
-                // 모든 카드를 다 풀었는지 확인
-                if (newSatisfiedConditions.length === aiSelect.length) {
-                    setIsCleared(true);
-                    if (timerRef.current) clearInterval(timerRef.current);
-                    await updateMyStatus(true, playTime, false);
-                }
-                break; // 하나 찾았으니 루프 종료
+                if (newSatisfiedConditions.length === aiSelect.length) isRoundClear = true;
+                break;
             }
         }
+        if (!foundMatch) { handleElimination("WRONG"); return; }
+    }
+    // (일반 모드)
+    else {
+        const aiHand = aiSelect[questionTurn];
+        const condition = targetConditions[questionTurn];
+        let isCorrect = false;
 
-        // 아무것도 매칭되지 않음 -> 오답 -> 탈락
-        if (!foundMatch) {
-            handleElimination("WRONG");
+        if (condition === 'DRAW') isCorrect = idx === aiHand;
+        else if (condition === 'WIN') isCorrect = (aiHand === 0 && idx === 1) || (aiHand === 1 && idx === 2) || (aiHand === 2 && idx === 0);
+        else if (condition === 'LOSE') isCorrect = (aiHand === 0 && idx === 2) || (aiHand === 1 && idx === 0) || (aiHand === 2 && idx === 1);
+
+        if (isCorrect) {
+            if (questionTurn + 1 === aiSelect.length) isRoundClear = true;
+            else setQuestionTurn(prev => prev + 1);
+        } else {
+            handleElimination("WRONG"); return;
         }
-        return;
     }
 
-    // 🔥 [로직 2] 일반 / 익스퍼트 모드 (순차 진행)
-    const aiHand = aiSelect[questionTurn];
-    const condition = targetConditions[questionTurn];
-    let isCorrect = false;
-
-    if (condition === 'DRAW') isCorrect = idx === aiHand;
-    else if (condition === 'WIN') isCorrect = (aiHand === 0 && idx === 1) || (aiHand === 1 && idx === 2) || (aiHand === 2 && idx === 0);
-    else if (condition === 'LOSE') isCorrect = (aiHand === 0 && idx === 2) || (aiHand === 1 && idx === 0) || (aiHand === 2 && idx === 1);
-
-    if (isCorrect) {
-      if (questionTurn + 1 === aiSelect.length) {
+    // [라운드 클리어 시]
+    if (isRoundClear) {
         setIsCleared(true);
         if (timerRef.current) clearInterval(timerRef.current);
-        await updateMyStatus(true, playTime, false);
-      } else {
-        setQuestionTurn(prev => prev + 1);
-      }
-    } else {
-      handleElimination("WRONG");
+        
+        const nextRound = myRoundRef.current + 1;
+        // 🔥 playTime은 초기화되지 않았으므로 누적 시간이 저장됨
+        await updateMyStatus(nextRound, false, playTime, false);
+
+        setTimeout(() => {
+            startNewRound(nextRound, roomData.seed || 1234, roomData.mode);
+        }, 1000); 
     }
   };
 
   const handleElimination = async (reason: string) => {
     setIsEliminated(true);
     if (timerRef.current) clearInterval(timerRef.current);
-    await updateMyStatus(false, 9999, true); 
+    await updateMyStatus(myRoundRef.current, false, playTime, true); 
+    
+    // 🔥 게임 오버 시 기록 저장 (랭킹용)
+    saveRecordToLeaderboard(myRoundRef.current, playTime);
+    
+    // 잠시 후 결과창 이동
+    setTimeout(() => {
+        finalizeGame();
+    }, 2000);
   };
 
-  const updateMyStatus = async (cleared: boolean, time: number, dead: boolean) => {
+  // 🔥 [수정 3] 영구 기록 저장 함수 (랭킹에 반영되기 위함)
+  const saveRecordToLeaderboard = async (finalRound: number, totalTime: number) => {
+      if (!currentUserId) return;
+      
+      // 'leaderboard' 테이블에 기록 삽입 (실패 시 무시)
+      // 만약 랭킹 테이블 이름이 다르다면 여기를 수정해야 합니다.
+      try {
+          await supabase.from('leaderboard').insert({
+              user_id: currentUserId,
+              best_round: finalRound,
+              best_time: totalTime,
+              mode: mode,
+              created_at: new Date().toISOString()
+          });
+      } catch (err) {
+          console.error("랭킹 저장 실패(뷰일 가능성 있음):", err);
+          // 만약 leaderboard가 뷰라면, 실제 테이블인 'records' 등에 넣어야 함
+          // await supabase.from('records').insert({...});
+      }
+  };
+
+  const updateMyStatus = async (round: number, cleared: boolean, time: number, dead: boolean) => {
     if (!currentUserId) return;
     if (cleared && !roomData.first_cleared_at) {
       await supabase.from('rooms').update({ first_cleared_at: new Date().toISOString() }).eq('id', roomId);
     }
     await supabase.from('room_participants')
-      .update({ is_cleared: cleared, play_time: time, is_dead: dead })
+      .update({ 
+          current_round: round, 
+          is_cleared: cleared, 
+          play_time: time, 
+          is_dead: dead 
+      })
       .eq('room_id', roomId).eq('user_id', currentUserId);
   };
 
-  // --- 6. 방장 로직 ---
-  useEffect(() => {
-    if (!currentUserId || !roomData || currentUserId !== roomData.creator_id) return;
-    if (participants.length === 0) return;
-
-    const activePlayers = participants.filter(p => !p.is_dead);
-    const clearedPlayers = activePlayers.filter(p => p.is_cleared);
-    
-    if (activePlayers.length > 0 && activePlayers.length === clearedPlayers.length) {
-        if (roomData.first_cleared_at !== null) { 
-           proceedToNextRound();
-        }
-    }
-    
-    const allProcessed = participants.every(p => p.is_cleared || p.is_dead);
-    if (allProcessed && participants.length > 0 && roomData.first_cleared_at !== null) {
-        proceedToNextRound();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [participants]); 
-
-  const proceedToNextRound = async () => {
-     await new Promise(r => setTimeout(r, 2000));
-     await supabase.from('room_participants').update({ is_cleared: false, play_time: 0 }).eq('room_id', roomId);
-     await supabase.from('rooms').update({
-            round: currentRound + 1,
-            seed: Math.random(),
-            first_cleared_at: null
-        }).eq('id', roomId);
+  const finalizeGame = () => {
+     // 부모 컴포넌트에게 누적 시간을 전달
+     onGameOver(myRoundRef.current, playTime); 
   };
 
-  const finalizeGame = (finalRoomData: any) => {
-     onGameOver(currentRound, 0); 
-  };
-
-  // --- 7. 렌더링 ---
   return (
     <div className="w-full max-w-[340px] flex flex-col items-center py-6 animate-in fade-in select-none">
-      {/* 상단 정보 */}
-      <div className="w-full flex justify-between items-end mb-8">
-        <div>
-          <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter leading-none">Round {currentRound}</h2>
-          <p className="text-[#FF9900] text-xs font-black uppercase italic mt-1">
-            {isEliminated ? "ELIMINATED" : isCleared ? "Waiting..." : `Time: ${playTime}s`}
-          </p>
-        </div>
+      
+      {/* 1. 상단 정보 */}
+      <div className="w-full text-left mt-0 mb-6">
+        <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {currentRound}</h2>
+        <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">
+          Total Time: {playTime.toFixed(2)} sec
+        </p>
+        
         {roomData?.first_cleared_at && !isCleared && !isEliminated && (
-          <div className="text-red-500 text-[10px] font-black uppercase animate-pulse border border-red-500/30 px-2 py-1 rounded">
+          <div className="text-red-500 text-[10px] font-black uppercase animate-pulse border border-red-500/30 px-2 py-1 rounded w-fit mt-2">
             Hurry Up!
           </div>
         )}
       </div>
 
-      {/* 타 플레이어 현황 */}
+      {/* 2. 타 플레이어 현황 */}
       <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-3xl p-4 mb-8 space-y-2">
-        {participants.map(p => (
+        <div className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Other Players</div>
+        {participants.filter(p => p.user_id !== currentUserId).map(p => (
           <div key={p.user_id} className="flex justify-between items-center opacity-80">
             <span className={`text-[10px] font-black uppercase flex items-center gap-1
-               ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : p.is_cleared ? 'text-green-400' : 'text-zinc-500'}`}>
-               {p.is_dead && "💀"} {p.profiles?.display_name} {p.user_id === currentUserId && " (ME)"}
+               ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : 'text-zinc-500'}`}>
+               {p.is_dead && "💀"} {p.profiles?.display_name}
             </span>
+            
+            {/* 🔥 [수정 2] 시간 표시는 제거하고 라운드만 표시 */}
             <span className={`text-xs font-mono font-bold ${p.is_dead ? 'text-red-900' : 'text-white'}`}>
-              {p.is_dead ? "FAIL" : p.is_cleared ? `${Math.floor(p.play_time)}s` : "..."}
+              {p.is_dead ? "FAIL" : `Round ${p.current_round || 1}`}
             </span>
           </div>
         ))}
       </div>
 
-      {/* 게임 인터페이스 */}
+      {/* 3. 게임 인터페이스 (변경 없음) */}
       <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] w-full">
-         {/* ✨ [UI 분기] 셔플/익스퍼트 모드는 카운트 표시, 일반 모드는 현재 조건 표시 */}
          {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
             <div className="text-center mb-10 select-none">
                 <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
-                <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
+                    <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
                 </div>
                 <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
-                <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
+                    <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
                 </div>
             </div>
          ) : (
             <div className="text-center mb-10">
-                <p className="text-[#FF9900] text-5xl font-black tracking-tighter uppercase leading-none">
-                    {isEliminated ? "GAME OVER" : targetConditions[questionTurn]}
+                <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">
+                    {isEliminated ? "GAME OVER" : `${aiSelect.length} ${mode.split(' ')[0]}`}
                 </p>
-                <p className="text-white text-xl font-bold opacity-50 uppercase tracking-tight mt-1">
-                    {isEliminated ? "Watch others play" : `${questionTurn} / ${aiSelect.length}`}
+                <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">
+                    {isEliminated ? "Watch others" : `${questionTurn} ${mode.split(' ')[0]}`}
                 </p>
             </div>
          )}
 
-         {/* 카드 리스트 */}
-         <div className="flex flex-wrap justify-center gap-2 mb-10">
+         <div className="flex flex-wrap justify-center gap-3 mb-4">
             {aiSelect.map((hand, i) => {
-               // 모드에 따라 '현재 활성화된 카드'인지 판단
-               let isActive = false;
-               let isSolved = false;
+               const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
+               const isCurrent = (i === questionTurn && !isMemoryPhase);
+               const showDetails = isMemoryPhase || isSolved;
                
-               if (mode === 'SHUFFLE MODE') {
-                   isSolved = solvedIndices.includes(i);
-                   isActive = !isSolved; // 안 풀린 건 다 활성
-               } else {
-                   isActive = (i === questionTurn);
-                   isSolved = (i < questionTurn);
-               }
-
                return (
-                <div key={i} className={`w-12 h-12 rounded-2xl bg-zinc-900 border-2 transition-all 
-                    ${isSolved ? 'border-transparent opacity-20' : (isActive && !isEliminated && !isCleared ? 'border-[#FF9900] shadow-[0_0_15px_#FF990044]' : 'border-zinc-700 opacity-50')}`}>
-                    
-                    {/* 셔플/익스퍼트: 작은 조건 표시 */}
-                    {(isActive && (mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE')) ? null : null} 
-
-                    {/* 카드 이미지 */}
-                    {(isMemoryPhase || isActive || isSolved || isEliminated || isCleared || mode === 'SHUFFLE MODE') && (
-                        <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-contain p-2" />
+                <div key={i} className="relative flex flex-col items-center">
+                    {isCurrent && mode === 'EXPERT MODE' && !isEliminated && !isCleared && (
+                      <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{targetConditions[i]}</span>
                     )}
+                    <div className={`w-14 h-14 rounded-2xl overflow-hidden transition-all duration-300 bg-zinc-900 
+                        ${showDetails 
+                            ? (hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 'shadow-[0_0_12px_rgba(34,197,94,0.7)]') 
+                            : (isCurrent && !isEliminated && !isCleared)
+                                ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' 
+                                : 'shadow-none'
+                        }`}>
+                        {isMemoryPhase ? (
+                            <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                {(isSolved || isEliminated || isCleared) && (
+                                    <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-40" />
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
                );
             })}
          </div>
       </div>
 
-      {/* 조작 버튼 영역 */}
+      {/* 4. 버튼 영역 */}
       <div className="w-full flex justify-center mt-auto">
         {isEliminated ? (
            <div className="text-zinc-500 font-bold uppercase animate-pulse">Spectating Mode...</div>
         ) : isCleared ? (
-           <div className="text-green-500 font-bold uppercase animate-bounce">Round Clear!</div>
+           <div className="text-green-500 font-bold uppercase animate-bounce">Next Round!</div>
         ) : isMemoryPhase ? (
-          <button onClick={() => setIsMemoryPhase(false)} className="text-[#FF9900] text-3xl font-black italic uppercase animate-pulse hover:scale-105 transition-transform">I Got It</button>
+          <button onClick={() => { playClickSound(); setIsMemoryPhase(false); }} className="text-[#FF9900] text-3xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse">
+            OK, I got it
+          </button>
         ) : (
           <div className="flex gap-4 w-full px-2">
             {['rock', 'paper', 'scissor'].map((type) => (
               <button 
                 key={type} 
                 onClick={() => handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0)} 
-                className="flex-1 aspect-square rounded-3xl bg-zinc-900 border border-zinc-800 active:scale-90 transition-all flex items-center justify-center p-4"
+                className={`flex-1 aspect-square rounded-3xl overflow-hidden active:scale-90 transition-all bg-zinc-900 
+                    ${type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'shadow-[0_0_15px_rgba(236,72,153,0.5)]'}`}
               >
-                <img src={`/images/${type}.png`} className="w-full h-full object-contain" />
+                <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
               </button>
             ))}
           </div>

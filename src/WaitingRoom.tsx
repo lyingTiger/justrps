@@ -197,10 +197,9 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
   };
 
 // 🎮 [게임 시작] 방장 전용 (수정됨: 시드 랜덤화 추가)
-  const handleStart = async () => {
+const handleStart = async () => {
     if (!roomId || !channelRef.current) return;
 
-    // 1. 준비 안 된 사람 찾기 (기존 로직 유지)
     const unreadyUsers = participants.filter(p => p.user_id !== roomInfo.creator_id && !p.is_ready);
     if (unreadyUsers.length > 0) {
       const targetIds = unreadyUsers.map(p => p.user_id);
@@ -212,11 +211,13 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
       return; 
     }
 
-    // 2. 모두 준비됨 -> 게임 시작 상태 변경 + 🔥[핵심] 시드 랜덤 변경
-    // seed에 Math.random()을 넣어 매 판마다 문제가 달라지게 함
+    // 🔥 [수정] 시드를 0~1 사이 소수가 아니라, 1~10000 사이의 '큰 정수'로 생성
+    // DB 컬럼이 int여도 랜덤성이 보장되도록 함
+    const randomSeed = Math.floor(Math.random() * 10000); 
+
     await supabase.from('rooms').update({ 
         status: 'playing',
-        seed: Math.random() 
+        seed: randomSeed 
     }).eq('id', roomId);
   };
 
