@@ -5,11 +5,13 @@ interface MultiGameProps {
   roomId: string;
   userNickname: string;
   playClickSound: () => void;
+  // 🔥 [수정] 부모(App.tsx)의 헤더 코인을 올려주는 함수 받기
+  onEarnCoin: () => void; 
   onGameOver: (finalRound: number, totalTime: number) => void;
   onBackToLobby: () => void;
 }
 
-export default function MultiGameEngine({ roomId, userNickname, playClickSound, onGameOver, onBackToLobby }: MultiGameProps) {
+export default function MultiGameEngine({ roomId, userNickname, playClickSound, onEarnCoin, onGameOver, onBackToLobby }: MultiGameProps) {
   // --- 상태 관리 ---
   const [currentRound, setCurrentRound] = useState(1);
   const [playTime, setPlayTime] = useState(0); 
@@ -19,8 +21,13 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   const [roomData, setRoomData] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
-  // 🔥 [수정 1] 로딩 상태 추가 (초기값 true)
   const [isLoading, setIsLoading] = useState(true);
+
+  // ❌ [삭제] 화면 표시용 로컬 코인 상태 (uiCoin) 삭제됨
+  // const [uiCoin, setUiCoin] = useState(0);
+
+  // ✅ [유지] 서버 전송용 코인 저장소 (게임 끝나고 한 번에 DB 저장용)
+  const coinRef = useRef(0);
 
   // 게임 로직 관련
   const [aiSelect, setAiSelect] = useState<number[]>([]);
@@ -93,7 +100,6 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     } catch (e) {
         console.error(e);
     } finally {
-        // 🔥 [수정 2] 데이터 로드 및 초기화가 다 끝난 후 로딩 해제
         setIsLoading(false); 
     }
   };
@@ -184,13 +190,14 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     }
   }, [roomData?.first_cleared_at, isCleared, isEliminated]);
 
-  // --- 4. 입력 처리 ---
+  // --- 4. 입력 처리 (코인 획득 로직 수정) ---
   const handleSelect = async (idx: number) => {
     if (isEliminated || isCleared) return;
     playClickSound();
 
     let isRoundClear = false;
 
+    // [로직 1] 셔플 모드
     if (mode === 'SHUFFLE MODE') {
         let foundMatch = false;
         for (let i = 0; i < aiSelect.length; i++) {
@@ -202,6 +209,12 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
             const current = satisfiedConditions.filter(c => c === result).length;
 
             if (needed > current) {
+                // 🔥 [수정] 정답! 
+                // 1. 서버 저장용 Ref 증가
+                coinRef.current += 1;
+                // 2. 부모(App.tsx)의 함수 호출 -> 헤더 코인 즉시 업데이트
+                onEarnCoin();
+
                 const newSolvedIndices = [...solvedIndices, i];
                 const newSatisfiedConditions = [...satisfiedConditions, result];
                 setSolvedIndices(newSolvedIndices);
@@ -213,6 +226,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
         }
         if (!foundMatch) { handleElimination("WRONG"); return; }
     }
+    // [로직 2] 일반/익스퍼트 모드
     else {
         const aiHand = aiSelect[questionTurn];
         const condition = targetConditions[questionTurn];
@@ -223,6 +237,12 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
         else if (condition === 'LOSE') isCorrect = (aiHand === 0 && idx === 2) || (aiHand === 1 && idx === 0) || (aiHand === 2 && idx === 1);
 
         if (isCorrect) {
+            // 🔥 [수정] 정답! 
+            // 1. 서버 저장용 Ref 증가
+            coinRef.current += 1;
+            // 2. 부모(App.tsx)의 함수 호출 -> 헤더 코인 즉시 업데이트
+            onEarnCoin();
+
             if (questionTurn + 1 === aiSelect.length) isRoundClear = true;
             else setQuestionTurn(prev => prev + 1);
         } else {
@@ -260,7 +280,6 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
               play_time: totalTime,
               mode: mode
           });
-          console.log("기록 저장 성공");
       } catch (err) {
           console.error("기록 저장 실패:", err);
       }
@@ -281,14 +300,21 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
       .eq('room_id', roomId).eq('user_id', currentUserId);
   };
 
-  const finalizeGame = () => {
-     onGameOver(myRoundRef.current, playTime); 
+  // 🔥 [유지] 게임 종료 시 DB 일괄 정산 (헤더는 이미 업데이트 됨)
+  const finalizeGame = async () => {
+    if (coinRef.current > 0) {
+        try {
+            console.log(`💰 Saving ${coinRef.current} Coins to DB...`);
+            await supabase.rpc('increment_coin', { amount: coinRef.current });
+        } catch (err) {
+            console.error("코인 저장 실패:", err);
+        }
+    }
+    onGameOver(myRoundRef.current, playTime); 
   };
 
-// 🔥 [수정 3] 로딩 UI (화면 중앙 정렬 및 디자인 적용)
   if (isLoading) {
       return (
-          // min-h-screen으로 화면 전체 높이를 잡고 중앙 정렬
           <div className="w-full min-h-screen flex flex-col items-center justify-center animate-in fade-in select-none">
               <div className="text-[#FF9900] text-3xl font-black uppercase italic tracking-tighter animate-pulse">
                   Loading...
@@ -304,11 +330,12 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     <div className="w-full max-w-[340px] flex flex-col items-center py-6 animate-in fade-in select-none">
       
       {/* 1. 상단 정보 */}
-      <div className="w-full text-left mt-0 mb-6">
+      <div className="w-full text-left mt-0 mb-6 relative">
         <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {currentRound}</h2>
         <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">
           Total Time: {playTime.toFixed(2)} sec
         </p>
+        {/* ❌ [삭제] 코인 UI div 삭제됨 */}
         
         {roomData?.first_cleared_at && !isCleared && !isEliminated && (
           <div className="text-red-500 text-[10px] font-black uppercase animate-pulse border border-red-500/30 px-2 py-1 rounded w-fit mt-2">

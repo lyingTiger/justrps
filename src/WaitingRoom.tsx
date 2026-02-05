@@ -15,12 +15,16 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
   // 🔥 [추가] 강퇴 대상 ID 저장용 (null이면 모달 닫힘)
   const [kickTargetId, setKickTargetId] = useState<string | null>(null);
 
+  // 🔥 [추가] 강퇴 당했을 때 띄울 알림창 상태
+  const [showKickedModal, setShowKickedModal] = useState(false);
+
   // 🔥 [추가] 실시간 구독 함수 안에서 내 아이디를 정확히 알기 위한 Ref
   const userIdRef = useRef<string | null>(null);
   
   const isExiting = useRef(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const isCreatorRef = useRef(false);
+  const hasJoinedRef = useRef(false);
 
   // 🔊 효과음 (비프음)
   const playBeep = () => {
@@ -78,33 +82,26 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
       });
 
       channel
-        // 🔥 [수정] 참가자 변경 감지 (강퇴 당했을 때 나가는 로직 강화)
-       // 🔥 [수정] 필터(filter)를 제거하여 DELETE 이벤트를 확실하게 수신함
-        // 🔥 [수정] TypeScript 에러 해결을 위해 타입 단언(as any) 추가
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants' }, (payload) => {
+
+        // 🔥 [수정] 방 상태 변경(게임 시작) 감지 - 필터 제거 및 안전한 타입 처리
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms' }, (payload) => {
           
-          console.log('Realtime Event:', payload);
-
-          // TS 에러 해결: payload.new와 payload.old를 any로 캐스팅하여 속성 접근 허용
-          const newRecord = payload.new as any;
-          const oldRecord = payload.old as any;
-
-          // 1. 내 방에서 일어난 일이 아니면 무시
-          const eventRoomId = newRecord?.room_id || oldRecord?.room_id;
+          // 1. 데이터 안전하게 꺼내기
+          const newRoom = payload.new as any;
           
-          // 방 ID가 다르면 무시 (단, 삭제 이벤트는 oldRecord에 room_id가 없을 수도 있으므로 주의 필요하지만, 
-          // replica identity full 설정을 했다면 들어옵니다.)
-          if (eventRoomId && eventRoomId !== roomId) return;
+          // 2. 내 방 번호(roomId)와 일치하는지 확인 (필터 대신 직접 확인)
+          if (newRoom.id !== roomId) return;
 
-          // 2. 삭제(DELETE) 이벤트이고, 삭제된 사람이 '나(Ref)'라면? -> 즉시 퇴장
-          if (payload.eventType === 'DELETE' && oldRecord.user_id === userIdRef.current) {
-             alert("방장에 의해 강퇴되었습니다."); 
-             onLeave(); 
-             return; 
+          // 3. 방 정보 업데이트
+          setRoomInfo(newRoom);
+          if (user) isCreatorRef.current = (newRoom.creator_id === user.id);
+
+          // 4. 게임 시작 신호 감지
+          // 방장이 'status'를 'playing'으로 바꿨다면 -> 나도 게임 시작!
+          if (newRoom.status === 'playing') {
+             console.log("🎮 Game Start Signal Received!");
+             onStartGame();
           }
-          
-          // 3. 그 외(다른 사람이 들어오거나 나감) -> 리스트 갱신
-          fetchParticipants();
         })
         .on('broadcast', { event: 'alert_unready' }, (payload) => {
           if (payload.payload?.targetIds?.includes(currentUserId)) {
@@ -161,12 +158,37 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
+    // 🔥 [추가] 3초마다 명단 강제 새로고침 (이벤트 놓침 방지용 안전장치)
+    // 혹시라도 실시간 알림이 씹혀도, 3초 뒤에는 무조건 유저가 화면에 뜹니다.
+    const refreshInterval = setInterval(() => {
+        fetchParticipants();
+    }, 3000);
+
     return () => {
+      // 🔥 [추가] 나갈 때 타이머 해제
+      clearInterval(refreshInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, onLeave, onStartGame]);
+
+  // 🔥 [추가] 명단 변화 감지 센서 (강퇴 로직의 핵심)
+  useEffect(() => {
+    if (!currentUserId || participants.length === 0) return;
+
+    const isMeInList = participants.some(p => p.user_id === currentUserId);
+
+    if (isMeInList) {
+      // 명단에 내 이름이 보이면 "정상 입장 상태"로 도장 쾅!
+      hasJoinedRef.current = true;
+    } else {
+      // 내 이름이 없는데...
+      if (hasJoinedRef.current && !isExiting.current) {
+         setShowKickedModal(true); // 🔥 [추가] 모달 오픈!
+      }
+    }
+  }, [participants, currentUserId]);
 
   // --- 핸들러 함수들 ---
   const handleManualExit = async () => {
@@ -208,34 +230,83 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
   const handleToggleReady = async () => {
     if (!currentUserId || !roomId) return;
-    const me = participants.find(p => p.user_id === currentUserId);
-    if (!me) return;
+    
+    // 1. 현재 내 상태 찾기
+    const meIndex = participants.findIndex(p => p.user_id === currentUserId);
+    if (meIndex === -1) return;
+    
+    const me = participants[meIndex];
+    const newReadyState = !me.is_ready;
 
-    await supabase.from('room_participants')
-      .update({ is_ready: !me.is_ready })
+    // 2. 🔥 [낙관적 업데이트] 서버 응답 기다리지 않고 화면부터 즉시 변경! (반응속도 UP)
+    const nextParticipants = [...participants];
+    nextParticipants[meIndex] = { ...me, is_ready: newReadyState };
+    setParticipants(nextParticipants);
+
+    // 3. 뒤에서 조용히 DB 업데이트
+    const { error } = await supabase.from('room_participants')
+      .update({ is_ready: newReadyState })
       .eq('room_id', roomId).eq('user_id', currentUserId);
+
+    // 혹시 실패하면 원상복구 (롤백)
+    if (error) {
+        console.error("Ready update failed:", error);
+        alert("레디 상태 변경 실패!");
+        // 실패했으니 원래대로 되돌림
+        nextParticipants[meIndex] = { ...me, is_ready: !newReadyState };
+        setParticipants([...nextParticipants]);
+    }
   };
 
     const handleStart = async () => {
-    if (!roomId || !channelRef.current) return;
+    console.log("🖱️ Start Button Clicked!"); // [디버그용] 클릭 확인
 
-    // 1. 준비 안 된 사람 찾기 (방장 제외)
-    const unreadyUsers = participants.filter(p => p.user_id !== roomInfo.creator_id && !p.is_ready);
-    
-    // 2. 안 된 사람이 한 명이라도 있으면 -> 경고 신호(broadcast) 발송 후 함수 종료(return)
-    if (unreadyUsers.length > 0) {
-      const targetIds = unreadyUsers.map(p => p.user_id);
-      await channelRef.current.send({
-        type: 'broadcast',
-        event: 'alert_unready',
-        payload: { targetIds } // 누구한테 울릴지 명단 전송
-      });
-      return; // ⛔ 여기서 멈추므로 게임이 시작되지 않고 경고만 날아갑니다.
+    if (!roomId) {
+        console.error("❌ Error: Room ID is missing");
+        return;
     }
 
-    // 3. 모두 준비되었으면 -> 게임 시작 & 시드 변경
+    // 1. [멀티플레이] 2명 이상일 때만 '준비 안 된 사람' 체크
+    if (participants.length > 1) {
+        // roomInfo가 로딩 안 됐을 수도 있으니 creator_id 체크에 안전장치 추가
+        const creatorId = roomInfo?.creator_id || currentUserId; 
+        const unreadyUsers = participants.filter(p => p.user_id !== creatorId && !p.is_ready);
+        
+        if (unreadyUsers.length > 0) {
+          console.log("⚠️ Waiting for users:", unreadyUsers);
+          if (channelRef.current) {
+              const targetIds = unreadyUsers.map(p => p.user_id);
+              await channelRef.current.send({
+                type: 'broadcast',
+                event: 'alert_unready',
+                payload: { targetIds }
+              });
+          }
+          return; 
+        }
+    }
+
+    // 2. [공통] 게임 시작 시도
+    console.log("🚀 Attempting to start game (DB Update)...");
     const randomSeed = Math.floor(Math.random() * 10000); 
-    await supabase.from('rooms').update({ status: 'playing', seed: randomSeed }).eq('id', roomId);
+    
+    const { error } = await supabase
+        .from('rooms')
+        .update({ 
+            status: 'playing', 
+            seed: randomSeed 
+        })
+        .eq('id', roomId);
+
+    if (error) {
+        // 🔥 여기가 범인일 가능성이 높음! 에러 메시지를 alert로 띄움
+        console.error("❌ DB Update Failed:", error);
+        alert(`게임 시작 실패: ${error.message}`);
+    } else {
+        console.log("✅ DB Update Success! Starting Game...");
+        // 🔥 [중요] 방장은 DB 업데이트 성공 확인 후 즉시 게임 화면으로 이동 (서버 응답 대기 X)
+        onStartGame();
+    }
   };
 
   // --- 렌더링 준비 ---
@@ -395,6 +466,33 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
                 Confirm Kick
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🛠️ [추가] 강퇴 당함 알림 모달 🛠️ */}
+      {showKickedModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+          <div className="w-full max-w-[280px] bg-zinc-900 border border-zinc-800 rounded-[32px] p-6 shadow-2xl animate-in zoom-in-95 border-t-red-500 border-t-4 text-center">
+            
+            <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+               <span className="text-2xl">👋</span>
+            </div>
+            
+            <h3 className="text-white text-xl font-black uppercase italic tracking-tighter mb-2">
+              Kicked Out
+            </h3>
+            
+            <p className="text-zinc-500 text-[11px] font-bold leading-relaxed mb-6">
+              You have been removed from this room <br/> by the host.
+            </p>
+
+            <button 
+              onClick={onLeave} 
+              className="w-full h-12 bg-zinc-800 text-white text-xs font-black uppercase rounded-2xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700 hover:border-zinc-500"
+            >
+              Back to Lobby
+            </button>
           </div>
         </div>
       )}

@@ -574,7 +574,12 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
         
         {view === 'multiBattle' && currentRoomId && (
           <MultiGameEngine 
-            roomId={currentRoomId} userNickname={userNickname} playClickSound={playClickSound}
+            roomId={currentRoomId} 
+            userNickname={userNickname} 
+            playClickSound={playClickSound}
+            // 🔥 [추가] 이 줄을 꼭 넣어야 헤더의 코인이 올라갑니다!
+            onEarnCoin={() => setUserCoins(prev => prev + 1)}
+            
             onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('lobby'); }}
             onBackToLobby={() => setView('lobby')}
           />
