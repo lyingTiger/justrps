@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
-import MultiResultModal from './MultiResultModal'; // 🔥 모달 import
+import MultiResultModal from './MultiResultModal'; 
 
 interface MultiGameProps {
   roomId: string;
@@ -21,12 +21,12 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   const [roomData, setRoomData] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // 🔥 [추가] 결과 모달 표시 여부
   const [showResult, setShowResult] = useState(false);
 
-  // 서버 전송용 코인 저장소
   const coinRef = useRef(0);
+  
+  // ⏱️ [핵심] 멀티플레이도 '라운드 진입 시간'을 기준으로 기록
+  const roundEntryTimeRef = useRef(0);
 
   // 게임 로직 관련
   const [aiSelect, setAiSelect] = useState<number[]>([]);
@@ -39,7 +39,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const myRoundRef = useRef(1);
 
-  // --- 1. 초기 설정 및 구독 ---
+  // --- 1. 초기 설정 ---
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -50,9 +50,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
 
     const channel = supabase.channel(`multi_game_${roomId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, 
-        (payload) => {
-           setRoomData(payload.new);
-        })
+        (payload) => { setRoomData(payload.new); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` }, 
         () => fetchParticipants())
       .subscribe();
@@ -61,21 +59,15 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
       if (timerRef.current) clearInterval(timerRef.current);
       supabase.removeChannel(channel); 
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
-  // --- 2. 게임 종료 감지 (전원 종료 시 결과창 오픈) ---
+  // --- 2. 게임 종료 감지 ---
   useEffect(() => {
     if (!participants || participants.length === 0) return;
-
-    // 1. 모든 참가자가 죽거나(is_dead) 깼거나(is_cleared) 확인
     const allFinished = participants.every(p => p.is_dead || p.is_cleared);
-
-    // 2. 내가 게임이 끝났고(관전모드) + 전원이 끝났다면 -> 결과창 오픈!
     if ((isEliminated || isCleared) && allFinished) {
-        if (!showResult) {
-            // 약간의 딜레이 후 결과창 표시
-            setTimeout(() => setShowResult(true), 1000);
-        }
+        if (!showResult) setTimeout(() => setShowResult(true), 1000);
     }
   }, [participants, isEliminated, isCleared, showResult]);
 
@@ -97,8 +89,11 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
                 if (me) {
                     const savedRound = me.current_round || 1;
                     myRoundRef.current = savedRound;
+                    
                     setPlayTime(me.play_time || 0);
-                    // 이미 죽었거나 깬 상태로 재진입 시 처리
+                    // 재접속 시 이전 플레이 타임을 진입 시간으로 복구
+                    roundEntryTimeRef.current = me.play_time || 0; 
+
                     if (me.is_dead) setIsEliminated(true);
                     else startNewRound(savedRound, safeSeed, safeMode, true); 
                 } else {
@@ -120,7 +115,10 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     myRoundRef.current = newRound;
     setCurrentRound(newRound);
     
-    // 시드 및 문제 생성 로직 (기존 동일)
+    // ⏱️ 라운드 시작 시점의 시간을 '진입 시간'으로 저장
+    if (newRound === 1) roundEntryTimeRef.current = 0;
+    else roundEntryTimeRef.current = playTime;
+
     const roundSeed = seed + newRound; 
     const seededRandom = (s: number) => () => {
         s |= 0; s = s + 0x6D2B79F5 | 0;
@@ -221,17 +219,19 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
         }
     }
 
-    // 정답 시 처리
     if (isCorrectAnswer) {
         coinRef.current += 1;
-        onEarnCoin(); // 헤더 업데이트
+        onEarnCoin(); 
     }
 
     if (isRoundClear) {
         setIsCleared(true);
         if (timerRef.current) clearInterval(timerRef.current);
         const nextRound = myRoundRef.current + 1;
+        
+        // 🔥 [중요] 다음 라운드 DB 저장 시, 시간을 '현재 playTime(==다음라운드 진입시간)'으로 저장
         await updateMyStatus(nextRound, false, playTime, false);
+        
         setTimeout(() => {
             startNewRound(nextRound, roomData.seed || 1234, roomData.mode);
         }, 1000); 
@@ -241,22 +241,69 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   const handleElimination = async (reason: string) => {
     setIsEliminated(true);
     if (timerRef.current) clearInterval(timerRef.current);
-    // 탈락 시 earned_coins도 같이 저장
-    await updateMyStatus(myRoundRef.current, false, playTime, true); 
-    finalizeGame(); // 코인 DB 저장
+    
+    // 🔥 [중요] 탈락 시 기록 저장: 전체 시간이 아니라 '라운드 진입 시간'을 저장
+    await updateMyStatus(myRoundRef.current, false, roundEntryTimeRef.current, true); 
+    
+    // 리더보드에도 진입 시간으로 기록
+    saveRecordToLeaderboard(myRoundRef.current, roundEntryTimeRef.current);
+
+    finalizeGame();
+  };
+
+  
+
+  const saveRecordToLeaderboard = async (finalRound: number, time: number) => {
+      if (!currentUserId) return;
+      try {
+          // 1. 기본: 멀티플레이 전적(히스토리) 저장 (기존 코드)
+          await supabase.from('game_records').insert({
+              user_id: currentUserId,
+              round: finalRound,
+              play_time: time,
+              mode: mode
+          });
+
+          // 🔥 [추가] 혼자 플레이했다면(참가자 1명), 싱글 랭킹에도 도전!
+          // if (participants.length === 1) 
+          {
+               console.log("혼자 플레이했으므로 싱글 랭킹 갱신 시도...");
+             
+             // 내 최고 기록 확인
+             const { data: record } = await supabase
+                .from('mode_records')
+                .select('*')
+                .eq('user_id', currentUserId)
+                .eq('mode', mode)
+                .maybeSingle();
+             
+             // 신기록이면 갱신 (싱글플레이 로직과 동일)
+             const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && time < record.best_time);
+
+             if (isNewRecord) {
+                 await supabase.from('mode_records').upsert({ 
+                    user_id: currentUserId, 
+                    mode: mode, 
+                    best_round: finalRound, 
+                    best_time: time, 
+                    updated_at: new Date().toISOString() 
+                 }, { onConflict: 'user_id, mode' });
+                 console.log("🎉 멀티 연습게임으로 싱글 랭킹 갱신 완료!");
+             }
+          }
+
+      } catch (err) { console.error("기록 저장 실패:", err); }
   };
 
   const updateMyStatus = async (round: number, cleared: boolean, time: number, dead: boolean) => {
     if (!currentUserId) return;
-    
-    // 🔥 [수정] earned_coins 컬럼 업데이트 추가
     await supabase.from('room_participants')
       .update({ 
           current_round: round, 
           is_cleared: cleared, 
           play_time: time, 
           is_dead: dead,
-          earned_coins: coinRef.current // 현재까지 획득한 코인 저장
+          earned_coins: coinRef.current 
       })
       .eq('room_id', roomId).eq('user_id', currentUserId);
   };
@@ -267,16 +314,33 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
             await supabase.rpc('increment_coin', { amount: coinRef.current });
         } catch (err) { console.error(err); }
     }
-    // onGameOver 호출 삭제 (이제 모달이 대신함)
   };
 
-  // --- 렌더링 ---
+  const handleBackToRoom = async () => {
+    if (!currentUserId || !roomId) return;
+    await supabase.from('room_participants')
+      .update({ 
+        current_round: 1, 
+        is_cleared: false, 
+        is_dead: false, 
+        play_time: 0, 
+        earned_coins: 0,
+        is_ready: false 
+      })
+      .eq('room_id', roomId)
+      .eq('user_id', currentUserId);
+
+    if (roomData?.creator_id === currentUserId) {
+        console.log("🧹 Host resetting room status...");
+        await supabase.from('rooms').update({ status: 'waiting', first_cleared_at: null }).eq('id', roomId);
+    }
+    onGameOver(1, 0); 
+  };
+
   if (isLoading) return <div className="text-white text-center mt-20 animate-pulse">Loading Battle...</div>;
 
   return (
     <div className="w-full max-w-[340px] flex flex-col items-center py-6 animate-in fade-in select-none">
-      
-      {/* 1. 상단 정보 */}
       <div className="w-full text-left mt-0 mb-6 relative">
         <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {currentRound}</h2>
         <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">Total Time: {playTime.toFixed(2)} sec</p>
@@ -285,7 +349,6 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
         )}
       </div>
 
-      {/* 2. 타 플레이어 현황 */}
       <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-3xl p-4 mb-8 space-y-2">
         <div className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Other Players</div>
         {participants.filter(p => p.user_id !== currentUserId).map(p => (
@@ -300,9 +363,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
         ))}
       </div>
 
-      {/* 3. 게임 영역 (죽었으면 관전 메시지) */}
       <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] w-full">
-         {/* 관전 모드일 때 메시지 표시 */}
          {(isEliminated || isCleared) ? (
             <div className="text-center animate-in zoom-in">
                 <div className="text-6xl mb-4">{isEliminated ? "💀" : "🎉"}</div>
@@ -314,7 +375,6 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
                 </p>
             </div>
          ) : (
-             // 게임 진행 화면 (기존 코드 유지)
              <>
                  {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
                     <div className="text-center mb-10 select-none">
@@ -354,7 +414,6 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
          )}
       </div>
 
-      {/* 4. 버튼 영역 */}
       <div className="w-full flex justify-center mt-auto">
         {(!isEliminated && !isCleared) && (
             isMemoryPhase ? (
@@ -369,17 +428,12 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
         )}
       </div>
 
-      {/* 🔥 결과 모달 연결 */}
       <MultiResultModal 
         isOpen={showResult} 
         roomId={roomId} 
         currentUserId={currentUserId}
         onBackToLobby={onBackToLobby}
-        onBackToRoom={() => {
-            // 방으로 돌아갈 때: 나만 나가는 게 아니라 방 전체 상태를 리셋하면 좋겠지만,
-            // 간단하게 onGameOver를 호출하여 상위 컴포넌트(WaitingRoom)로 돌아가게 함
-            onGameOver(myRoundRef.current, playTime);
-        }}
+        onBackToRoom={handleBackToRoom}
       />
     </div>
   );

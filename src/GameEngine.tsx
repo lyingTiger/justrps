@@ -1,19 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 
-// 부모(App.tsx)로부터 전달받는 데이터 규격 정의
 interface GameProps {
   round: number;
   mode: string;
   playClickSound: () => void;
   onEarnCoin: () => void;
   onRoundClear: (nextRound: number) => void;
-  onGameOver: (finalRound: number, entryTime: number) => void; // entryTime 전달 확인
+  // 🔥 entryTime: 해당 라운드에 진입했을 때의 시간
+  onGameOver: (finalRound: number, entryTime: number) => void; 
   isModalOpen: boolean; 
 }
 
 export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin }: GameProps) {
+  // 화면 표시용 전체 시간
   const [playTime, setPlayTime] = useState(0);      
-  // ✨ [추가] 이번 라운드에 '진입했을 때'의 시간을 기억하는 변수
+  // 🔥 [핵심] 기록용: 이번 라운드 진입 시간
   const [entryTime, setEntryTime] = useState(0);
 
   const [aiSelect, setAiSelect] = useState<number[]>([]); 
@@ -24,21 +25,15 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
   const [isMemoryPhase, setIsMemoryPhase] = useState(true); 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 라운드 초기화 및 타이머 시작
   useEffect(() => {
-    // -----------------------------------------------------------
-    // ✨ [수정] 시간 초기화 및 진입 시간 기록 로직
-    // -----------------------------------------------------------
+    // 1. 라운드 진입 시점의 시간을 스냅샷 찍음
     if (round === 1) {
-      // 첫 게임 시작 시에만 시간을 0으로 리셋
       setPlayTime(0);
       setEntryTime(0);
     } else {
-      // 2라운드부터는 시간을 리셋하지 않음 (누적)
-      // 대신, 현재까지 흐른 시간을 '이번 라운드 진입 시간'으로 저장
+      // 2라운드부터는 현재까지 흐른 시간이 진입 시간
       setEntryTime(playTime);
     }
-    // -----------------------------------------------------------
 
     const questionNum = round + 2; 
     const newAiSelect = Array.from({ length: questionNum }, () => Math.floor(Math.random() * 3));
@@ -57,15 +52,12 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
     setSatisfiedConditions([]);
     setIsMemoryPhase(true); 
     
-    // 🔥 [삭제] setPlayTime(0); <- 이 코드가 매 라운드 시간을 리셋시키고 있었음. 삭제함.
-
-    // 기존 타이머가 있다면 제거 후 새로 시작 (누적된 playTime에 계속 더함)
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => setPlayTime(prev => prev + 0.01), 10);
 
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [round, mode]); // playTime을 의존성 배열에 넣지 않음 (라운드 전환 시점의 값만 필요)
+  }, [round, mode]); 
 
   const getCounts = (list: string[]) => {
     const counts = { WIN: 0, DRAW: 0, LOSE: 0 };
@@ -106,16 +98,15 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
         }
       }
       
-      // 틀렸을 때 처리
+      // 틀렸을 때: 진입 시간(entryTime)을 기록으로 넘김
       if (!foundMatch) { 
         if (timerRef.current) clearInterval(timerRef.current); 
-        // ✨ [수정] playTime 대신 entryTime을 전달하여 '해당 라운드 진입 시간'을 기록으로 사용
         onGameOver(round, parseFloat(entryTime.toFixed(2))); 
       }
       return;
     }
 
-    // [2] 익스퍼트 및 기타 모드
+    // [2] 일반/익스퍼트 모드
     const aiHand = aiSelect[questionTurn];
     const condition = targetConditions[questionTurn];
     let isCorrect = false;
@@ -133,9 +124,8 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
         setQuestionTurn(prev => prev + 1);
       }
     } else {
-      // 틀렸을 때 처리
+      // 틀렸을 때: 진입 시간(entryTime)을 기록으로 넘김
       if (timerRef.current) clearInterval(timerRef.current);
-      // ✨ [수정] playTime 대신 entryTime 전달
       onGameOver(round, parseFloat(entryTime.toFixed(2)));
     }
   };
@@ -144,7 +134,7 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
     <div className="w-full max-w-[320px] flex flex-col min-h-[550px] justify-start py-6 animate-in fade-in duration-500">
       <div className="w-full text-left mt-0">
         <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {round}</h2>
-        {/* 화면에는 계속 흐르는 누적 시간(playTime)을 보여줌 */}
+        {/* 화면에는 긴장감을 위해 계속 흐르는 시간 표시 */}
         <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">Play Time: {playTime.toFixed(2)} sec</p>
       </div>
 

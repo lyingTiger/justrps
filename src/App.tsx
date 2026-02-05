@@ -393,69 +393,82 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
     audio.play().catch(() => {});
   };
 
- // --- [수정: 게임 오버 로직 개선] ---
+  // --- [App.tsx 내부 수정] ---
   const handleGameOver = async (finalRound: number, entryTime: number) => {
-    // 1. [UI 우선] DB 조회 전에 모달부터 띄워서 사용자에게 결과를 즉시 보여줍니다.
-    // 'isNewRecord'는 일단 false로 보여주고, 아래에서 비동기로 확인 후 업데이트합니다.
+    console.log(`🏁 Game Over Report: Round ${finalRound}, Time ${entryTime}`);
+
+    // 1. UI 표시 (DB 저장 여부와 상관없이 즉시 뜸)
     setResultData({ 
       round: finalRound, 
       time: entryTime, 
       coins: sessionCoins, 
       isNewRecord: false 
     });
-    setRound(finalRound); // 배경 라운드 UI 맞춤
-    setShowResultModal(true); // 🔥 모달 즉시 오픈!
+    setRound(finalRound); 
+    setShowResultModal(true); 
 
-    // 2. [방어 코드] 유저 ID가 없으면 DB 저장은 건너뛰되, 게임은 멈추지 않게 함
     if (!currentUserId) {
-        console.warn("로그인 정보가 없어 기록이 저장되지 않습니다.");
+        console.error("❌ 오류: 로그인 정보가 없어 기록을 저장할 수 없습니다.");
         return;
     }
 
     try {
-      // 3. [비동기] 최고 기록 확인 및 DB 저장 (백그라운드 처리)
-      const { data: record, error } = await supabase
+      // 2. 내 최고 기록 가져오기
+      const { data: record, error: fetchError } = await supabase
         .from('mode_records')
         .select('*')
         .eq('user_id', currentUserId)
         .eq('mode', selectedOption)
         .maybeSingle();
 
-      if (error) throw error;
+      if (fetchError) {
+          console.error("❌ 기존 기록 조회 실패 (DB 권한 확인 필요):", fetchError.message);
+          throw fetchError;
+      }
 
-      // 신기록 여부 판단
+      // 3. 신기록인지 판별
+      // 기록이 아예 없거나( !record ) 
+      // 라운드가 더 높거나 ( finalRound > record.best_round )
+      // 라운드는 같은데 시간이 더 짧으면 ( ... && entryTime < record.best_time )
       const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && entryTime < record.best_time);
 
-      // 4. [상태 업데이트] 신기록이라면 모달 내용을 갱신해서 "NEW RECORD" 배지 표시
+      console.log(`📊 기록 판독: 기존 ${record?.best_round || 0}R vs 현재 ${finalRound}R -> 신기록? ${isNewRecord}`);
+
       if (isNewRecord) {
-        setResultData(prev => ({ ...prev, isNewRecord: true })); // 모달이 떠 있는 상태에서 내용만 갱신됨
+        setResultData(prev => ({ ...prev, isNewRecord: true }));
         
-        await supabase.from('mode_records').upsert({ 
+        // 4. DB에 저장 (Upsert)
+        const { error: upsertError } = await supabase.from('mode_records').upsert({ 
           user_id: currentUserId, 
           mode: selectedOption, 
           best_round: finalRound, 
           best_time: entryTime, 
           updated_at: new Date().toISOString() 
         }, { onConflict: 'user_id, mode' });
+
+        if (upsertError) {
+            console.error("❌ DB 저장 실패 (RLS 정책 확인):", upsertError.message);
+        } else {
+            console.log("✅ 신기록 DB 저장 완료!");
+        }
       }
 
-      // 5. 로그 저장 및 코인 지급
-      await Promise.all([
-        supabase.from('game_logs').insert({ 
+      // 5. 로그 및 코인 저장
+      await supabase.from('game_logs').insert({ 
           user_id: currentUserId, 
           mode: selectedOption, 
           reached_round: finalRound, 
           play_time: entryTime 
-        }),
-        sessionCoins > 0 ? supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: sessionCoins }) : Promise.resolve()
-      ]);
+      });
       
-      // 유저 데이터(코인 등) 최신화
+      if (sessionCoins > 0) {
+          await supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: sessionCoins });
+      }
+      
       fetchUserData(currentUserId);
 
     } catch (err) {
-      console.error("게임 결과 저장 실패:", err);
-      // 에러가 나도 이미 모달은 떠 있으므로 사용자는 당황하지 않음
+      console.error("🔥 치명적 에러:", err);
     }
   };
 
@@ -577,11 +590,21 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
             roomId={currentRoomId} 
             userNickname={userNickname} 
             playClickSound={playClickSound}
-            // 🔥 [추가] 이 줄을 꼭 넣어야 헤더의 코인이 올라갑니다!
-            onEarnCoin={() => setUserCoins(prev => prev + 1)}
+            // 코인 획득 시 헤더 업데이트
+            onEarnCoin={() => setUserCoins(prev => prev + 1)} 
             
-            onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('lobby'); }}
-            onBackToLobby={() => setView('lobby')}
+            // 🔥 [수정 1] "Back to Room" 클릭 시 -> 대기실(waitingRoom)로 이동!
+            onGameOver={() => { 
+                if (currentUserId) fetchUserData(currentUserId); 
+                setView('waitingRoom'); // 방 번호(currentRoomId)는 유지됨
+            }}
+            
+            // 🔥 [수정 2] "To Lobby" 클릭 시 -> 메인 로비로 이동 (방 번호 삭제)
+            onBackToLobby={() => { 
+                if (currentUserId) fetchUserData(currentUserId);
+                setCurrentRoomId(null); // 방에서 완전히 나감
+                setView('lobby'); 
+            }}
           />
         )}
 
