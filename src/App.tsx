@@ -626,23 +626,6 @@ export default function App() {
           <h2 className="text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>
             <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
           </h2>
-          
-          {/* 🔻 [신규] 방문자 통계 UI */}
-          <div className="flex flex-col border-l border-zinc-800 pl-4 h-8 justify-center">
-            <div className="flex items-center leading-none mb-1">
-              {/* w-8을 주어 Today와 Total 뒤의 숫자가 같은 위치에서 시작하게 함 */}
-              <span className="w-8 text-[8px] text-zinc-500 font-black uppercase tracking-tighter">Today</span>
-              <span className="text-[10px] text-white font-mono font-bold text-left">
-                {visitorStats.today.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex items-center leading-none">
-              <span className="w-8 text-[8px] text-zinc-500 font-black uppercase tracking-tighter">Total</span>
-              <span className="text-[10px] text-white font-mono font-bold text-left">
-                {visitorStats.total.toLocaleString()}
-              </span>
-            </div>
-          </div>
         </div>
 
 
@@ -667,7 +650,7 @@ export default function App() {
                   onClick={() => setView('info')} 
                   className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white"
                 >
-                  Info
+                  game Info
                 </button>
 
                 <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800 uppercase">Logout</button>
@@ -699,7 +682,11 @@ export default function App() {
         )}
 
         {view === 'info' && (
-          <InfoPage onBack={() => setView('lobby')} />
+          <InfoPage 
+            onBack={() => setView('lobby')} 
+            todayCount={visitorStats.today} 
+            totalCount={visitorStats.total}
+          />
         )}
         
         {view === 'lobby' && (

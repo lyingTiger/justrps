@@ -120,6 +120,7 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
         <div className="flex gap-2">
           <input 
             type="text" 
+            autoComplete="one-time-code" // 또는 "new-password", "one-time-code"
             placeholder="ROOM NAME / SEARCH" 
             value={newRoomName}
             onChange={(e) => { setNewRoomName(e.target.value); setSearchName(e.target.value); }}
@@ -131,6 +132,7 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
         <div className="flex gap-2">
           <input 
             type="password" 
+            autoComplete="one-time-code" // 또는 "new-password", "one-time-code"
             placeholder="PASSWORD (OPTIONAL)" 
             value={password}
             onChange={(e) => setPassword(e.target.value)}
