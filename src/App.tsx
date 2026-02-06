@@ -54,6 +54,10 @@ export default function App() {
   const [sessionCoins, setSessionCoins] = useState(0); 
   const CONTINUE_COST = 50;
 
+  // 🔻 [추가] 전면 광고 제어용 상태
+  const [adFreeUntil, setAdFreeUntil] = useState<string | null>(null); // 광고 제거 만료 시간
+  const [playCount, setPlayCount] = useState(0); // 게임 판수 카운터
+
   // ------------------------------------------------------------------
   // ✨ [신규 추가] 상태 초기화 함수 (로그아웃 시 잔여 데이터 제거용)
   // ------------------------------------------------------------------
@@ -122,6 +126,7 @@ export default function App() {
       
       setUserNickname(newName);
       setUserCoins(newCoins);
+      setAdFreeUntil(profile.ad_free_until);
 
       // 🚀 [추가] 브라우저에 데이터 박제 (새로고침 대비)
       localStorage.setItem('cached_nickname', newName);
@@ -396,7 +401,24 @@ export default function App() {
     audio.play().catch(() => {});
   };
 
-  // --- [App.tsx 내부 수정] ---
+
+  // 🔥 [신규] 전면 광고 실행 로직 (100시간 혜택 체크)
+  const showInterstitialAd = () => {
+    if (adFreeUntil) {
+      const now = new Date();
+      const expiryDate = new Date(adFreeUntil);
+
+      if (now < expiryDate) {
+        console.log("💎 100시간 광고 제거 혜택 적용 중입니다. 광고를 건너뜁니다.");
+        return; 
+      }
+    }
+
+    // 혜택이 없으면 광고 호출
+    console.log("🎬 전면 광고(Interstitial Ad)를 호출합니다.");
+    // 실제 광고 API 연동 시 이 아래에 코드를 작성합니다.
+  };
+
   const handleGameOver = async (finalRound: number, entryTime: number) => {
     console.log(`🏁 Game Over Report: Round ${finalRound}, Time ${entryTime}`);
 
@@ -472,8 +494,19 @@ export default function App() {
 
     } catch (err) {
       console.error("🔥 치명적 에러:", err);
+    } finally {
+      // 🔻 [추가] 3판마다 전면 광고 실행 로직
+      const newPlayCount = playCount + 1;
+      setPlayCount(newPlayCount);
+
+      if (newPlayCount >= 3) {
+        showInterstitialAd();
+        setPlayCount(0); // 카운트 초기화
+      }
     }
   };
+
+
 
   // 🔥 [신규] 광고 보고 이어하기 처리
   const handleAdContinueSuccess = () => {
