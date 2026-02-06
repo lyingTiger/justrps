@@ -10,6 +10,7 @@ import WaitingRoom from './WaitingRoom';
 import MultiGameEngine from './MultiGameEngine'; 
 import ShopPage from './ShopPage';
 import AdOverlay from './AdOverlay';
+import InfoPage from './InfoPage';
 
 export default function App() {
   // --- 1. 유저 및 세션 상태 ---
@@ -19,10 +20,10 @@ export default function App() {
   const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached_coins') || '0'));
   const [showResultModal, setShowResultModal] = useState(false);
   const [showAdOverlay, setShowAdOverlay] = useState(false);
+  const [visitorStats, setVisitorStats] = useState({ today: 0, total: 0 });
 
   // --- 2. 게임 및 뷰 제어 ---
-  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle'>('lobby');
-  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); 
+  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle' | 'info'>('lobby');  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); 
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
   const [round, setRound] = useState(1);
   const [gameKey, setGameKey] = useState(Date.now());
@@ -204,6 +205,16 @@ export default function App() {
   // ------------------------------------------------------------------
   useEffect(() => {
     document.title = "just RPS";
+
+    // 🔻 [추가] 방문자 수 업데이트 및 조회
+  const handleVisitors = async () => {
+    await supabase.rpc('increment_visitor');
+    const { data } = await supabase.from('site_stats').select('today_count, total_count').eq('id', 'global').single();
+    if (data) {
+      setVisitorStats({ today: data.today_count, total: data.total_count });
+    }
+  };
+  handleVisitors();
     
     // 1. [초기 세션 확인] 데이터 로드 로직을 삭제합니다. (중복 방지)
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -569,18 +580,51 @@ export default function App() {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => setIsUserMenuOpen(false)}>
       <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50">
-        {/* 🔻 [수정] 상단 헤더 로고: just(오렌지) + R(파랑)/P(초록)/S(핑크) 적용 */}
-        <h2 className="text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>
-          <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
-        </h2>
+        
+        {/* 🔻 [수정] 로고와 방문자 수를 한 덩어리로 묶음 */}
+        <div className="flex items-center gap-6">
+          <h2 className="text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>
+            <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
+          </h2>
+          
+          {/* 🔻 [신규] 방문자 통계 UI */}
+          <div className="flex flex-col border-l border-zinc-800 pl-4 h-8 justify-center">
+            <div className="flex items-center leading-none mb-1">
+              {/* w-8을 주어 Today와 Total 뒤의 숫자가 같은 위치에서 시작하게 함 */}
+              <span className="w-8 text-[8px] text-zinc-500 font-black uppercase tracking-tighter">Today</span>
+              <span className="text-[10px] text-white font-mono font-bold text-left">
+                {visitorStats.today.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center leading-none">
+              <span className="w-8 text-[8px] text-zinc-500 font-black uppercase tracking-tighter">Total</span>
+              <span className="text-[10px] text-white font-mono font-bold text-left">
+                {visitorStats.total.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+
+
         <div className="flex items-center gap-4">
           <div className="relative">
             <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 tracking-tighter">
               {userNickname} <span className="text-[10px] opacity-50">▼</span>
             </button>
+
+            {/* 사용자 메뉴 드랍다운 */}
+
             {isUserMenuOpen && (
               <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-1 z-[100] shadow-2xl">
                 <button onClick={() => setView('settings')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">Settings</button>
+
+                <button 
+                  onClick={() => setView('info')} 
+                  className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white"
+                >
+                  Info
+                </button>
+
                 <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800 uppercase">Logout</button>
               </div>
             )}
@@ -599,6 +643,10 @@ export default function App() {
             onSaveNickname={(nick: string) => handleSaveNickname(nick)} 
             volume={volume} setVolume={setVolume} isMuted={isMuted} setIsMuted={setIsMuted} onBack={() => setView('lobby')} 
           />
+        )}
+
+        {view === 'info' && (
+          <InfoPage onBack={() => setView('lobby')} />
         )}
         
         {view === 'lobby' && (
