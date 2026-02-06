@@ -6,15 +6,12 @@ interface GameProps {
   playClickSound: () => void;
   onEarnCoin: () => void;
   onRoundClear: (nextRound: number) => void;
-  // 🔥 entryTime: 해당 라운드에 진입했을 때의 시간
-  onGameOver: (finalRound: number, entryTime: number) => void; 
+  onGameOver: (finalRound: number, entryTime: number) => void; // entryTime 기준
   isModalOpen: boolean; 
 }
 
-export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin }: GameProps) {
-  // 화면 표시용 전체 시간
-  const [playTime, setPlayTime] = useState(0);      
-  // 🔥 [핵심] 기록용: 이번 라운드 진입 시간
+export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin, isModalOpen }: GameProps) {  const [playTime, setPlayTime] = useState(0);      
+  // ⏱️ [핵심] 이번 라운드 진입 시간 저장소
   const [entryTime, setEntryTime] = useState(0);
 
   const [aiSelect, setAiSelect] = useState<number[]>([]); 
@@ -26,12 +23,11 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // 1. 라운드 진입 시점의 시간을 스냅샷 찍음
+    // 1라운드는 0초 시작, 그 외에는 현재까지 흐른 시간이 진입 시간
     if (round === 1) {
       setPlayTime(0);
       setEntryTime(0);
     } else {
-      // 2라운드부터는 현재까지 흐른 시간이 진입 시간
       setEntryTime(playTime);
     }
 
@@ -52,12 +48,30 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
     setSatisfiedConditions([]);
     setIsMemoryPhase(true); 
     
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => setPlayTime(prev => prev + 0.01), 10);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [round, mode]);
 
+
+  // 🚨 [신규 추가] 모달 상태에 따라 타이머를 멈추거나 다시 시작하는 로직
+  useEffect(() => {
+    if (isModalOpen) {
+      // 결과창이 뜨면 타이머를 멈춤
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    } else {
+      // 결과창이 닫히면(이어하기 성공 시) 타이머가 없을 경우 다시 시작
+      if (!timerRef.current) {
+        timerRef.current = setInterval(() => setPlayTime(prev => prev + 0.01), 10);
+      }
+    }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [round, mode]); 
+  }, [isModalOpen, round]);
+
 
   const getCounts = (list: string[]) => {
     const counts = { WIN: 0, DRAW: 0, LOSE: 0 };
@@ -98,9 +112,9 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
         }
       }
       
-      // 틀렸을 때: 진입 시간(entryTime)을 기록으로 넘김
       if (!foundMatch) { 
         if (timerRef.current) clearInterval(timerRef.current); 
+        // 🔥 [수정] playTime이 아니라 entryTime(진입 시간)을 기록으로 사용
         onGameOver(round, parseFloat(entryTime.toFixed(2))); 
       }
       return;
@@ -124,8 +138,8 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
         setQuestionTurn(prev => prev + 1);
       }
     } else {
-      // 틀렸을 때: 진입 시간(entryTime)을 기록으로 넘김
       if (timerRef.current) clearInterval(timerRef.current);
+      // 🔥 [수정] entryTime(진입 시간)을 기록으로 사용
       onGameOver(round, parseFloat(entryTime.toFixed(2)));
     }
   };
@@ -134,7 +148,7 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
     <div className="w-full max-w-[320px] flex flex-col min-h-[550px] justify-start py-6 animate-in fade-in duration-500">
       <div className="w-full text-left mt-0">
         <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {round}</h2>
-        {/* 화면에는 긴장감을 위해 계속 흐르는 시간 표시 */}
+        {/* 화면에는 계속 흐르는 시간을 보여줌 (긴장감 유도) */}
         <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">Play Time: {playTime.toFixed(2)} sec</p>
       </div>
 
