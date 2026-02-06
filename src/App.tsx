@@ -376,6 +376,41 @@ useEffect(() => {
     }
   };
 
+
+  // ------------------------------------------------------------------
+  // 🔄 [신규] 브라우저 뒤로 가기 인터셉트 (App-like Navigation)
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    // 1. 현재 뷰가 바뀔 때마다 브라우저 히스토리에 상태를 밀어넣습니다.
+    // 로비(lobby)가 아닐 때만 히스토리를 쌓아서, 로비에서는 뒤로 가기 시 실제 종료되도록 유도할 수도 있습니다.
+    if (view !== 'lobby') {
+      window.history.pushState({ view }, '', '');
+    } else {
+      // 로비일 때는 히스토리를 초기화하거나 메인 상태를 유지합니다.
+      window.history.replaceState({ view: 'lobby' }, '', '');
+    }
+
+    // 2. 사용자가 '뒤로 가기'를 눌렀을 때 실행될 함수
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.view) {
+        console.log("⬅️ 뒤로 가기 감지: ", event.state.view);
+        setView(event.state.view); // 기록된 이전 뷰로 강제 이동
+      } else {
+        // 기록된 상태가 없으면 로비로 보냅니다.
+        setView('lobby');
+      }
+    };
+
+    // 3. 이벤트 리스너 등록
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [view]); // view가 바뀔 때마다 히스토리에 박제
+  
+
+
   const handleGoogleLogin = async () => {
     try {
       await supabase.auth.signInWithOAuth({
