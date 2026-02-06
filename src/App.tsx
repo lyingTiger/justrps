@@ -227,13 +227,26 @@ export default function App() {
     document.title = "just RPS";
 
     // 🔻 [추가] 방문자 수 업데이트 및 조회
-  const handleVisitors = async () => {
-    await supabase.rpc('increment_visitor');
-    const { data } = await supabase.from('site_stats').select('today_count, total_count').eq('id', 'global').single();
+    const handleVisitors = async () => {
+      await supabase.rpc('increment_visitor');
+      // 🔻 [수정] .single() 대신 .maybeSingle()을 사용하여 406 에러를 방지합니다.
+    const { data, error } = await supabase
+      .from('site_stats')
+      .select('today_count, total_count')
+      .eq('id', 'global')
+      .maybeSingle(); // 👈 이 부분으로 교체
+
+    if (error) {
+      console.error("❌ 방문자 데이터 로드 실패:", error.message);
+      return;
+    }
+
     if (data) {
       setVisitorStats({ today: data.today_count, total: data.total_count });
+    } else {
+      console.warn("⚠️ 'global' 통계 데이터가 아직 생성되지 않았습니다.");
     }
-  };
+    };
   handleVisitors();
     
     // 1. [초기 세션 확인] 데이터 로드 로직을 삭제합니다. (중복 방지)
