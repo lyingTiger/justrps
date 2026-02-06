@@ -10,6 +10,7 @@ interface SettingsPageProps {
   isMuted: boolean;
   setIsMuted: (m: boolean) => void;
   onBack: () => void;
+  playClickSound: () => void;
 }
 
 export default function SettingsPage({ 
@@ -20,7 +21,8 @@ export default function SettingsPage({
   setVolume, 
   isMuted, 
   setIsMuted, 
-  onBack 
+  onBack,
+  playClickSound 
 }: SettingsPageProps) {
   return (
     <div className="w-full max-w-[320px] flex flex-col items-center mt-12 px-4 animate-in fade-in duration-500">
@@ -34,11 +36,12 @@ export default function SettingsPage({
             type="text" 
             value={userNickname} 
             onChange={(e) => setUserNickname(e.target.value)}
+            maxLength={15}
             className="w-full h-12 bg-black border border-zinc-800 rounded-2xl px-4 text-sm text-white outline-none focus:border-[#FF9900] transition-colors font-bold"
           />
           <button 
             onClick={() => onSaveNickname(userNickname)}
-            className="w-full h-12 bg-[#FF9900] text-black font-black uppercase rounded-2xl text-xs active:scale-95 transition-all shadow-lg"
+            className="w-full h-12 bg-[#FF9900] text-black font-black uppercase rounded-2xl text-base active:scale-95 transition-all shadow-lg"
           >
             Save Changes
           </button>
@@ -65,8 +68,12 @@ export default function SettingsPage({
         </div>
       </div>
 
-      <button onClick={onBack} className="mt-10 text-[10px] text-zinc-600 font-bold uppercase underline tracking-widest hover:text-[#FF9900] transition-colors">
-        Back to Lobby
+      {/* 메인으로 버튼 */}
+      <button 
+        onClick={() => { playClickSound(); onBack(); }} 
+        className="w-3/4 h-14 mt-8 rounded-md font-bold text-base bg-[#FF9900] text-black uppercase active:scale-95 transition-all shadow-lg"
+      >
+        Main
       </button>
     </div>
   );

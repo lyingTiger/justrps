@@ -22,6 +22,9 @@ export default function App() {
   const [showAdOverlay, setShowAdOverlay] = useState(false);
   const [visitorStats, setVisitorStats] = useState({ today: 0, total: 0 });
 
+  // 인게임 메시지 팝업 상태
+  const [msgPopup, setMsgPopup] = useState({ isOpen: false, title: '', desc: '' });
+
   // --- 2. 게임 및 뷰 제어 ---
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle' | 'info'>('lobby');  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); 
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
@@ -90,24 +93,41 @@ export default function App() {
         .eq('id', userId)
         .maybeSingle();
 
-      // 2. [자가 치유] 데이터가 없다면? -> 즉시 생성 (이메일 로그인 문제 해결)
+      // 2. [자가 치유] 데이터가 없다면? -> 즉시 생성
       if (!profile && !error) {
         console.warn("⚠️ 프로필이 없습니다. 자동으로 생성합니다.");
+        
+        // 🔻 세션에서 구글 메타데이터 가져오기
+        // 1. [fetchUserData 내부] 구글 가입 시 15자 제한
+        const { data: { session } } = await supabase.auth.getSession();
+        const rawName = session?.user?.user_metadata?.full_name || 'Player';
+
+        // 🔻 [수정] 저장 제한을 15자로 변경
+        const MAX_DB_LEN = 15;
+        const googleName = rawName.length > MAX_DB_LEN 
+          ? rawName.substring(0, MAX_DB_LEN) 
+          : rawName;
+
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert({ 
             id: userId, 
-            display_name: 'Player', // 기본 닉네임
+            display_name: googleName, // 👈 이제 구글 실명이 들어갑니다!
             coins: 0 
           })
           .select()
           .single();
           
         if (!insertError) {
-            profile = newProfile; // 방금 만든 데이터로 교체
-            console.log("✅ 프로필 자동 생성 완료!");
-        } else {
-            console.error("❌ 프로필 생성 실패:", insertError.message);
+            profile = newProfile;
+            console.log(`✅ 프로필 생성 완료! (닉네임: ${googleName})`);
+
+            // 🔻 구글 가입 성공 시 인게임 팝업 호출
+            setMsgPopup({
+              isOpen: true,
+              title: "WELCOME!",
+              desc: `Hi, ${googleName}!\nENJOY JUST RPS!`
+            });
         }
       }
 
@@ -273,11 +293,26 @@ export default function App() {
 
   const handleSaveNickname = async (newNickname: string) => {
     if (!currentUserId) return;
+    
+    // 🔻 15자 초과 시 중단 (인게임 알림 로직은 추후 통합)
+    if (newNickname.length > 15) {
+      console.warn("닉네임은 최대 15자까지 가능합니다.");
+      return;
+    }
+
     const { error } = await supabase.from('profiles').update({ display_name: newNickname }).eq('id', currentUserId);
-    if (!error) { setUserNickname(newNickname); alert("닉네임이 성공적으로 변경되었습니다."); }
+    if (!error) { 
+      setUserNickname(newNickname); 
+      // 🔻 닉네임 변경 성공 팝업
+      setMsgPopup({
+        isOpen: true,
+        title: "NICKNAME UPDATED!",
+        desc: `"${newNickname}"`
+      });
+    }
   };
 
-// --- [수정] 초심자용 심플 로그인/회원가입 (역할 완전 분리) ---
+// ---  초심자용 심플 로그인/회원가입 (역할 완전 분리) ---
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -304,7 +339,12 @@ export default function App() {
           });
         }
 
-        alert("가입 성공! 이제 '로그인' 해주세요.");
+        // 가입 축하 메세지
+        setMsgPopup({
+          isOpen: true,
+          title: "WELCOME!",
+          desc: "PLEASE SIGN IN TO START!"
+        });
         setIsSignUpMode(false); // 로그인 화면으로 자동 전환
 
       } else {
@@ -553,7 +593,7 @@ export default function App() {
             {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />}
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
             <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all shadow-[0_5px_15px_rgba(255,153,0,0.3)]">
-              {loading ? 'Wait...' : (isSignUpMode ? 'Join Session' : 'Access Data')}
+              {loading ? 'Wait...' : (isSignUpMode ? 'Join Session' : 'LOG IN')}
             </button>
           </form>
 
@@ -608,9 +648,14 @@ export default function App() {
 
         <div className="flex items-center gap-4">
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 tracking-tighter">
-              {userNickname} <span className="text-[10px] opacity-50">▼</span>
-            </button>
+            <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="...">
+              
+          {/* 🔻 [수정] 표시 10자 제한 및 '...' 처리 */}
+          {userNickname.length > 10 
+            ? userNickname.substring(0, 10) + '...' 
+            : userNickname} 
+          <span className="text-[10px] opacity-50">▼</span>
+        </button>
 
             {/* 사용자 메뉴 드랍다운 */}
 
@@ -637,11 +682,19 @@ export default function App() {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-start p-0">
+
+        {/* 세팅 페이지 뷰 전환 */}
         {view === 'settings' && (
           <SettingsPage 
-            userNickname={userNickname} setUserNickname={setUserNickname} 
+            userNickname={userNickname} 
+            setUserNickname={setUserNickname} 
             onSaveNickname={(nick: string) => handleSaveNickname(nick)} 
-            volume={volume} setVolume={setVolume} isMuted={isMuted} setIsMuted={setIsMuted} onBack={() => setView('lobby')} 
+            volume={volume} 
+            setVolume={setVolume} 
+            isMuted={isMuted} 
+            setIsMuted={setIsMuted} 
+            onBack={() => setView('lobby')} 
+            playClickSound={playClickSound}
           />
         )}
 
@@ -790,6 +843,26 @@ export default function App() {
         onShop={() => { setShowResultModal(false); setView('shop'); }} 
         onWatchAd={() => setShowAdOverlay(true)}
       />
+
+      {/* 인게임 메시지 팝업 (Common Message Popup) */}
+      {msgPopup.isOpen && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-[280px] bg-zinc-900 border-2 border-[#FF9900] rounded-[40px] p-8 flex flex-col items-center text-center shadow-[0_0_50px_rgba(255,153,0,0.2)] animate-in zoom-in-95 duration-200">
+            <div className="text-4xl mb-4 animate-bounce">🎉</div>
+            <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-2">{msgPopup.title}</h3>
+            <p className="text-xl text-white font-bold uppercase leading-tight mb-8 whitespace-pre-line">{msgPopup.desc}</p>
+            
+            <button 
+              onClick={() => setMsgPopup(prev => ({ ...prev, isOpen: false }))}
+              className="w-full h-12 bg-[#FF9900] text-black font-black text-sm rounded-2xl uppercase hover:bg-[#ffad33] active:scale-95 transition-all"
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }
