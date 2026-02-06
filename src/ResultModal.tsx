@@ -35,7 +35,7 @@ export default function ResultModal({
         </h2>
 
         {/* 🔥 [복구] 모드 표시는 원본 디자인(오렌지색 대형 텍스트) 그대로 유지 */}
-        <p className="text-4xl font-black text-[#FF9900] italic uppercase tracking-tighter leading-none mb-8 text-center">
+        <p className="text-4xl mb-2 font-black text-[#FF9900] italic uppercase tracking-tighter leading-none text-center">
           {mode.includes('MODE') ? mode : `${mode} MODE`}
         </p>
 
@@ -44,7 +44,7 @@ export default function ResultModal({
           <div className="text-8xl font-black text-white leading-none tracking-tighter">
             {round}
           </div>
-          <div className="text-2xl font-black text-white uppercase italic tracking-widest mt-[-10px]">
+          <div className="text-2xl font-black text-white uppercase italic tracking-widest mt-[-5px]">
             ROUND
           </div>
           {isNewRecord && (
