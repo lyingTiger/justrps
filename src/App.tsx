@@ -790,7 +790,8 @@ useEffect(() => {
         {view === 'ranking' && (
           <RankingPage 
             onBack={() => setView('lobby')} 
-            playClickSound={playClickSound} 
+            playClickSound={playClickSound}
+            userNickname={userNickname}
           />
         )}
 

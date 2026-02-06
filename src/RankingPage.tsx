@@ -11,20 +11,26 @@ interface RankingRecord {
   profiles: {
     display_name: string;
   };
+  
 }
 
 interface RankingPageProps {
   onBack: () => void;
   playClickSound: () => void;
+  userNickname: string;
 }
 
-export default function RankingPage({ onBack, playClickSound }: RankingPageProps) {
+export default function RankingPage({ onBack, playClickSound, userNickname }: RankingPageProps) {
   const [activeMode, setActiveMode] = useState('WIN MODE');
   const [rankings, setRankings] = useState<RankingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [myUserId, setMyUserId] = useState<string | null>(null);
+  // 🔻 [수술] 닉네임을 활용한 동적 라벨 생성
+  const myBestLabel = `${userNickname}'s BEST`;
+  // 처음 진입 시 activeMode를 'WIN MODE'로 설정하는 것은 유지하거나, 
+  // 원한다면 이 동적 라벨을 기본값으로 할 수도 있습니다.
 
-  const modes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE', 'MY BEST'];
+const modes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE', myBestLabel];
 
   // 1. 내 ID 먼저 파악
   useEffect(() => {
@@ -39,11 +45,12 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
   }, [activeMode, myUserId]);
 
   const fetchRankings = async () => {
+    if (!myUserId && activeMode === myBestLabel) return;
     setLoading(true);
+    
     try {
-
-      // 🔻 [신규] MY BEST 모드 로직
-      if (activeMode === 'MY BEST') {
+      // 🔻 [수정] 'MY BEST' 문자열 대신 myBestLabel 변수로 체크
+      if (activeMode === myBestLabel) {
         const { data: myAllRecords, error } = await supabase
           .from('mode_records')
           .select('*, profiles(display_name)')
@@ -54,13 +61,13 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
 
         setRankings((myAllRecords || []).map((item: any) => ({
           id: item.user_id,
-          mode: item.mode.replace(' MODE', ''), // 'WIN MODE' -> 'WIN'
+          mode: item.mode.replace(' MODE', ''),
           best_round: item.best_round,
           best_time: item.best_time,
-          rank: 0, // 내 기록 보기에서는 등수 대신 모드 이름 표시
+          rank: 0,
           profiles: { display_name: item.profiles?.display_name || 'Me' }
         })));
-        return; // MY BEST 처리 후 종료
+        return;
       }
 
       // [Step 1] 전체 TOP 10 가져오기 (테이블 이름 변경: leaderboard -> mode_records)
@@ -184,9 +191,20 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
                   : -1;
 
                 return rankings.map((res, i) => {
-                  const isMe = myUserId && res.id === myUserId;
+                const isMe = myUserId && res.id === myUserId;
+                const isMyBestTab = activeMode === myBestLabel;
+                
+                const overallBestIndex = isMyBestTab 
+                  ? rankings.reduce((bestIdx, curr, idx, arr) => {
+                      if (curr.best_round > arr[bestIdx].best_round) return idx;
+                      if (curr.best_round === arr[bestIdx].best_round && curr.best_time < arr[bestIdx].best_time) return idx;
+                      return bestIdx;
+                    }, 0)
+                  : -1;
+    
+                const isTopRecord = isMyBestTab && i === overallBestIndex;
+
                   const isFloatingUser = !isMyBestTab && i === 10;
-                  const isTopRecord = isMyBestTab && i === overallBestIndex;
 
                   return (
                     <div key={i}>
