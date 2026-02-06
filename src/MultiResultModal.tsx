@@ -83,10 +83,10 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
         
         {/* 헤더 */}
         <div className="mb-6 text-center">
-            <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter">
+            <h2 className="text-3xl font-black text-[#FF9900] italic uppercase tracking-tighter">
                 Battle Result
             </h2>
-            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">
+            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-1">
                 Final Ranking
             </p>
         </div>
@@ -106,17 +106,22 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
                  <div key={p.user_id} className={`w-full p-3 rounded-2xl border ${rankBorder} bg-zinc-900/50 flex items-center justify-between relative overflow-hidden`}>
                     {isMe && <div className="absolute inset-0 bg-white/5 pointer-events-none" />}
                     
-                    <div className="flex items-center gap-3">
-                        <span className={`text-2xl font-black italic w-6 text-center ${rankColor}`}>{p.rank}</span>
-                        <div className="flex flex-col">
-                            <span className={`text-xs font-bold uppercase ${isMe ? 'text-white' : 'text-zinc-400'}`}>
-                                {p.profiles?.display_name}
-                            </span>
-                            <span className="text-[10px] text-zinc-600 font-mono">
-                                Round {p.current_round} / {p.play_time.toFixed(2)}s
-                            </span>
-                        </div>
-                    </div>
+                    <div className="flex items-center gap-4">
+                      
+                      {/* 원형 컨테이너 추가 */}
+                      <div className="w-10 h-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center shrink-0 shadow-inner">
+                        <span className={`text-xl font-black italic leading-none ${rankColor}`}>{p.rank}</span>
+                      </div>
+                      
+                      <div className="flex flex-col">
+                          <span className={`text-lg font-black uppercase ${isMe ? 'text-white' : 'text-zinc-400'}`}>
+                              {p.profiles?.display_name}
+                          </span>
+                          <span className="text-lg font-mono font-black text-zinc-500">
+                              Round {p.current_round} / {p.play_time.toFixed(2)}s
+                          </span>
+                      </div>
+                  </div>
 
                     <div className="flex flex-col items-end">
                         <div className="flex items-center gap-1">
@@ -136,16 +141,16 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
         </div>
 
         {/* 버튼 영역 */}
-        <div className="w-full flex gap-3">
+        <div className="grid grid-cols-2 gap-3 w-full">
             <button 
                 onClick={onBackToLobby}
-                className="flex-1 h-12 rounded-xl bg-zinc-800 text-zinc-400 font-black uppercase text-xs hover:bg-zinc-700 hover:text-white transition-all"
+                className="h-14 bg-zinc-600 text-white font-black text-sm rounded-2xl uppercase hover:bg-zinc-500 active:scale-95 transition-all border border-zinc-500 shadow-lg"
             >
-                To Lobby
+                Main
             </button>
             <button 
                 onClick={onBackToRoom}
-                className="flex-1 h-12 rounded-xl bg-[#FF9900] text-black font-black uppercase text-xs shadow-lg active:scale-95 transition-all"
+                className="h-14 bg-zinc-600 text-white font-black text-sm rounded-2xl uppercase hover:bg-zinc-500 active:scale-95 transition-all border border-zinc-500 shadow-lg"
             >
                 Back to Room
             </button>

@@ -182,9 +182,9 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
 
       <button 
         onClick={() => { playClickSound(); onBack(); }} 
-        className="mt-12 text-zinc-500 font-bold text-sm border-b border-zinc-700 pb-0.5 hover:text-white hover:border-white transition-all uppercase tracking-tighter"
+        className="w-3/4 h-14 mt-8 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all shadow-lg"
       >
-        Back to Lobby
+        Main
       </button>
 
       <style>{`

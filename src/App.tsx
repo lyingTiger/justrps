@@ -476,11 +476,19 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
   // 🔥 [화면 분기] isLoggedIn이 false면 로그인 화면을 리턴
   // resetUserState()가 호출되면 isLoggedIn이 false가 되어 이 화면이 보여야 함
   // ------------------------------------------------------------------
+// ------------------------------------------------------------------
+  // 🔥 [화면 분기] isLoggedIn이 false면 로그인 화면을 리턴
+  // ------------------------------------------------------------------
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="w-full max-w-[320px]">
-          <h1 className="text-5xl font-black text-[#FF9900] mb-8 text-center italic tracking-tighter uppercase">just RPS</h1>
+          
+          {/* 🔻 [수정] 로그인 화면용 큰 로고 (5xl + 중앙정렬 + 색상적용) */}
+          <h1 className="text-5xl font-black mb-8 text-center italic tracking-tighter uppercase">
+            <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
+          </h1>
+
           <form onSubmit={handleAuthSubmit} className="space-y-4">
             <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
             {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />}
@@ -489,15 +497,18 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
               {loading ? 'Wait...' : (isSignUpMode ? 'Join Session' : 'Access Data')}
             </button>
           </form>
+
           <div className="flex items-center gap-2 my-4">
              <div className="h-[1px] bg-zinc-800 flex-1"></div>
              <span className="text-base text-zinc-600 font-bold uppercase">or</span>
              <div className="h-[1px] bg-zinc-800 flex-1"></div>
           </div>
+
           <button type="button" onClick={handleGoogleLogin} className="w-full h-14 bg-white text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M23.52 12.29C23.52 11.43 23.45 10.61 23.31 9.82H12V14.45H18.45C18.17 15.93 17.31 17.18 16.03 18.04V21.03H19.9C22.16 18.95 23.52 15.89 23.52 12.29Z" fill="#4285F4"/><path d="M12 24C15.24 24 17.96 22.92 19.9 21.03L16.03 18.04C14.95 18.76 13.58 19.18 12 19.18C8.88 19.18 6.23 17.07 5.29 14.25H1.31V17.34C3.26 21.21 7.29 24 12 24Z" fill="#34A853"/><path d="M5.29 14.25C5.05 13.53 4.92 12.77 4.92 12C4.92 11.23 5.05 10.47 5.29 9.75V6.66H1.31C0.47 8.33 0 10.11 0 12C0 13.89 0.47 15.67 1.31 17.34L5.29 14.25Z" fill="#FBBC05"/><path d="M12 4.82C13.76 4.82 15.34 5.43 16.58 6.61L20.01 3.17C17.95 1.25 15.24 0 12 0C7.29 0 3.26 2.79 1.31 6.66L5.29 9.75C6.23 6.93 8.88 4.82 12 4.82Z" fill="#EA4335"/></svg>
             Sign in with Google
           </button>
+          
           <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-base text-zinc-500 text-center underline font-bold mt-4 uppercase">
             {isSignUpMode ? "Back to Login" : "Create Account"}
           </button>
@@ -510,7 +521,10 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
   return (
     <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => setIsUserMenuOpen(false)}>
       <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50">
-        <h2 className="text-2xl font-bold text-[#FF9900] tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>just RPS</h2>
+        {/* 🔻 [수정] 상단 헤더 로고: just(오렌지) + R(파랑)/P(초록)/S(핑크) 적용 */}
+        <h2 className="text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>
+          <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
+        </h2>
         <div className="flex items-center gap-4">
           <div className="relative">
             <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="text-sm font-bold hover:text-[#FF9900] transition-colors flex items-center gap-1 tracking-tighter">
@@ -543,11 +557,33 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 space-y-3 px-4">
              <div className="flex gap-3 mb-12">{['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}</div>
 
-             {/* 🔥 [수정] 버튼들이 이제 handleLobbyNavigation을 통해 검문 후 이동합니다 */}
-             <button onClick={() => handleLobbyNavigation('modeSelect')} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase tracking-widest active:scale-95 shadow-[0_0_20px_rgba(255,153,0,0.2)]">Play</button>
-             <button onClick={() => handleLobbyNavigation('shop')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Shop</button>
-             <button onClick={() => handleLobbyNavigation('ranking')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">rank board</button>
-             <button onClick={() => handleLobbyNavigation('tutorial')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Tutorial</button>
+             <button 
+                   onClick={() => handleLobbyNavigation('modeSelect')} 
+                   className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:scale-95"
+                 >
+                   Play
+                 </button>
+                 
+                 <button 
+                   onClick={() => handleLobbyNavigation('shop')} 
+                   className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:scale-95"
+                 >
+                   Shop
+                 </button>
+                 
+                 <button 
+                   onClick={() => handleLobbyNavigation('ranking')} 
+                   className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:scale-95"
+                 >
+                   Rank Board
+                 </button>
+                 
+                 <button 
+                   onClick={() => handleLobbyNavigation('tutorial')} 
+                   className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:scale-95"
+                 >
+                   Tutorial
+                 </button>
 
              <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center text-center">
                 <div className="grid grid-cols-3 w-full mb-1"><p className="text-[10px] text-zinc-500 uppercase font-bold">Total Play</p><p className="text-[10px] text-zinc-500 uppercase font-bold">Win Rate</p><p className="text-[10px] text-zinc-500 uppercase font-bold">Best Rank</p></div>
@@ -565,15 +601,20 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
           <div className="w-full max-w-[320px] flex flex-col items-center mt-16 gap-3 px-4">
             <button onClick={() => { resetGameSession(); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95">Single Play</button>
             <button onClick={() => setView('multiplay')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Multi Play</button>
-            <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full mt-6">
+            <div className="flex flex-col gap-3 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full mt-6">
               {['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'].map(opt => (
-                <label key={opt} className="flex items-center gap-2 cursor-pointer text-[10px] font-bold">
+                <label key={opt} className="flex items-center gap-2 cursor-pointer text-[14px] font-bold">
                   <input type="radio" checked={selectedOption === opt} onChange={() => setSelectedOption(opt)} className="accent-[#FF9900]" />
                   <span className={selectedOption === opt ? 'text-[#FF9900]' : 'text-zinc-500'}>{opt}</span>
                 </label>
               ))}
             </div>
-            <button onClick={() => setView('lobby')} className="text-base text-zinc-500 underline uppercase mt-8 font-bold">Main</button>
+            <button 
+              onClick={() => setView('lobby')} 
+              className="w-3/4 h-14 mt-8 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all shadow-lg"
+            >
+              Main
+            </button>
           </div>
         )}
 

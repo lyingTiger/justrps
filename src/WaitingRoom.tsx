@@ -292,14 +292,19 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
     <div className="w-full max-w-[340px] flex flex-col items-center mt-6 px-4 animate-in fade-in select-none">
       <div className="w-full flex justify-between items-end mb-6">
         <div>
-           <h2 className="text-3xl font-black italic uppercase tracking-tighter text-white leading-none">
+           {/* 🔻 [수정] 방 코드(UUID) <p> 태그 삭제함 */}
+           <h2 className="text-4xl font-black italic uppercase tracking-tighter text-white leading-none">
              {roomInfo?.name || "Loading..."}
            </h2>
-           <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
-             Code: <span className="text-[#FF9900] select-text">{roomId?.slice(0,4).toUpperCase()}</span>
-           </p>
         </div>
-        <button onClick={handleManualExit} className="text-zinc-500 text-[10px] font-bold uppercase underline pb-1 hover:text-white">Leave</button>
+        
+        {/* 🔻 [수정] Leave 버튼 디자인을 MultiplayPage의 Back 버튼과 동일하게 변경 */}
+        <button 
+          onClick={handleManualExit} 
+          className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700"
+        >
+          Leave
+        </button>
       </div>
 
       <div className="w-full space-y-2 mb-8">

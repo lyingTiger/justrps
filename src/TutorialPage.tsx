@@ -13,10 +13,9 @@ export default function TutorialPage({ onBack }: TutorialPageProps) {
   return (
     <div className="w-full max-w-[340px] flex flex-col items-center py-8 px-4 animate-in fade-in slide-in-from-bottom-5 duration-500">
       {/* 헤더 섹션 */}
-      <div className="w-full flex justify-between items-end mb-8 shrink-0">
-        <h2 className="text-4xl font-black italic uppercase tracking-tighter text-white">Tutorial</h2>
-        <button onClick={onBack} className="text-zinc-500 text-[10px] font-bold uppercase underline pb-1">Close</button>
-      </div>
+      <h2 className="text-5xl font-black text-[#FF9900] italic uppercase tracking-tighter mb-10 text-center [text-shadow:2px_2px_0_rgba(0,0,0,1)]">
+        Tutorial
+      </h2>
 
       {/* 단계별 가이드 영역 (커스텀 스크롤바 적용됨) */}
       <div className="w-full overflow-y-auto custom-scrollbar pr-2 max-h-[60vh]">

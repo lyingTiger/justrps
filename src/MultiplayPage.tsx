@@ -19,31 +19,27 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [passInput, setPassInput] = useState('');
 
-  // 🚀 [START] 실시간 동기화: INSERT, UPDATE, DELETE 모두 감시 🚀
   useEffect(() => {
     fetchRooms();
 
     const subscription = supabase.channel('lobby_v4_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
-        setTimeout(fetchRooms, 100); // DB 트리거 처리를 위한 미세한 간격
+        setTimeout(fetchRooms, 100); 
       })
       .subscribe();
 
     return () => { supabase.removeChannel(subscription); };
   }, []);
 
-const fetchRooms = async () => {
-  const { data } = await supabase
-    .from('rooms')
-    .select('*')
-    .in('status', ['waiting', 'playing'])
-    // .gt('current_players', 0) // 👈 이 줄이 있으면 인원수 갱신 전까지 방이 안 보입니다. 과감히 지우세요!
-    .order('created_at', { ascending: false });
-  if (data) setRooms(data);
-};
+  const fetchRooms = async () => {
+    const { data } = await supabase
+      .from('rooms')
+      .select('*')
+      .in('status', ['waiting', 'playing'])
+      .order('created_at', { ascending: false });
+    if (data) setRooms(data);
+  };
   
-
-  // 방 입장 시도 (비밀번호 체크 포함)
   const handleJoinAttempt = (room: any) => {
     if (room.current_players >= room.max_players) {
       alert("방이 가득 찼습니다!");
@@ -65,53 +61,36 @@ const fetchRooms = async () => {
     else alert("방 입장에 실패했습니다.");
   };
 
-  // 🛠️ [복구] 방 생성 로직 🛠️
-const handleCreateRoom = async () => {
-  if (!newRoomName.trim()) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  const handleCreateRoom = async () => {
+    if (!newRoomName.trim()) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-  // 🚀 [에러 추적을 위한 수정]
-  const { data: room, error: roomError } = await supabase.from('rooms').insert({
-    name: newRoomName,
-    password: password || null,
-    max_players: maxPlayers,
-    current_players: 1,
-    mode: selectedMode,
-    creator_id: user.id,
-    status: 'waiting',
-    seed: Math.random()
-  }).select().single();
+    const { data: room, error: roomError } = await supabase.from('rooms').insert({
+      name: newRoomName,
+      password: password || null,
+      max_players: maxPlayers,
+      current_players: 1,
+      mode: selectedMode,
+      creator_id: user.id,
+      status: 'waiting',
+      seed: Math.random()
+    }).select().single();
 
-  console.log("방 생성 결과 room:", room); 
-  console.log("방 생성 에러 roomError:", roomError);
-
-  if (!room) {
-    console.error("방이 만들어졌지만 데이터를 받아오지 못했습니다. (SELECT 권한 문제)");
-    return;
-  }
-
-  if (roomError) {
-    console.error("방 생성 실패:", roomError.message); // 👈 여기서 에러 메시지를 확인하세요!
-    alert("방 생성 실패: " + roomError.message);
-    return;
-  }
-
-  if (room) {
-    const { error: partError } = await supabase.from('room_participants').insert({ 
-      room_id: room.id, 
-      user_id: user.id 
-    });
-    
-    if (partError) {
-      console.error("참가자 등록 실패:", partError.message);
+    if (!room || roomError) {
+      alert("방 생성 실패: " + (roomError?.message || "Unknown error"));
+      return;
     }
-    
-    onJoin(room.id);
-  }
-};
 
-  // 🛠️ [복구] 랜덤 입장 (Quick Match) 🛠️
+    if (room) {
+      await supabase.from('room_participants').insert({ 
+        room_id: room.id, 
+        user_id: user.id 
+      });
+      onJoin(room.id);
+    }
+  };
+
   const handleQuickMatch = () => {
     const publicRooms = rooms.filter(r => !r.password && r.current_players < r.max_players);
     if (publicRooms.length > 0) {
@@ -126,15 +105,17 @@ const handleCreateRoom = async () => {
 
   return (
     <div className="w-full max-w-[340px] flex flex-col items-center mt-6 px-4 animate-in fade-in relative">
-      <div className="w-full flex justify-between items-end mb-6">
+      <div className="w-full flex justify-between items-center mb-6">
         <h2 className="text-4xl font-black italic uppercase tracking-tighter text-[#FF9900]">Multiplay</h2>
-        {/* <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 mb-1">
-           Creating: <span className="text-white">{selectedMode}</span>
-        </span> */}
-        <button onClick={onBack} className="text-zinc-500 text-[10px] font-bold uppercase underline pb-1">Back</button>
+        
+        <button 
+          onClick={onBack} 
+          className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700"
+        >
+          Back
+        </button>
       </div>
 
-      {/* 🛠️ [UI 복구] 방 생성 및 옵션 영역 🛠️ */}
       <div className="w-full space-y-3 mb-8 bg-zinc-900/30 p-4 rounded-[32px] border border-zinc-800/50">
         <div className="flex gap-2">
           <input 
@@ -148,7 +129,6 @@ const handleCreateRoom = async () => {
         </div>
         
         <div className="flex gap-2">
-          {/* 비밀번호 입력 필드 */}
           <input 
             type="password" 
             placeholder="PASSWORD (OPTIONAL)" 
@@ -156,26 +136,26 @@ const handleCreateRoom = async () => {
             onChange={(e) => setPassword(e.target.value)}
             className="flex-1 h-11 bg-black border border-zinc-800 rounded-2xl px-4 text-[10px] text-white outline-none focus:border-[#FF9900] font-bold" 
           />
-          {/* 최대 인원수 선택 영역 */}
           <div className="flex items-center gap-1 bg-black border border-zinc-800 rounded-2xl px-2">
+            {/* 🔻 [수정 2] 비활성 상태일 때 text-zinc-700 -> text-white로 변경 */}
             {[2, 3, 4].map(n => (
-              <button key={n} onClick={() => setMaxPlayers(n)} className={`w-7 h-7 text-[10px] font-black rounded-lg transition-all ${maxPlayers === n ? 'bg-[#FF9900] text-black' : 'text-zinc-700'}`}>{n}P</button>
+              <button key={n} onClick={() => setMaxPlayers(n)} className={`w-7 h-7 text-[10px] font-black rounded-lg transition-all ${maxPlayers === n ? 'bg-[#FF9900] text-black' : 'text-white'}`}>{n}P</button>
             ))}
           </div>
         </div>
 
-        {/* 🛠️ [UI 복구] 퀵 매치 버튼 🛠️ */}
+        {/* 🔻 [수정 3] 버튼 텍스트 'random join'으로 변경 */}
         <button 
           onClick={handleQuickMatch}
-          className="w-full h-11 bg-zinc-800 text-white font-black uppercase rounded-2xl text-[10px] active:scale-95 transition-all border border-zinc-700 hover:bg-zinc-700"
+          className="w-full h-11 bg-zinc-800 text-white font-black uppercase rounded-2xl text-xs active:scale-95 transition-all border border-zinc-700 hover:bg-zinc-700"
         >
-          Quick Match (Random Join)
+          random join
         </button>
       </div>
 
-    {/* 🛠️ [UI 복구] 방 목록 영역 (뱃지 추가됨) 🛠️ */}
       <div className="w-full flex flex-col gap-2">
-        <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1 ml-2">Active Rooms</h3>
+        {/* 🔻 [수정 4] 텍스트 중앙 정렬 (ml-2 제거하고 text-center w-full 추가) */}
+        <h3 className="w-full text-center text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">Active Rooms</h3>
         <div className="w-full h-[220px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
           {filteredRooms.length === 0 ? (
             <div className="w-full py-10 text-center border border-dashed border-zinc-800 rounded-[24px] opacity-20">
@@ -186,14 +166,12 @@ const handleCreateRoom = async () => {
               <div key={room.id} onClick={() => handleJoinAttempt(room)} className="w-full p-4 bg-zinc-900 border border-zinc-800 rounded-[24px] flex justify-between items-center cursor-pointer hover:border-[#FF9900] group transition-all active:scale-[0.98]">
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    {/* 방 이름 */}
                     <span className="font-black text-sm italic text-white group-hover:text-[#FF9900]">{room.name}</span>
                     {room.password && <span className="text-[10px] opacity-40">🔒</span>}
                   </div>
                   <span className="text-[9px] text-zinc-600 font-black uppercase tracking-tighter">{room.mode}</span>
                 </div>
                 
-                {/* 🔥 [수정됨] 우측 영역: 상태 뱃지 + 인원수 */}
                 <div className="flex flex-col items-end gap-1">
                   {room.status === 'playing' ? (
                     <span className="text-[8px] font-black text-red-500 border border-red-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider animate-pulse">
@@ -212,7 +190,6 @@ const handleCreateRoom = async () => {
         </div>
       </div>
 
-      {/* 🛠️ [UI 복구] 비밀번호 확인 모달 🛠️ */}
       {showPassModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
           <div className="w-full max-w-[280px] bg-zinc-900 border border-zinc-800 rounded-[32px] p-6 shadow-2xl animate-in zoom-in-95">

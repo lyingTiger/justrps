@@ -29,10 +29,12 @@ export default function ResultModal({
       <div className="w-full max-w-[340px] bg-zinc-900 border-2 border-zinc-800 rounded-[40px] p-8 shadow-[0_0_60px_rgba(0,0,0,0.8)] flex flex-col items-center animate-in zoom-in-95 duration-300">
         
         {/* 타이틀 영역 */}
-        <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter leading-none mb-1">
+        {/* 🔥 [수정 1] Game Over 크기 축소 (text-4xl -> text-3xl) */}
+        <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter leading-none mb-1">
           Game Over
         </h2>
-        {/* 🟠 [수정]: 모드 이름 뒤에 'MODE' 추가 및 대문자 유지 */}
+
+        {/* 🔥 [복구] 모드 표시는 원본 디자인(오렌지색 대형 텍스트) 그대로 유지 */}
         <p className="text-4xl font-black text-[#FF9900] italic uppercase tracking-tighter leading-none mb-8 text-center">
           {mode.includes('MODE') ? mode : `${mode} MODE`}
         </p>
@@ -61,8 +63,8 @@ export default function ResultModal({
           <div className="flex justify-between items-center px-1">
             <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Earned</span>
             <div className="flex items-center gap-1">
-              <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
               <span className="text-[#FF9900] font-mono font-bold text-lg">+{earnedCoins}</span>
+              <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
             </div>
           </div>
         </div>
@@ -83,7 +85,6 @@ export default function ResultModal({
             <div className="flex items-center gap-2 mt-1">
               <span className="text-[10px] font-bold uppercase opacity-70">Left: {continueCount}/3</span>
               <div className="flex items-center gap-1">
-                {/* 🟠 [수정]: 기존 오리지널 코인 아이콘으로 교체 (grayscale 제거) */}
                 <img src="/images/coin.png" alt="coin" className="w-3.5 h-3.5 object-contain" />
                 <span className="text-[10px] font-bold">-{continueCost}</span>
               </div>
@@ -92,17 +93,12 @@ export default function ResultModal({
 
           <div className="grid grid-cols-2 gap-3">
             <button onClick={onRetry} className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-zinc-700 active:scale-95 transition-all">Retry</button>
-            <button onClick={onLobby} className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-zinc-700 active:scale-95 transition-all">Lobby</button>
+            {/* 🔥 [수정 2] Lobby -> Main 텍스트 변경 */}
+            <button onClick={onLobby} className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-zinc-700 active:scale-95 transition-all">Main</button>
           </div>
         </div>
 
-        {/* SHOP 바로가기 */}
-        <button 
-          onClick={onShop}
-          className="mt-8 text-zinc-500 font-bold text-[10px] uppercase tracking-widest border-b border-zinc-800 pb-0.5 hover:text-[#FF9900] hover:border-[#FF9900] transition-all"
-        >
-          Visit Shop
-        </button>
+        {/* 🔥 [수정 3] Visit Shop 버튼 삭제됨 */}
       </div>
     </div>
   );

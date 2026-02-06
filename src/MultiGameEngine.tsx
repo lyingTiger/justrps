@@ -366,13 +366,20 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
       <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] w-full">
          {(isEliminated || isCleared) ? (
             <div className="text-center animate-in zoom-in">
-                <div className="text-6xl mb-4">{isEliminated ? "💀" : "🎉"}</div>
+                {/* 🔻 [수정 1] 클리어 시 폭죽 아이콘 삭제 (탈락 시 해골만 표시) */}
+                {isEliminated && <div className="text-6xl mb-4"></div>}
+                
+                {/* 🔻 [수정 2] Finished! -> Next Round 로 텍스트 변경 */}
                 <h3 className={`text-3xl font-black uppercase italic ${isEliminated ? 'text-zinc-600' : 'text-green-500'}`}>
-                    {isEliminated ? "Eliminated" : "Finished!"}
+                    {isEliminated ? "Game over" : "Next Round!"}
                 </h3>
-                <p className="text-zinc-500 text-xs font-bold uppercase mt-2 animate-pulse">
-                    Waiting for others to finish...
-                </p>
+                
+                {/* 🔻 [수정 3] 클리어 시 대기 텍스트 삭제 (탈락 시에만 표시) */}
+                {isEliminated && (
+                    <p className="text-zinc-500 text-xs font-bold uppercase mt-2 animate-pulse">
+                        Waiting for others to finish...
+                    </p>
+                )}
             </div>
          ) : (
              <>
