@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient';
 // 랭킹 데이터 인터페이스
 interface RankingRecord {
   id: string; 
+  mode?: string;
   best_round: number;
   best_time: number;
   rank: number;
@@ -23,7 +24,7 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
   const [loading, setLoading] = useState(true);
   const [myUserId, setMyUserId] = useState<string | null>(null);
 
-  const modes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'];
+  const modes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE', 'MY BEST'];
 
   // 1. 내 ID 먼저 파악
   useEffect(() => {
@@ -40,6 +41,28 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
   const fetchRankings = async () => {
     setLoading(true);
     try {
+
+      // 🔻 [신규] MY BEST 모드 로직
+      if (activeMode === 'MY BEST') {
+        const { data: myAllRecords, error } = await supabase
+          .from('mode_records')
+          .select('*, profiles(display_name)')
+          .eq('user_id', myUserId)
+          .order('updated_at', { ascending: false });
+
+        if (error) throw error;
+
+        setRankings((myAllRecords || []).map((item: any) => ({
+          id: item.user_id,
+          mode: item.mode.replace(' MODE', ''), // 'WIN MODE' -> 'WIN'
+          best_round: item.best_round,
+          best_time: item.best_time,
+          rank: 0, // 내 기록 보기에서는 등수 대신 모드 이름 표시
+          profiles: { display_name: item.profiles?.display_name || 'Me' }
+        })));
+        return; // MY BEST 처리 후 종료
+      }
+
       // [Step 1] 전체 TOP 10 가져오기 (테이블 이름 변경: leaderboard -> mode_records)
       const { data: top10Data, error: top10Error } = await supabase
         .from('mode_records') // 🔥 [수정] 실제 데이터가 저장된 테이블
@@ -120,7 +143,7 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
       </h2>
 
       {/* 모드 선택 탭 */}
-      <div className="w-full flex justify-center flex-wrap gap-x-5 gap-y-3 mb-10 px-4">
+      <div className="w-full flex justify-center flex-wrap gap-x-5 gap-y-5 mb-10 px-4">
         {modes.map((mode) => {
           const isActive = activeMode === mode;
           return (
@@ -142,37 +165,73 @@ export default function RankingPage({ onBack, playClickSound }: RankingPageProps
         })}
       </div>
 
-      {/* 랭킹 리스트 */}
+      {/* 랭킹 리스트 영역 */}
       <div className="w-full px-2">
         <div className="max-h-[400px] overflow-y-auto no-scrollbar">
           {loading ? (
             <div className="p-12 text-center text-zinc-700 font-bold uppercase italic animate-pulse">Loading...</div>
           ) : rankings.length > 0 ? (
             <>
-              {rankings.map((res, i) => {
-                const isMe = myUserId && res.id === myUserId;
-                const isFloatingUser = i === 10; 
+              {(() => {
+                const isMyBestTab = activeMode === 'MY BEST';
+                
+                const overallBestIndex = isMyBestTab 
+                  ? rankings.reduce((bestIdx, curr, idx, arr) => {
+                      if (curr.best_round > arr[bestIdx].best_round) return idx;
+                      if (curr.best_round === arr[bestIdx].best_round && curr.best_time < arr[bestIdx].best_time) return idx;
+                      return bestIdx;
+                    }, 0)
+                  : -1;
 
-                return (
-                  <div key={i}>
-                    {isFloatingUser && (
-                        <div className="text-center text-zinc-700 text-[10px] my-1">...</div>
-                    )}
-                    <div 
-                      className={`grid grid-cols-[12%_43%_20%_25%] py-0 items-center text-lg transition-colors ${getRankStyle(res.rank, !!isMe)}`}
-                    >
-                      <span className="text-center">{res.rank}</span>
-                      <span className="text-left truncate pr-2">
-                        {res.profiles?.display_name}
-                      </span>
-                      <span className="text-center">{res.best_round}R</span>
-                      <span className="text-left pl-2">
-                        {res.best_time.toFixed(2)}s {/* 소수점 2자리로 통일 */}
-                      </span>
+                return rankings.map((res, i) => {
+                  const isMe = myUserId && res.id === myUserId;
+                  const isFloatingUser = !isMyBestTab && i === 10;
+                  const isTopRecord = isMyBestTab && i === overallBestIndex;
+
+                  return (
+                    <div key={i}>
+                      {isFloatingUser && <div className="text-center text-zinc-700 text-[10px] my-1">...</div>}
+                      
+                      {/* 🔻 [수정] 내 기록들 간의 끝선을 완벽히 맞추는 5:2:3 그리드 설계 */}
+                      <div 
+                        className={isMyBestTab 
+                          ? `w-full grid grid-cols-[5fr_2fr_3fr] py-2 items-center transition-colors ${isTopRecord ? 'text-[#FFD700]' : 'text-white'} font-bold`
+                          : `w-full grid grid-cols-[12%_43%_20%_25%] py-2 items-center text-base transition-colors ${getRankStyle(res.rank, !!isMe)}`
+                        }
+                      >
+                        {isMyBestTab ? (
+                          <>
+                            {/* 1. 모드 데이터 (5) - 왼쪽 끝 정렬 / base 크기 */}
+                            <div className="text-left text-base uppercase whitespace-nowrap pl-2">
+                              {res.mode} MODE
+                            </div>
+                            
+                            {/* 2. 라운드 데이터 (2) - 정중앙 정렬 / base 크기 */}
+                            <div className="text-center text-base font-mono">
+                              {res.best_round}R
+                            </div>
+                            
+                            {/* 3. 시간 데이터 (3) - 오른쪽 끝 정렬 / base 크기 */}
+                            <div className="text-right text-base font-mono pr-2">
+                              {res.best_time.toFixed(2)}s
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {/* 기존 일반 랭킹 로직 유지 */}
+                            <span className="text-center">{res.rank}</span>
+                            <span className="text-left truncate pr-2">{res.profiles?.display_name}</span>
+                            <span className="text-center font-mono">{res.best_round}R</span>
+                            <span className="text-left pl-2 font-mono text-sm">{res.best_time.toFixed(2)}s</span>
+                          </>
+                        )}
+                      </div>
+
+
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </>
           ) : (
             <div className="p-12 text-center text-zinc-800 text-xs font-bold uppercase">No records</div>

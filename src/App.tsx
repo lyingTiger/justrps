@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import GameEngine from './GameEngine';
 import SettingsPage from './SettingsPage';
@@ -11,6 +10,7 @@ import MultiGameEngine from './MultiGameEngine';
 import ShopPage from './ShopPage';
 import AdOverlay from './AdOverlay';
 import InfoPage from './InfoPage';
+import { useState, useEffect, useRef } from 'react';
 
 export default function App() {
   // --- 1. 유저 및 세션 상태 ---
@@ -21,6 +21,7 @@ export default function App() {
   const [showResultModal, setShowResultModal] = useState(false);
   const [showAdOverlay, setShowAdOverlay] = useState(false);
   const [visitorStats, setVisitorStats] = useState({ today: 0, total: 0 });
+  const lastFetchedId = useRef<string | null>(null);
 
   // 인게임 메시지 팝업 상태
   const [msgPopup, setMsgPopup] = useState({ isOpen: false, title: '', desc: '' });
@@ -220,88 +221,63 @@ export default function App() {
     };
   }, [isLoggedIn]); // 로그인 상태일 때만 동작
 
+/// ------------------------------------------------------------------
+// 🔥 [수정] 통합된 세션 체크 및 데이터 로드 (중복 제거 버전)
 // ------------------------------------------------------------------
-  // 🔥 [수정] 통합된 세션 체크 및 데이터 로드
-  // ------------------------------------------------------------------
-  useEffect(() => {
-    document.title = "just RPS";
+useEffect(() => {
+  document.title = "just RPS";
 
-    // 🔻 [추가] 방문자 수 업데이트 및 조회
-    const handleVisitors = async () => {
-      await supabase.rpc('increment_visitor');
-      // 🔻 [수정] .single() 대신 .maybeSingle()을 사용하여 406 에러를 방지합니다.
-    const { data, error } = await supabase
+  // 1. 방문자 수 업데이트 (앱 실행 시 1회만)
+  const handleVisitors = async () => {
+    await supabase.rpc('increment_visitor');
+    const { data } = await supabase
       .from('site_stats')
       .select('today_count, total_count')
       .eq('id', 'global')
-      .maybeSingle(); // 👈 이 부분으로 교체
-
-    if (error) {
-      console.error("❌ 방문자 데이터 로드 실패:", error.message);
-      return;
-    }
+      .maybeSingle();
 
     if (data) {
       setVisitorStats({ today: data.today_count, total: data.total_count });
-    } else {
-      console.warn("⚠️ 'global' 통계 데이터가 아직 생성되지 않았습니다.");
     }
-    };
+  };
   handleVisitors();
-    
-    // 1. [초기 세션 확인] 데이터 로드 로직을 삭제합니다. (중복 방지)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        console.log("✅ 세션 복구됨:", session.user.email);
-        setCurrentUserId(session.user.id);
-        setIsLoggedIn(true);
-        
-        // ❌ [삭제] 여기서 데이터를 부르지 마세요! onAuthStateChange가 알아서 합니다.
-        // setTimeout(() => fetchUserData(session.user.id), 500); 
-        // ↑ 이 줄을 지우거나 주석 처리하세요.
-      }
-    });
+  
+  // 🔻 [삭제] getSession()을 통한 초기 로드 로직을 삭제합니다.
+  // onAuthStateChange가 INITIAL_SESSION 이벤트를 통해 초기 로드까지 처리합니다.
 
-    // 2. [Auth 상태 감지] 얘가 '진짜'입니다. 여기서만 데이터를 부릅니다.
+  // 2. [Auth 상태 감지] 컨트롤 타워 수정
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth Event:", event); // 로그 확인용
+      console.log("🛠️ Auth Event:", event); 
 
       if (event === 'SIGNED_OUT' || !session) {
+        lastFetchedId.current = null; // 로그아웃 시 초기화
         resetUserState();
       } 
       else if (session?.user) {
-        // ... (중략: ID 설정 및 프로필 생성 로직) ...
-        
-        const user = session.user;
+        const userId = session.user.id;
 
-        if (currentUserId !== user.id) {
-            setCurrentUserId(user.id);
+        // 유저 ID 상태 업데이트
+        if (currentUserId !== userId) {
+            setCurrentUserId(userId);
             setIsLoggedIn(true);
         }
-        
-        // ... (프로필 체크 로직 유지) ...
 
-        // ✅ 여기서 한 번만 확실하게 부릅니다.
-        setTimeout(() => fetchUserData(session.user.id), 500);
+        // 🔻 [수술] 중복 호출 방지 가드 실행
+        if (lastFetchedId.current === userId) {
+          console.log("⏭️ 이미 최신 데이터를 불러왔습니다. 호출을 건너뜁니다.");
+          return;
+        }
+
+        console.log("📥 데이터 로드를 시작합니다...");
+        lastFetchedId.current = userId;
+        fetchUserData(userId); // 👈 불필요한 setTimeout은 제거해도 안전합니다.
       }
     });
 
-    return () => { subscription.unsubscribe(); };
-  }, []);
+  return () => { subscription.unsubscribe(); };
+}, []);
 
-  // ------------------------------------------------------------------
-  // 🔥 [보완] 뷰 변경(로고 클릭 등) 시 데이터 재로드
-  // ------------------------------------------------------------------
-  useEffect(() => {
-    if (isLoggedIn && currentUserId && (view === 'lobby' || view === 'settings')) {
-      // 로고 클릭 등으로 로비에 돌아왔을 때 데이터 최신화
-      // 이미 닉네임이 로드된 상태라면 'Loading...'으로 되돌리지 않고 조용히 업데이트만 수행
-      const timer = setTimeout(() => {
-        fetchUserData(currentUserId);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [view, isLoggedIn, currentUserId]);
+
 
 
   const handleSaveNickname = async (newNickname: string) => {
@@ -811,7 +787,12 @@ export default function App() {
           />
         )}
         
-        {view === 'ranking' && <RankingPage onBack={() => setView('lobby')} playClickSound={playClickSound} />}
+        {view === 'ranking' && (
+          <RankingPage 
+            onBack={() => setView('lobby')} 
+            playClickSound={playClickSound} 
+          />
+        )}
 
         {view === 'shop' && (
           <ShopPage 
