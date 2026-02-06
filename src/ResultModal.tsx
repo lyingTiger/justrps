@@ -14,33 +14,32 @@ interface ResultModalProps {
   onRetry: () => void;
   onLobby: () => void;
   onShop: () => void;
+  onWatchAd: () => void;
 }
 
 export default function ResultModal({ 
   isOpen, mode, round, time, earnedCoins, userCoins, isNewRecord, 
-  continueCount, continueCost, onContinue, onRetry, onLobby, onShop 
+  continueCount, continueCost, onContinue, onRetry, onLobby, onShop,
+  onWatchAd 
 }: ResultModalProps) {
   if (!isOpen) return null;
-
-  const canContinue = continueCount > 0 && userCoins >= continueCost;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md animate-in fade-in duration-300">
       <div className="w-full max-w-[340px] bg-zinc-900 border-2 border-zinc-800 rounded-[40px] p-8 shadow-[0_0_60px_rgba(0,0,0,0.8)] flex flex-col items-center animate-in zoom-in-95 duration-300">
         
-        {/* 타이틀 영역 */}
-        {/* 🔥 [수정 1] Game Over 크기 축소 (text-4xl -> text-3xl) */}
-        <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter leading-none mb-1">
-          Game Over
-        </h2>
+        {/* 1. 상단 그룹: Game Over & Mode */}
+        <div className="w-full text-center mb-4">
+            <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter leading-none mb-1">
+                Game Over
+            </h2>
+            <p className="text-4xl mb-2 font-black text-[#FF9900] italic uppercase tracking-tighter leading-none text-center">
+                {mode.includes('MODE') ? mode : `${mode} MODE`}
+            </p>
+        </div>
 
-        {/* 🔥 [복구] 모드 표시는 원본 디자인(오렌지색 대형 텍스트) 그대로 유지 */}
-        <p className="text-4xl mb-2 font-black text-[#FF9900] italic uppercase tracking-tighter leading-none text-center">
-          {mode.includes('MODE') ? mode : `${mode} MODE`}
-        </p>
-
-        {/* 메인 결과 (ROUND) */}
-        <div className="relative mb-8 text-center">
+        {/* 2. 중앙 그룹: ROUND */}
+        <div className="relative my-8 text-center">
           <div className="text-8xl font-black text-white leading-none tracking-tighter">
             {round}
           </div>
@@ -54,8 +53,9 @@ export default function ResultModal({
           )}
         </div>
 
-        {/* 스탯 정보 */}
-        <div className="w-full space-y-3 mb-8 bg-black/30 p-4 rounded-3xl border border-zinc-800/50">
+        {/* 3. 하단 그룹: 데이터 (스탯 정보) */}
+        {/* 🔻 [수정] border-zinc-800/50 ➡️ border-[#FF9900] (1px 주황색 테두리 적용) */}
+        <div className="w-full space-y-3 mb-6 bg-black/30 p-4 rounded-3xl border border-zinc-700">
           <div className="flex justify-between items-center px-1">
             <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Clear Time</span>
             <span className="text-white font-mono font-bold text-lg">{time.toFixed(2)}s</span>
@@ -69,36 +69,81 @@ export default function ResultModal({
           </div>
         </div>
 
-        {/* 버튼 그룹 */}
-        <div className="w-full space-y-3">
-          {/* CONTINUE 버튼 */}
-          <button 
-            onClick={onContinue}
-            disabled={!canContinue}
-            className={`w-full h-16 rounded-2xl flex flex-col items-center justify-center transition-all shadow-xl
-              ${canContinue 
-                ? 'bg-white text-black active:scale-95' 
-                : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-              }`}
-          >
-            <span className="text-lg font-black uppercase leading-none">Continue</span>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[10px] font-bold uppercase opacity-70">Left: {continueCount}/3</span>
-              <div className="flex items-center gap-1">
-                <img src="/images/coin.png" alt="coin" className="w-3.5 h-3.5 object-contain" />
-                <span className="text-[10px] font-bold">-{continueCost}</span>
-              </div>
-            </div>
-          </button>
+        {/* 4. 최하단: 이어하기 & 버튼 그룹 */}
+        <div className="w-full flex flex-col items-center">
+            
+            {/* 이어하기 섹션 (테두리만 깜빡이는 이중 레이어 구조) */}
+            {continueCount > 0 ? (
+                <div className="w-full relative mb-6 group">
+                    {/* 🔻 [추가] 테두리와 빛 번짐 효과만 담당하는 레이어 (내용물에 영향 없음) */}
+                    <div className="absolute inset-0 rounded-[32px] border-2 border-[#FF9900] shadow-[0_0_20px_rgba(255,153,0,0.4)] animate-pulse pointer-events-none"></div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={onRetry} className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-zinc-700 active:scale-95 transition-all">Retry</button>
-            {/* 🔥 [수정 2] Lobby -> Main 텍스트 변경 */}
-            <button onClick={onLobby} className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-zinc-700 active:scale-95 transition-all">Main</button>
-          </div>
+                    {/* 🔻 [수정] 실제 내용물 레이어 (배경색만 담당, 깜빡임 없음) */}
+                    <div className="relative bg-black/40 p-6 rounded-[32px] flex flex-col items-center">
+                        {/* 텍스트 질문 */}
+                        <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-1">
+                            Continue?
+                        </h3>
+                        {/* 남은 횟수 표기 */}
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase mb-4">
+                            Attempts Left: <span className="text-[#FF9900]">{continueCount}</span>/3
+                        </p>
+
+                        {/* 이어하기 버튼 2개 (마우스 오버/클릭 시 주황색 테두리 추가) */}
+                        <div className="grid grid-cols-2 gap-3 w-full">
+                            {/* 옵션 1: 코인 사용 */}
+                            <button 
+                                onClick={onContinue}
+                                disabled={userCoins < continueCost}
+                                /* 🔻 [수정] hover:border-[#FF9900] 및 active:border-[#FF9900] 추가 */
+                                className={`h-10 rounded-2xl flex items-center justify-center gap-2 transition-all border text-sm font-black uppercase
+                                ${userCoins >= continueCost 
+                                    ? 'bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700 hover:border-[#FF9900] active:border-[#FF9900] active:scale-95' 
+                                    : 'bg-zinc-900 border-zinc-800 text-zinc-600 opacity-50 cursor-not-allowed'
+                                }`}
+                            >
+                                <img src="/images/coin.png" alt="coin" className="w-4 h-4" />
+                                <span>-{continueCost}</span>
+                            </button>
+
+                            {/* 옵션 2: 광고 시청 */}
+                            <button 
+                                onClick={onWatchAd}
+                                /* 🔻 [수정] hover:border-[#FF9900] 및 active:border-[#FF9900] 추가 */
+                                className="h-10 rounded-2xl flex items-center justify-center transition-all border bg-zinc-800 border-zinc-700 text-white text-sm font-black uppercase hover:bg-zinc-700 hover:border-[#FF9900] active:border-[#FF9900] active:scale-95"
+                            >
+                                WATCH AD
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                /* 횟수 다 씀 */
+                <div className="w-full h-12 flex items-center justify-center bg-zinc-800/50 rounded-2xl text-zinc-500 font-bold text-xs uppercase mb-6 border border-zinc-800">
+                    No Continues Left
+                </div>
+            )}
+
+            {/* 하단 공통 버튼 (Retry / Main) */}
+            <div className="w-full grid grid-cols-2 gap-3">
+                {/* 🔻 [수정] Retry 버튼: hover/active 시 주황색 테두리 추가 */}
+                <button 
+                    onClick={onRetry} 
+                    className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase transition-all border border-zinc-700 hover:bg-zinc-700 hover:border-[#FF9900] active:border-[#FF9900] active:scale-95"
+                >
+                    Retry
+                </button>
+
+                {/* 🔻 [수정] Main 버튼: hover/active 시 주황색 테두리 추가 */}
+                <button 
+                    onClick={onLobby} 
+                    className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase transition-all border border-zinc-700 hover:bg-zinc-700 hover:border-[#FF9900] active:border-[#FF9900] active:scale-95"
+                >
+                    Main
+                </button>
+            </div>
         </div>
 
-        {/* 🔥 [수정 3] Visit Shop 버튼 삭제됨 */}
       </div>
     </div>
   );

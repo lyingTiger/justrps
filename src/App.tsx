@@ -8,13 +8,17 @@ import MultiplayPage from './MultiplayPage';
 import TutorialPage from './TutorialPage';
 import WaitingRoom from './WaitingRoom'; 
 import MultiGameEngine from './MultiGameEngine'; 
+import ShopPage from './ShopPage';
+import AdOverlay from './AdOverlay';
 
 export default function App() {
   // --- 1. 유저 및 세션 상태 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-const [userNickname, setUserNickname] = useState(localStorage.getItem('cached_nickname') || 'Loading...');
-const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached_coins') || '0'));
+  const [userNickname, setUserNickname] = useState(localStorage.getItem('cached_nickname') || 'Loading...');
+  const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached_coins') || '0'));
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [showAdOverlay, setShowAdOverlay] = useState(false);
 
   // --- 2. 게임 및 뷰 제어 ---
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle'>('lobby');
@@ -45,8 +49,7 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // --- 5. 결과창 상태 ---
-  const [showResultModal, setShowResultModal] = useState(false);
-  const [resultData, setResultData] = useState({ round: 0, time: 0, coins: 0, isNewRecord: false });
+   const [resultData, setResultData] = useState({ round: 0, time: 0, coins: 0, isNewRecord: false });
   const [continueCount, setContinueCount] = useState(3);
   const [sessionCoins, setSessionCoins] = useState(0); 
   const CONTINUE_COST = 50;
@@ -472,6 +475,18 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
     }
   };
 
+  // 🔥 [신규] 광고 보고 이어하기 처리
+  const handleAdContinueSuccess = () => {
+    // 1. 이어하기 횟수 차감
+    setContinueCount(prev => prev - 1);
+    // 2. 결과창 닫기 & 광고창 닫기
+    setShowResultModal(false);
+    setShowAdOverlay(false);
+    // 3. (선택) 부활했다는 알림이나 로그
+    console.log("📺 광고 보고 부활!");
+  };
+
+
   // ------------------------------------------------------------------
   // 🔥 [화면 분기] isLoggedIn이 false면 로그인 화면을 리턴
   // resetUserState()가 호출되면 isLoggedIn이 false가 되어 이 화면이 보여야 함
@@ -663,8 +678,26 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
         )}
         
         {view === 'ranking' && <RankingPage onBack={() => setView('lobby')} playClickSound={playClickSound} />}
-        {view === 'shop' && <div className="p-20 text-white font-bold uppercase text-center animate-pulse">Shop coming soon...<button onClick={() => setView('lobby')} className="block mx-auto mt-4 text-xs underline font-bold">Back</button></div>}
-      </main>
+
+        {view === 'shop' && (
+          <ShopPage 
+            onBack={() => setView('lobby')}
+            userCoins={userCoins}
+            currentUserId={currentUserId}
+            onUpdateCoins={(newAmount) => {
+               setUserCoins(newAmount);
+               // 로컬 스토리지도 동기화
+               localStorage.setItem('cached_coins', newAmount.toString());
+            }}
+          />
+        )}      </main>
+
+      {/* 🔥 [추가] 광고 오버레이 (결과창 위에서 뜸) */}
+      <AdOverlay 
+        isOpen={showAdOverlay} 
+        onClose={() => setShowAdOverlay(false)} 
+        onReward={handleAdContinueSuccess} 
+      />
 
       {/* 결과 모달 */}
       <ResultModal 
@@ -674,6 +707,7 @@ const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached
         onRetry={() => { setShowResultModal(false); resetGameSession(); setView('battle'); }} 
         onLobby={() => { setShowResultModal(false); resetGameSession(); setView('lobby'); }} 
         onShop={() => { setShowResultModal(false); setView('shop'); }} 
+        onWatchAd={() => setShowAdOverlay(true)}
       />
     </div>
   );
