@@ -1,2 +1,0 @@
-# justrps
-RPS memory game
