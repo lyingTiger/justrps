@@ -22,6 +22,7 @@ export default function App() {
   const [showAdOverlay, setShowAdOverlay] = useState(false);
   const [visitorStats, setVisitorStats] = useState({ today: 0, total: 0 });
   const lastFetchedId = useRef<string | null>(null);
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
   // 인게임 메시지 팝업 상태
   const [msgPopup, setMsgPopup] = useState({ isOpen: false, title: '', desc: '' });
@@ -607,48 +608,61 @@ useEffect(() => {
 
   // --- 로그인 후 메인 화면 ---
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => setIsUserMenuOpen(false)}>
+    // 🔻 [수정] 배경 클릭 시 두 메뉴가 모두 닫히도록 최상단 div에 핸들러 유지
+    <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => { setIsUserMenuOpen(false); setIsSettingsMenuOpen(false); }}>
       <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50">
         
-        {/* 🔻 [수정] 로고와 방문자 수를 한 덩어리로 묶음 */}
-        <div className="flex items-center gap-6">
+        {/* [좌측] 로고 및 시스템 설정 영역 */}
+        <div className="flex items-center gap-1">
           <h2 className="text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>
             <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
           </h2>
+
+          {/* ⚙️ [수정] 기어 아이콘: Settings와 Game Info 담당 */}
+          <div className="relative">
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsSettingsMenuOpen(!isSettingsMenuOpen); }}
+              className="w-5 h-5 flex items-center justify-center transition-transform active:scale-90 ml-2"
+            >
+              <img 
+                src="/images/icon_setting.png" 
+                alt="Settings" 
+                className={`w-full h-full object-contain transition-opacity ${isSettingsMenuOpen ? 'opacity-100' : 'opacity-50 hover:opacity-100'}`}
+              />
+            </button>
+
+            {/* 📍 시스템 메뉴 (기어 클릭 시) */}
+            {isSettingsMenuOpen && (
+              <div className="absolute right-0 mt-3 w-26 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
+                <button onClick={() => setView('settings')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">Settings</button>
+                <button onClick={() => setView('info')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white">Game Info</button>
+              </div>
+            )}
+          </div>
         </div>
 
-
-        <div className="flex items-center gap-4">
+        {/* [우측] 계정 및 재화 영역 */}
+        <div className="flex items-center gap-5">
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="...">
-              
-          {/* 🔻 [수정] 표시 10자 제한 및 '...' 처리 */}
-          {userNickname.length > 10 
-            ? userNickname.substring(0, 10) + '...' 
-            : userNickname} 
-          <span className="text-[10px] opacity-50">▼</span>
-        </button>
+            <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="font-bold text-sm tracking-tight text-zinc-300 hover:text-white transition-colors">
+              {userNickname.length > 10 ? userNickname.substring(0, 10) + '...' : userNickname} 
+              <span className="text-[10px] opacity-50 ml-1"></span>
+            </button>
 
-            {/* 사용자 메뉴 드랍다운 */}
-
+            {/* 📍 계정 메뉴 (닉네임 클릭 시: 로그아웃만 유지) */}
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-1 z-[100] shadow-2xl">
-                <button onClick={() => setView('settings')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">Settings</button>
-
-                <button 
-                  onClick={() => setView('info')} 
-                  className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white"
-                >
-                  game Info
-                </button>
-
+              <div className="absolute right-0 mt-2 w-21 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
                 <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800 uppercase">Logout</button>
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 bg-zinc-900 px-4 py-2 rounded-full border border-zinc-800">
+
+          {/* 코인 영역 (배경/테두리 삭제됨) */}
+          <div className="flex items-center gap-1.5 ml-1">
             <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
-            <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">{userCoins.toLocaleString()}</span>
+            <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">
+              {userCoins.toLocaleString()}
+            </span>
           </div>
         </div>
       </header>
