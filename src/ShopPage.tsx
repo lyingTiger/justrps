@@ -102,13 +102,13 @@ export default function ShopPage({ onBack, userCoins, currentUserId, onUpdateCoi
     };
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col items-center mt-6 px-4 animate-in fade-in">
+    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4">
       <AdOverlay isOpen={isAdOpen} onClose={() => setIsAdOpen(false)} onReward={handleAdReward} />
 
       {/* 상단 헤더 */}
-      <div className="w-full flex justify-between items-center mb-8">
-        <h2 className="text-4xl font-black italic uppercase tracking-tighter text-[#FF9900]">Shop</h2>
-        <button onClick={onBack} className="h-10 px-4 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl border border-zinc-700 hover:border-[#FF9900] transition-all">Back</button>
+      <div className="w-full flex justify-end mb-0">
+        
+        <button onClick={onBack} className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700">Back</button>
       </div>
 
       <div className="w-full space-y-4">

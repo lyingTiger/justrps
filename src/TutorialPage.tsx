@@ -11,14 +11,18 @@ export default function TutorialPage({ onBack }: TutorialPageProps) {
   const divider = <div className="w-full h-[1px] bg-zinc-700 my-6" />; 
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col items-center py-8 px-4 animate-in fade-in slide-in-from-bottom-5 duration-500">
-      {/* 헤더 섹션 */}
-      <h2 className="text-5xl font-black text-[#FF9900] italic uppercase tracking-tighter mb-10 text-center [text-shadow:2px_2px_0_rgba(0,0,0,1)]">
-        Tutorial
-      </h2>
+    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 animate-in fade-in duration-700 font-sans">
+
+      <div className="w-full flex justify-end mb-0">
+        <button onClick={onBack}
+            className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700"
+        >
+          Back
+        </button>
+      </div>
 
       {/* 단계별 가이드 영역 (커스텀 스크롤바 적용됨) */}
-      <div className="w-full overflow-y-auto custom-scrollbar pr-2 max-h-[60vh]">
+      <div className="w-full overflow-y-auto custom-scrollbar pr-2 mt-4 max-h-[60vh]">
         
         {/* --- 01 단계: 기억하기 --- */}
         <div className="flex flex-col items-center text-center space-y-3 animate-in slide-in-from-top duration-700">
@@ -69,14 +73,6 @@ export default function TutorialPage({ onBack }: TutorialPageProps) {
           </div>
         </div>
       </div>
-
-      {/* 하단 시작 버튼 */}
-      <button 
-        onClick={onBack}
-        className="w-full h-14 shrink-0 bg-[#FF9900] text-black font-black uppercase rounded-2xl text-lg mt-8 active:scale-95 transition-all shadow-[0_10px_30px_rgba(255,153,0,0.2)]"
-      >
-        Ready to Battle
-      </button>
     </div>
   );
 }

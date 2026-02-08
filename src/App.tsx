@@ -25,7 +25,17 @@ export default function App() {
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
   // 인게임 메시지 팝업 상태
-  const [msgPopup, setMsgPopup] = useState({ isOpen: false, title: '', desc: '' });
+  const [msgPopup, setMsgPopup] = useState<{
+  isOpen: boolean;
+  title: string;
+  desc: string;
+  onConfirm?: (() => void) | null; // 💉 '?' 추가로 이전 코드들과의 호환성 확보
+  }>({ 
+    isOpen: false, 
+    title: '', 
+    desc: '', 
+    onConfirm: null 
+  });
 
   // --- 2. 게임 및 뷰 제어 ---
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle' | 'info'>('lobby');  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); 
@@ -125,10 +135,11 @@ export default function App() {
             console.log(`✅ 프로필 생성 완료! (닉네임: ${googleName})`);
 
             // 🔻 구글 가입 성공 시 인게임 팝업 호출
-            setMsgPopup({
-              isOpen: true,
-              title: "WELCOME!",
-              desc: `Hi, ${googleName}!\nENJOY JUST RPS!`
+            const [msgPopup, setMsgPopup] = useState({ 
+            isOpen: false, 
+            title: '', 
+            desc: '', 
+            onConfirm: null as (() => void) | null 
             });
         }
       }
@@ -583,8 +594,31 @@ useEffect(() => {
   };
 
 
+  // 최고 기록 시작 버튼 핸들러
+  const handlePlayFromBest = () => {
+    if (userCoins >= 100) {
+      setMsgPopup({
+        isOpen: true,
+        title: "CONTINUE?",
+        desc: "-100", // 💉 문구 대신 차감될 숫자만 전달
+        onConfirm: async () => {
+          // 코인 차감 및 시작 로직...
+          setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }));
+        }
+      });
+    } else {
+      setMsgPopup({
+        isOpen: true,
+        title: "AD START?",
+        desc: "WATCH AD", // 💉 광고 케이스도 간결하게 수정
+        onConfirm: () => {
+          setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }));
+        }
+      });
+    }
+  };  
 
-  // 🔥 [신규] 광고 보고 이어하기 처리
+  // 광고 보고 이어하기 처리
   const handleAdContinueSuccess = () => {
     // 1. 이어하기 횟수 차감
     setContinueCount(prev => prev - 1);
@@ -774,26 +808,52 @@ useEffect(() => {
           </div>
         )}
 
-        {view === 'modeSelect' && (
-          <div className="w-full max-w-[320px] flex flex-col items-center mt-16 gap-3 px-4">
-            <button onClick={() => { resetGameSession(); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95">Single Play</button>
-            <button onClick={() => setView('multiplay')} className="w-full h-14 rounded-md font-bold text-lg bg-zinc-900 text-white border border-zinc-800 uppercase hover:bg-zinc-800">Multi Play</button>
-            <div className="flex flex-col gap-3 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full mt-6">
-              {['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'].map(opt => (
-                <label key={opt} className="flex items-center gap-2 cursor-pointer text-[14px] font-bold">
-                  <input type="radio" checked={selectedOption === opt} onChange={() => setSelectedOption(opt)} className="accent-[#FF9900]" />
-                  <span className={selectedOption === opt ? 'text-[#FF9900]' : 'text-zinc-500'}>{opt}</span>
-                </label>
-              ))}
-            </div>
+
+      {/* 플레이 선택 뷰 */}
+      {view === 'modeSelect' && (
+        <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4">
+          
+
+          <div className="w-full flex justify-end mb-0">
             <button 
               onClick={() => setView('lobby')} 
-              className="w-3/4 h-14 mt-8 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all shadow-lg"
+              className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700"
             >
-              Main
+              back
             </button>
           </div>
-        )}
+
+          {/* 💉 [추가] 모드 선택 섹션 타이틀 */}
+          <p className="w-full text-left text-base font-black text-[#ffcc33] uppercase ml-1">select mode</p>
+
+          <div className="flex flex-col gap-3 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full mt-0">
+            {['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'].map(opt => (
+              <label key={opt} className="flex items-center gap-2 cursor-pointer text-[14px] font-bold">
+                <input type="radio" checked={selectedOption === opt} onChange={() => setSelectedOption(opt)} className="accent-[#FF9900]" />
+                <span className={selectedOption === opt ? 'text-[#FF9900]' : 'text-zinc-500'}>{opt}</span>
+              </label>
+            ))}
+          </div>
+
+          {/* 💉 [추가] 플레이 방식 선택 섹션 타이틀 */}
+          <p className="w-full text-left text-base font-black text-[#ffcc33] uppercase ml-1 mt-4">start with</p>
+
+          {/* 기존 플레이 버튼들 */}
+          <button onClick={() => { resetGameSession(); setView('battle'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#3399cc] hover:text-black hover:border-[#3399cc] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#3399cc] active:text-black active:border-[#3399cc] active:scale-95">Single Play</button>
+          
+          <button onClick={() => setView('multiplay')} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#66cc33] hover:text-black hover:border-[#66cc33] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#66cc33] active:text-black active:border-[#66cc33] active:scale-95">Multi Play</button>
+          
+          <button 
+            onClick={handlePlayFromBest} 
+            className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#ff3366] hover:text-black hover:border-[#ff3366] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#ff3366] active:text-black active:border-[#ff3366] active:scale-95"
+          >
+            Play from Best
+          </button>
+          
+        </div>
+      )}
+
+
 
         {view === 'multiplay' && (
           <MultiplayPage selectedMode={selectedOption} onBack={() => setView('modeSelect')} onJoin={(roomId) => { setCurrentRoomId(roomId); setView('waitingRoom'); }} />
@@ -875,20 +935,53 @@ useEffect(() => {
         onWatchAd={() => setShowAdOverlay(true)}
       />
 
+
       {/* 인게임 메시지 팝업 (Common Message Popup) */}
       {msgPopup.isOpen && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-[280px] bg-zinc-900 border-2 border-[#FF9900] rounded-[40px] p-8 flex flex-col items-center text-center shadow-[0_0_50px_rgba(255,153,0,0.2)] animate-in zoom-in-95 duration-200">
-            <div className="text-4xl mb-4 animate-bounce">🎉</div>
-            <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-2">{msgPopup.title}</h3>
-            <p className="text-xl text-white font-bold uppercase leading-tight mb-8 whitespace-pre-line">{msgPopup.desc}</p>
             
-            <button 
-              onClick={() => setMsgPopup(prev => ({ ...prev, isOpen: false }))}
-              className="w-full h-12 bg-[#FF9900] text-black font-black text-sm rounded-2xl uppercase hover:bg-[#ffad33] active:scale-95 transition-all"
-            >
-              Confirm
-            </button>
+            {/* 타이틀 */}
+            <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-1">{msgPopup.title}</h3>
+            
+            {/* 💉 [추가] 무엇을 시작하는지 설명하는 서브 텍스트 */}
+            {msgPopup.title === "CONTINUE?" && (
+              <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-6">
+                start from best record
+              </p>
+            )}
+
+            {/* 설명 및 코인 영역 */}
+            <div className="flex items-center justify-center gap-3 mb-10">
+              {msgPopup.title === "CONTINUE?" && (
+                <img src="/images/coin.png" alt="coin" className="w-6 h-6 object-contain" />
+              )}
+              <p className="text-2xl text-white font-black italic uppercase tracking-tighter">
+                {msgPopup.desc}
+              </p>
+            </div>
+            
+            {/* 버튼 영역 */}
+            <div className="flex gap-3 w-full">
+              {msgPopup.onConfirm && (
+                <button 
+                  onClick={() => msgPopup.onConfirm?.()}
+                  className="flex-1 h-12 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
+                >
+                  OK
+                </button>
+              )}
+              <button 
+                onClick={() => setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }))}
+                className={`h-12 font-bold text-lg rounded-2xl uppercase active:scale-95 transition-all ${
+                  msgPopup.onConfirm 
+                    ? "flex-1 bg-zinc-900 text-white hover:bg-[#FF9900] hover:text-black" 
+                    : "w-full bg-[#FF9900] text-black hover:bg-[#FF9900]"
+                }`}
+              >
+                {msgPopup.onConfirm ? "CANCEL" : "Confirm"}
+              </button>
+            </div>
           </div>
         </div>
       )}

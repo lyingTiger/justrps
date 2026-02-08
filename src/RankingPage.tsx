@@ -144,13 +144,20 @@ const modes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MOD
   };
 
   return (
-    <div className="w-full max-w-[360px] flex flex-col items-center mt-12 animate-in fade-in duration-700 font-sans">
-      <h2 className="text-5xl font-black text-[#FF9900] italic uppercase tracking-tighter mb-10 [text-shadow:2px_2px_0_rgba(0,0,0,1)]">
-        rankers
-      </h2>
+    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 animate-in fade-in duration-700 font-sans">
+      
+      <div className="w-full flex justify-end mb-0">
 
+        <button 
+          onClick={() => { playClickSound(); onBack(); }} 
+          className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700"
+        >
+          Back
+        </button>
+      </div>
+      
       {/* 모드 선택 탭 */}
-      <div className="w-full flex justify-center flex-wrap gap-x-5 gap-y-5 mb-10 px-4">
+      <div className="w-full flex justify-center flex-wrap gap-x-5 gap-y-5 mb-10 mt-4 px-4">
         {modes.map((mode) => {
           const isActive = activeMode === mode;
           return (
@@ -257,12 +264,7 @@ const modes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MOD
         </div>
       </div>
 
-      <button 
-        onClick={() => { playClickSound(); onBack(); }} 
-        className="w-3/4 h-14 mt-8 rounded-md font-bold text-lg bg-[#FF9900] text-black uppercase active:scale-95 transition-all shadow-lg"
-      >
-        Main
-      </button>
+     
 
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }

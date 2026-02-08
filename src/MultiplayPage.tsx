@@ -104,9 +104,9 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
   const filteredRooms = rooms.filter(r => r.name.toLowerCase().includes(searchName.toLowerCase()));
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col items-center mt-6 px-4 animate-in fade-in relative">
-      <div className="w-full flex justify-between items-center mb-6">
-        <h2 className="text-4xl font-black italic uppercase tracking-tighter text-[#FF9900]">Multiplay</h2>
+    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4">
+      <div className="w-full flex justify-end mb-0">
+        
         
         <button 
           onClick={onBack} 

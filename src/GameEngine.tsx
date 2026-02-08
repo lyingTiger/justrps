@@ -189,7 +189,7 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
       </div>
 
       <div className="w-full flex justify-center mt-auto">
-        {isMemoryPhase ? <button onClick={() => { playClickSound(); setIsMemoryPhase(false); }} className="text-[#FF9900] text-3xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse">OK, I got it</button> : (
+        {isMemoryPhase ? <button onClick={() => { playClickSound(); setIsMemoryPhase(false); }} className="w-full h-14 rounded-md font-bold uppercase transition-all bg-zinc-900 text-[#ffcc33] text-4xl font-black italic uppercase  hover:scale-105 transition-transform animate-pulse border border-[#282828]">OK, I got it</button> : (
           <div className="flex gap-4 w-full px-2">
             {['rock', 'paper', 'scissor'].map((type) => (
               <button key={type} onClick={() => handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0)} className={`flex-1 aspect-square rounded-3xl overflow-hidden active:scale-90 transition-all bg-zinc-900 ${type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'shadow-[0_0_15px_rgba(236,72,153,0.5)]'}`}><img src={`/images/${type}.png`} className="w-full h-full object-cover" /></button>
