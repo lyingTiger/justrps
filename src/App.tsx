@@ -73,7 +73,9 @@ export default function App() {
   // 🔻 [추가] 전면 광고 제어용 상태
   const [adFreeUntil, setAdFreeUntil] = useState<string | null>(null); // 광고 제거 만료 시간
   const [playCount, setPlayCount] = useState(0); // 게임 판수 카운터
-  const [pendingBestRound, setPendingBestRound] = useState<number | null>(null); // 💉 추가
+  const [pendingBestRound, setPendingBestRound] = useState<number | null>(null); 
+  const [sessionStartTime, setSessionStartTime] = useState(0); // 세션 시작 시간 상태
+  const [pendingBestTime, setPendingBestTime] = useState(0);   // 광고용 시간 예약  
 
   // ------------------------------------------------------------------
   // ✨ [신규 추가] 상태 초기화 함수 (로그아웃 시 잔여 데이터 제거용)
@@ -474,8 +476,11 @@ useEffect(() => {
     setView(targetView);
   };
 
-  const resetGameSession = () => {
-    setRound(1);
+  const resetGameSession = (startTime = 0) => {
+    if (startTime === 0) {
+      setRound(1); // 💉 재도전 시 라운드 1로 강제 고정
+    }
+    setSessionStartTime(startTime);
     setSessionCoins(0);
     setContinueCount(3);
     setGameKey(Date.now());
@@ -597,41 +602,45 @@ useEffect(() => {
   const handlePlayFromBest = async () => {
     if (!currentUserId) return;
 
-    // 1. DB에서 해당 모드의 최고 기록 가져오기
+    // DB에서 해당 모드의 최고 기록 가져오기
     const { data: record } = await supabase
       .from('mode_records')
-      .select('best_round')
+      .select('best_round, best_time')
       .eq('user_id', currentUserId)
       .eq('mode', selectedOption)
       .maybeSingle();
 
     const bestRound = record?.best_round || 1;
+    const bestTime = record?.best_time || 0;
 
+    // [분기] 코인 잔액에 따른 처리
     if (userCoins >= 100) {
+      // 코인이 충분한 경우: 바로 사용 확인 팝업
       setMsgPopup({
         isOpen: true,
         title: "CONTINUE?",
         desc: "-100",
         onConfirm: async () => {
-          // 💸 코인 차감 (RPC 호출)
+          // 코인 차감 (RPC 호출)
           await supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: -100 });
           setUserCoins(prev => prev - 100);
           
           // 🎮 게임 시작
-          setRound(bestRound);
-          resetGameSession(); // 세션 초기화 (코인 등)
           setRound(bestRound); // 초기화 후 라운드 재설정
+          resetGameSession(bestTime); // 최고 기록 시간 주입
           setView('battle');
           setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }));
         }
       });
     } else {
+      // 코인이 부족한 경우: 광고 시청 확인 팝업
       setMsgPopup({
         isOpen: true,
         title: "AD START?",
         desc: "WATCH AD",
         onConfirm: () => {
           setPendingBestRound(bestRound);
+          setPendingBestTime(bestTime); // 최고 기록 시간 예약
           // 광고 시청 후 성공 시 bestRound로 시작하게 연결
           setShowAdOverlay(true); 
           setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }));
@@ -646,9 +655,10 @@ useEffect(() => {
 
     // 💉 [추가] 최고 기록에서 시작하는 케이스 처리
     if (pendingBestRound !== null) {
-      resetGameSession(); 
-      setRound(pendingBestRound); // 🎯 저장된 최고 라운드로 세팅
-      setPendingBestRound(null);   // 사용 후 초기화
+      setRound(pendingBestRound);
+      resetGameSession(pendingBestTime); // 💉 예약된 시간 주입
+      setPendingBestRound(null);
+      setPendingBestTime(0);
       setView('battle');
       return;
     }
@@ -919,7 +929,7 @@ useEffect(() => {
         
         {view === 'battle' && (
           <GameEngine 
-            key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} 
+            key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} initialTime={sessionStartTime}
             onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} 
             onRoundClear={(next) => setRound(next)} onGameOver={handleGameOver} isModalOpen={showResultModal} 
           />
@@ -951,7 +961,7 @@ useEffect(() => {
         isOpen={showAdOverlay} 
         onClose={() => {
           setShowAdOverlay(false);
-          setPendingBestRound(null); // 💉 예약 정보 삭제
+          setPendingBestRound(null); // 예약 정보 삭제
         }} 
         onReward={handleAdContinueSuccess} 
       />
@@ -961,7 +971,7 @@ useEffect(() => {
         isOpen={showResultModal} mode={selectedOption} round={resultData.round} time={resultData.time} earnedCoins={resultData.coins} 
         userCoins={userCoins} isNewRecord={resultData.isNewRecord} continueCount={continueCount} continueCost={CONTINUE_COST} 
         onContinue={() => { if(userCoins >= CONTINUE_COST) { setUserCoins(c => c - CONTINUE_COST); setContinueCount(prev => prev - 1); setShowResultModal(false); } }} 
-        onRetry={() => { setShowResultModal(false); resetGameSession(); setView('battle'); }} 
+        onRetry={() => { setShowResultModal(false); setRound(1); resetGameSession(0); setView('battle'); }} 
         onLobby={() => { setShowResultModal(false); resetGameSession(); setView('lobby'); }} 
         onShop={() => { setShowResultModal(false); setView('shop'); }} 
         onWatchAd={() => setShowAdOverlay(true)}

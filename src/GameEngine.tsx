@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 interface GameProps {
   round: number;
   mode: string;
+  initialTime: number;
   playClickSound: () => void;
   onEarnCoin: () => void;
   onRoundClear: (nextRound: number) => void;
@@ -10,9 +11,11 @@ interface GameProps {
   isModalOpen: boolean; 
 }
 
-export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin, isModalOpen }: GameProps) {  const [playTime, setPlayTime] = useState(0);      
-  // ⏱️ [핵심] 이번 라운드 진입 시간 저장소
-  const [entryTime, setEntryTime] = useState(0);
+export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin, isModalOpen, initialTime }: GameProps) {
+  
+  // 2. [State 초기값 수정]
+  const [playTime, setPlayTime] = useState(initialTime);      // 💉 0 대신 initialTime
+  const [entryTime, setEntryTime] = useState(initialTime);
 
   const [aiSelect, setAiSelect] = useState<number[]>([]); 
   const [targetConditions, setTargetConditions] = useState<string[]>([]); 
