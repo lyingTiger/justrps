@@ -65,7 +65,7 @@ export default function App() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // --- 5. 결과창 상태 ---
-   const [resultData, setResultData] = useState({ round: 0, time: 0, coins: 0, isNewRecord: false });
+  const [resultData, setResultData] = useState({ round: 0, time: 0, coins: 0, isNewRecord: false });
   const [continueCount, setContinueCount] = useState(3);
   const [sessionCoins, setSessionCoins] = useState(0); 
   const CONTINUE_COST = 50;
@@ -73,6 +73,7 @@ export default function App() {
   // 🔻 [추가] 전면 광고 제어용 상태
   const [adFreeUntil, setAdFreeUntil] = useState<string | null>(null); // 광고 제거 만료 시간
   const [playCount, setPlayCount] = useState(0); // 게임 판수 카운터
+  const [pendingBestRound, setPendingBestRound] = useState<number | null>(null); // 💉 추가
 
   // ------------------------------------------------------------------
   // ✨ [신규 추가] 상태 초기화 함수 (로그아웃 시 잔여 데이터 제거용)
@@ -134,12 +135,10 @@ export default function App() {
             profile = newProfile;
             console.log(`✅ 프로필 생성 완료! (닉네임: ${googleName})`);
 
-            // 🔻 구글 가입 성공 시 인게임 팝업 호출
-            const [msgPopup, setMsgPopup] = useState({ 
-            isOpen: false, 
-            title: '', 
-            desc: '', 
-            onConfirm: null as (() => void) | null 
+            setMsgPopup({
+              isOpen: true,
+              title: "WELCOME!",
+              desc: `Hi, ${googleName}!\nENJOY JUST RPS!`
             });
         }
       }
@@ -595,14 +594,34 @@ useEffect(() => {
 
 
   // 최고 기록 시작 버튼 핸들러
-  const handlePlayFromBest = () => {
+  const handlePlayFromBest = async () => {
+    if (!currentUserId) return;
+
+    // 1. DB에서 해당 모드의 최고 기록 가져오기
+    const { data: record } = await supabase
+      .from('mode_records')
+      .select('best_round')
+      .eq('user_id', currentUserId)
+      .eq('mode', selectedOption)
+      .maybeSingle();
+
+    const bestRound = record?.best_round || 1;
+
     if (userCoins >= 100) {
       setMsgPopup({
         isOpen: true,
         title: "CONTINUE?",
-        desc: "-100", // 💉 문구 대신 차감될 숫자만 전달
+        desc: "-100",
         onConfirm: async () => {
-          // 코인 차감 및 시작 로직...
+          // 💸 코인 차감 (RPC 호출)
+          await supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: -100 });
+          setUserCoins(prev => prev - 100);
+          
+          // 🎮 게임 시작
+          setRound(bestRound);
+          resetGameSession(); // 세션 초기화 (코인 등)
+          setRound(bestRound); // 초기화 후 라운드 재설정
+          setView('battle');
           setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }));
         }
       });
@@ -610,23 +629,33 @@ useEffect(() => {
       setMsgPopup({
         isOpen: true,
         title: "AD START?",
-        desc: "WATCH AD", // 💉 광고 케이스도 간결하게 수정
+        desc: "WATCH AD",
         onConfirm: () => {
+          setPendingBestRound(bestRound);
+          // 광고 시청 후 성공 시 bestRound로 시작하게 연결
+          setShowAdOverlay(true); 
           setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }));
         }
       });
     }
-  };  
+  };
 
   // 광고 보고 이어하기 처리
   const handleAdContinueSuccess = () => {
-    // 1. 이어하기 횟수 차감
-    setContinueCount(prev => prev - 1);
-    // 2. 결과창 닫기 & 광고창 닫기
-    setShowResultModal(false);
     setShowAdOverlay(false);
-    // 3. (선택) 부활했다는 알림이나 로그
-    console.log("📺 광고 보고 부활!");
+
+    // 💉 [추가] 최고 기록에서 시작하는 케이스 처리
+    if (pendingBestRound !== null) {
+      resetGameSession(); 
+      setRound(pendingBestRound); // 🎯 저장된 최고 라운드로 세팅
+      setPendingBestRound(null);   // 사용 후 초기화
+      setView('battle');
+      return;
+    }
+
+    // 기존 로직: 게임 오버 후 부활 케이스
+    setContinueCount(prev => prev - 1);
+    setShowResultModal(false);
   };
 
 
@@ -920,7 +949,10 @@ useEffect(() => {
       {/* 🔥 [추가] 광고 오버레이 (결과창 위에서 뜸) */}
       <AdOverlay 
         isOpen={showAdOverlay} 
-        onClose={() => setShowAdOverlay(false)} 
+        onClose={() => {
+          setShowAdOverlay(false);
+          setPendingBestRound(null); // 💉 예약 정보 삭제
+        }} 
         onReward={handleAdContinueSuccess} 
       />
 
@@ -945,11 +977,12 @@ useEffect(() => {
             <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-1">{msgPopup.title}</h3>
             
             {/* 💉 [추가] 무엇을 시작하는지 설명하는 서브 텍스트 */}
-            {msgPopup.title === "CONTINUE?" && (
+            {(msgPopup.title === "CONTINUE?" || msgPopup.title === "AD START?") && (
               <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-6">
                 start from best record
               </p>
             )}
+            
 
             {/* 설명 및 코인 영역 */}
             <div className="flex items-center justify-center gap-3 mb-10">
