@@ -108,7 +108,7 @@ export default function App() {
   const handleShare = async () => {
     const shareData = {
       title: 'just RPS',
-      text: '인간 본연의 능력으로 플레이하는 기억력 가위바위보! 기록에 도전해보세요.',
+      text: '천재들의 놀이터! \n\n자신의 한계를 극복하고, \n친구들과 대결해 보세요!',
       url: window.location.origin,
     };
 
@@ -118,11 +118,13 @@ export default function App() {
         await navigator.share(shareData);
       } else {
         // PC 등 미지원 환경에서는 링크 복사로 대체
-        await navigator.clipboard.writeText(window.location.origin);
+        const combinedText = `${shareData.url}\n\n천재들의 놀이터! \n\n자신의 한계를 극복하고, \n친구들과 대결해 보세요!`;
+        await navigator.clipboard.writeText(combinedText);
+        
         setMsgPopup({
           isOpen: true,
-          title: "LINK COPIED!",
-          desc: "SHARE IT WITH FRIENDS!"
+          title: "COPIED!", 
+          desc: "MESSAGE & LINK COPIED!"
         });
       }
     } catch (err) {
