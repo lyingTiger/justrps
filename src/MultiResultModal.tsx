@@ -84,10 +84,10 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
         {/* 헤더 */}
         <div className="mb-6 text-center">
             <h2 className="text-3xl font-black text-[#FF9900] italic uppercase tracking-tighter">
-                Battle Result
+                Play Result
             </h2>
-            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-1">
-                Final Ranking
+            <p className="text-zinc-500 text-base font-bold uppercase tracking-widest mt-1">
+                Game Ranking
             </p>
         </div>
 
@@ -114,18 +114,18 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
                       </div>
                       
                       <div className="flex flex-col">
-                          <span className={`text-lg font-black uppercase ${isMe ? 'text-white' : 'text-zinc-400'}`}>
+                          <span className={`text-base font-black uppercase ${isMe ? 'text-white' : 'text-zinc-400'}`}>
                               {p.profiles?.display_name}
                           </span>
-                          <span className="text-lg font-mono font-black text-zinc-500">
-                              Round {p.current_round} / {p.play_time.toFixed(2)}s
+                          <span className="text-sm font-mono font-black text-zinc-500">
+                              {p.current_round}R / {p.play_time.toFixed(2)}s
                           </span>
                       </div>
                   </div>
 
                     <div className="flex flex-col items-end">
                         <div className="flex items-center gap-1">
-                            <span className="text-yellow-400 text-xs">🪙</span>
+                            <span className="text-yellow-400 text-xs"><img src="/images/coin.png" alt="coin" className="w-3 h-3 object-contain" /></span>
                             <span className="text-white font-black text-sm">+{p.total_reward}</span>
                         </div>
                         {p.bonus_coins > 0 && (
@@ -144,13 +144,13 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
         <div className="grid grid-cols-2 gap-3 w-full">
             <button 
                 onClick={onBackToLobby}
-                className="h-14 bg-zinc-600 text-white font-black text-sm rounded-2xl uppercase hover:bg-zinc-500 active:scale-95 transition-all border border-zinc-500 shadow-lg"
+                className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] hover:text-black active:scale-95 transition-all border border-zinc-800 shadow-lg"
             >
                 Main
             </button>
             <button 
                 onClick={onBackToRoom}
-                className="h-14 bg-zinc-600 text-white font-black text-sm rounded-2xl uppercase hover:bg-zinc-500 active:scale-95 transition-all border border-zinc-500 shadow-lg"
+                className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] hover:text-black active:scale-95 transition-all border border-zinc-700 shadow-lg"
             >
                 Back to Room
             </button>
