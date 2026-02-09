@@ -13,11 +13,14 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
   const [newRoomName, setNewRoomName] = useState('');
   const [password, setPassword] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(2);
+  const [isItemMode, setIsItemMode] = useState(false); // 아이템 모드 상태 (기본: No Item)
 
   // 비밀번호 확인용 상태
   const [showPassModal, setShowPassModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [passInput, setPassInput] = useState('');
+
+
 
   useEffect(() => {
     fetchRooms();
@@ -31,6 +34,8 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
     return () => { supabase.removeChannel(subscription); };
   }, []);
 
+
+
   const fetchRooms = async () => {
     const { data } = await supabase
       .from('rooms')
@@ -40,6 +45,8 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
     if (data) setRooms(data);
   };
   
+
+
   const handleJoinAttempt = (room: any) => {
     if (room.current_players >= room.max_players) {
       alert("방이 가득 찼습니다!");
@@ -53,6 +60,8 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
     }
   };
 
+
+
   const executeJoin = async (roomId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -60,6 +69,8 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
     if (!error) onJoin(roomId);
     else alert("방 입장에 실패했습니다.");
   };
+
+
 
   const handleCreateRoom = async () => {
     if (!newRoomName.trim()) return;
@@ -72,6 +83,7 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
       max_players: maxPlayers,
       current_players: 1,
       mode: selectedMode,
+      is_item_mode: isItemMode, 
       creator_id: user.id,
       status: 'waiting',
       seed: Math.random()
@@ -91,6 +103,8 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
     }
   };
 
+
+
   const handleQuickMatch = () => {
     const publicRooms = rooms.filter(r => !r.password && r.current_players < r.max_players);
     if (publicRooms.length > 0) {
@@ -101,7 +115,11 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
     }
   };
 
+
+
   const filteredRooms = rooms.filter(r => r.name.toLowerCase().includes(searchName.toLowerCase()));
+
+
 
   return (
     <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4">
@@ -146,6 +164,26 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
           </div>
         </div>
 
+
+{/* 💉 [추가] 아이템 모드 선택 섹션 */}
+        <div className="flex gap-2">
+          <div className="flex-1 flex items-center justify-around bg-black border border-zinc-800 rounded-2xl h-11 px-2">
+            <button 
+              onClick={() => setIsItemMode(true)} 
+              className={`flex-1 h-7 text-[9px] font-black rounded-lg transition-all ${isItemMode ? 'bg-[#FF9900] text-black' : 'text-zinc-500'}`}
+            >
+              ITEM GAME
+            </button>
+            <button 
+              onClick={() => setIsItemMode(false)} 
+              className={`flex-1 h-7 text-[9px] font-black rounded-lg transition-all ${!isItemMode ? 'bg-[#FF9900] text-black' : 'text-zinc-500'}`}
+            >
+              NO ITEM
+            </button>
+          </div>
+        </div>
+
+
         {/* 🔻 [수정 3] 버튼 텍스트 'random join'으로 변경 */}
         <button 
           onClick={handleQuickMatch}
@@ -154,6 +192,7 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
           random join
         </button>
       </div>
+
 
       <div className="w-full flex flex-col gap-2">
         {/* 🔻 [수정 4] 텍스트 중앙 정렬 (ml-2 제거하고 text-center w-full 추가) */}
@@ -170,6 +209,8 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
                   <div className="flex items-center gap-2">
                     <span className="font-black text-sm italic text-white ">{room.name}</span>
                     {room.password && <span className="text-[10px] opacity-40">🔒</span>}
+                    {/* 아이템전 표시 아이콘/라벨 */}
+                    {room.is_item_mode && <span className="text-[10px] text-[#FF9900] font-black">🎁</span>}
                   </div>
                   <span className="text-sm text-zinc-500 font-black uppercase tracking-tighter ">{room.mode}</span>
                 </div>

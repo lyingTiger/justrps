@@ -25,7 +25,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
 
   const coinRef = useRef(0);
   
-  // ⏱️ [핵심] 멀티플레이도 '라운드 진입 시간'을 기준으로 기록
+  // 멀티플레이도 '라운드 진입 시간'을 기준으로 기록
   const roundEntryTimeRef = useRef(0);
 
   // 게임 로직 관련
@@ -340,67 +340,66 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   if (isLoading) return <div className="text-white text-center mt-20 animate-pulse">Loading Battle...</div>;
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col items-center py-6 animate-in fade-in select-none">
-      <div className="w-full text-left mt-0 mb-6 relative">
-        <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {currentRound}</h2>
-        <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">Total Time: {playTime.toFixed(2)} sec</p>
-        {roomData?.first_cleared_at && !isCleared && !isEliminated && (
-          <div className="text-red-500 text-[10px] font-black uppercase animate-pulse border border-red-500/30 px-2 py-1 rounded w-fit mt-2">Hurry Up!</div>
-        )}
-      </div>
+    <div className="w-full max-w-[360px] mx-auto flex flex-col h-[calc(100dvh-120px)] justify-start py-6 animate-in fade-in duration-500 overflow-hidden select-none">
+    
+    {/* 💉 [수정] 헤더 영역: flex-none으로 위치 고정 */}
+    <div className="w-full text-left mt-0 mb-4 flex-none relative">
+      <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {currentRound}</h2>
+      <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">Total Time: {playTime.toFixed(2)} sec</p>
+      {roomData?.first_cleared_at && !isCleared && !isEliminated && (
+        <div className="text-red-500 text-[10px] font-black uppercase animate-pulse border border-red-500/30 px-2 py-1 rounded w-fit mt-2">Hurry Up!</div>
+      )}
+    </div>
 
-      <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-3xl p-4 mb-8 space-y-2">
-        <div className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Other Players</div>
-        {participants.filter(p => p.user_id !== currentUserId).map(p => (
-          <div key={p.user_id} className="flex justify-between items-center opacity-80">
-            <span className={`text-[10px] font-black uppercase flex items-center gap-1 ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : 'text-zinc-500'}`}>
-               {p.is_dead && "💀"} {p.profiles?.display_name}
-            </span>
-            <span className={`text-xs font-mono font-bold ${p.is_dead ? 'text-red-900' : 'text-white'}`}>
-              {p.is_dead ? "FAIL" : `Round ${p.current_round || 1}`}
-            </span>
+    {/* 💉 [수정] 플레이어 현황판: flex-none으로 고정 및 간격 최적화 */}  {/* border border-zinc-800 */}
+    <div className="w-full bg-zinc-900/50 rounded-3xl p-0 mb-0 flex-none space-y-2">
+      <div className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Other Players</div>
+      {participants.filter(p => p.user_id !== currentUserId).map(p => (
+        <div key={p.user_id} className="flex justify-between items-center opacity-80">
+          <span className={`text-[10px] font-black uppercase flex items-center gap-1 ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : 'text-zinc-500'}`}>
+             {p.is_dead && "💀"} {p.profiles?.display_name}
+          </span>
+          <span className={`text-xs font-mono font-bold ${p.is_dead ? 'text-red-900' : 'text-white'}`}>
+            {p.is_dead ? "FAIL" : `Round ${p.current_round || 1}`}
+          </span>
+        </div>
+      ))}
+    </div>
+
+      {/* 💉 [수정] 메인 콘텐츠 영역: flex-1과 overflow-y-auto로 이 영역만 스크롤 */}
+    <div className="flex-1 overflow-y-auto my-4 custom-scrollbar pr-1 flex flex-col items-center">
+       {(isEliminated || isCleared) ? (
+          <div className="text-center animate-in zoom-in py-10">
+              {isEliminated && <div className="text-6xl mb-4">💀</div>}
+              <h3 className={`text-3xl font-black uppercase italic ${isEliminated ? 'text-zinc-600' : 'text-green-500'}`}>
+                  {isEliminated ? "Game over" : "Next Round!"}
+              </h3>
+              {isEliminated && (
+                  <p className="text-zinc-500 text-xs font-bold uppercase mt-2 animate-pulse">
+                      Waiting for others to finish...
+                  </p>
+              )}
           </div>
-        ))}
-      </div>
+       ) : (
+           <div className="w-full flex flex-col items-center">
+               {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
+                  <div className="text-center mb-10 select-none flex-none">
+                      <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
+                          <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
+                      </div>
+                      <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
+                          <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
+                      </div>
+                  </div>
+               ) : (
+                  <div className="text-center mb-10 flex-none">
+                      <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">{aiSelect.length} {mode.split(' ')[0]}</p>
+                      <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">{questionTurn} {mode.split(' ')[0]}</p>
+                  </div>
+               )}
 
-      <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] w-full">
-         {(isEliminated || isCleared) ? (
-            <div className="text-center animate-in zoom-in">
-                {/* 🔻 [수정 1] 클리어 시 폭죽 아이콘 삭제 (탈락 시 해골만 표시) */}
-                {isEliminated && <div className="text-6xl mb-4"></div>}
-                
-                {/* 🔻 [수정 2] Finished! -> Next Round 로 텍스트 변경 */}
-                <h3 className={`text-3xl font-black uppercase italic ${isEliminated ? 'text-zinc-600' : 'text-green-500'}`}>
-                    {isEliminated ? "Game over" : "Next Round!"}
-                </h3>
-                
-                {/* 🔻 [수정 3] 클리어 시 대기 텍스트 삭제 (탈락 시에만 표시) */}
-                {isEliminated && (
-                    <p className="text-zinc-500 text-xs font-bold uppercase mt-2 animate-pulse">
-                        Waiting for others to finish...
-                    </p>
-                )}
-            </div>
-         ) : (
-             <>
-                 {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
-                    <div className="text-center mb-10 select-none">
-                        <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
-                            <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
-                        </div>
-                        <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
-                            <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
-                        </div>
-                    </div>
-                 ) : (
-                    <div className="text-center mb-10">
-                        <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">{aiSelect.length} {mode.split(' ')[0]}</p>
-                        <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">{questionTurn} {mode.split(' ')[0]}</p>
-                    </div>
-                 )}
-
-                 <div className="flex flex-wrap justify-center gap-3 mb-4">
-                    {aiSelect.map((hand, i) => {
+               <div className="flex flex-wrap justify-center gap-3 mb-4 w-full">
+                  {aiSelect.map((hand, i) => {
                        const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
                        const isCurrent = (i === questionTurn && !isMemoryPhase);
                        const showDetails = isMemoryPhase || isSolved;
@@ -416,19 +415,40 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
                         </div>
                        );
                     })}
-                 </div>
-             </>
-         )}
-      </div>
+               </div>
+           </div>
+       )}
+    </div>
 
-      <div className="w-full flex justify-center mt-auto">
+
+
+      {/* 하단 버튼 영역: mt-auto 및 flex-none으로 크기 고정 */}
+
+      <div className="w-full flex justify-center mt-auto flex-none pb-4">
         {(!isEliminated && !isCleared) && (
             isMemoryPhase ? (
-              <button onClick={() => { playClickSound(); setIsMemoryPhase(false); }} className="text-[#FF9900] text-3xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse">OK, I got it</button>
+              <button 
+                onClick={() => { playClickSound(); setIsMemoryPhase(false); }} 
+                className="w-full h-14 rounded-md font-bold uppercase transition-all bg-zinc-900 text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse border border-[#282828]"
+              >
+                OK, I got it
+              </button>
             ) : (
+              /* 💉 px-2와 gap-4를 유지하여 싱글플레이와 동일한 간격 확보 */
               <div className="flex gap-4 w-full px-2">
                 {['rock', 'paper', 'scissor'].map((type) => (
-                  <button key={type} onClick={() => handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0)} className={`flex-1 aspect-square rounded-3xl overflow-hidden active:scale-90 transition-all bg-zinc-900 ${type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'shadow-[0_0_15px_rgba(236,72,153,0.5)]'}`}><img src={`/images/${type}.png`} className="w-full h-full object-cover" /></button>
+                  <button 
+                    key={type} 
+                    onClick={() => handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0)} 
+                    /* 💉 [핵심] flex-none 제거, flex-1과 aspect-square로 전체 너비 균등 분할 */
+                    className={`flex-1 aspect-square rounded-3xl overflow-hidden active:scale-90 transition-all bg-zinc-900 ${
+                      type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 
+                      type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 
+                      'shadow-[0_0_15px_rgba(236,72,153,0.5)]'
+                    }`}
+                  >
+                    <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
+                  </button>
                 ))}
               </div>
             )

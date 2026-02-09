@@ -148,19 +148,23 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
   };
 
   return (
-    <div className="w-full max-w-[320px] flex flex-col min-h-[550px] justify-start py-6 animate-in fade-in duration-500">
-      <div className="w-full text-left mt-0">
-        <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {round}</h2>
-        {/* 화면에는 계속 흐르는 시간을 보여줌 (긴장감 유도) */}
-        <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">Play Time: {playTime.toFixed(2)} sec</p>
+    <div className="w-full max-w-[360px] flex flex-col h-[calc(100dvh-120px)] justify-start py-6 animate-in fade-in duration-500 overflow-hidden">      
+
+      {/* 💉 flex-none으로 헤더 고정 */}
+      <div className="w-full text-left mt-0 flex-none"> 
+      <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {round}</h2>
+      <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">Play Time: {playTime.toFixed(2)} sec</p>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center">
-        {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
-          <div className="text-center mb-10 select-none">
-            <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
-              <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
-            </div>
+
+      {/* flex-1과 overflow-y-auto를 주어 이 영역만 스크롤되게 함 */}
+    <div className="flex-1 overflow-y-auto my-4 custom-scrollbar pr-1 flex flex-col items-center">
+      {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
+        <div className="text-center mb-6 select-none flex-none">
+          <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
+            <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
+          </div>
+          
             <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
               <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
             </div>
@@ -171,6 +175,8 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
             <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">{questionTurn} {mode.split(' ')[0]}</p>
           </div>
         )}
+
+
 
         <div className="flex flex-wrap justify-center gap-3 mb-4">
           {aiSelect.map((hand, i) => {
@@ -191,11 +197,28 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
         </div>
       </div>
 
-      <div className="w-full flex justify-center mt-auto">
-        {isMemoryPhase ? <button onClick={() => { playClickSound(); setIsMemoryPhase(false); }} className="w-full h-14 rounded-md font-bold uppercase transition-all bg-zinc-900 text-[#ffcc33] text-4xl font-black italic uppercase  hover:scale-105 transition-transform animate-pulse border border-[#282828]">OK, I got it</button> : (
+
+
+      {/* 하단 버튼 영역 */}
+      <div className="w-full flex justify-center mt-auto flex-none pb-4">
+        {isMemoryPhase ? (
+          <button 
+            onClick={() => { playClickSound(); setIsMemoryPhase(false); }} 
+            className="w-full h-14 rounded-md font-bold uppercase transition-all bg-zinc-900 text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse border border-[#282828]"
+          >
+            OK, I got it
+          </button> 
+        ) : (
           <div className="flex gap-4 w-full px-2">
             {['rock', 'paper', 'scissor'].map((type) => (
-              <button key={type} onClick={() => handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0)} className={`flex-1 aspect-square rounded-3xl overflow-hidden active:scale-90 transition-all bg-zinc-900 ${type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'shadow-[0_0_15px_rgba(236,72,153,0.5)]'}`}><img src={`/images/${type}.png`} className="w-full h-full object-cover" /></button>
+              <button 
+                key={type} 
+                onClick={() => handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0)} 
+                /* aspect-square는 유지하되 flex-none으로 압착 방지 */
+                className={`flex-1 aspect-square rounded-3xl overflow-hidden active:scale-90 transition-all bg-zinc-900 ${type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'shadow-[0_0_15px_rgba(236,72,153,0.5)]'}`}
+              >
+                <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
+              </button>
             ))}
           </div>
         )}

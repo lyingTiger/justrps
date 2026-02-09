@@ -328,7 +328,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
            );
         })}
         {Array.from({ length: Math.max(0, (roomInfo?.max_players || 2) - participants.length) }).map((_, i) => (
-           <div key={`empty-${i}`} className="w-full p-3 rounded-2xl border border-dashed border-zinc-800 bg-transparent flex justify-center items-center opacity-30"><span className="text-[10px] font-black uppercase text-zinc-500">Waiting...</span></div>
+           <div key={`empty-${i}`} className="w-full p-3 rounded-2xl border border-dashed bg-transparent flex justify-center items-center opacity-100"><span className="text-lg font-black uppercase text-[#66cc33] animate-pulse">Waiting...</span></div>
         ))}
       </div>
 
