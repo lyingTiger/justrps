@@ -29,7 +29,7 @@ export default function App() {
   isOpen: boolean;
   title: string;
   desc: string;
-  onConfirm?: (() => void) | null; // 💉 '?' 추가로 이전 코드들과의 호환성 확보
+  onConfirm?: (() => void) | null; // '?' 추가로 이전 코드들과의 호환성 확보
   }>({ 
     isOpen: false, 
     title: '', 
@@ -44,7 +44,7 @@ export default function App() {
   const [gameKey, setGameKey] = useState(Date.now());
 
 
-// --- 3. 통계 및 설정 ---   새로고침 시에도 저장된 데이터를 바로 보여주도록 localStorage 값 우선 사용
+  // --- 3. 통계 및 설정 ---   새로고침 시에도 저장된 데이터를 바로 보여주도록 localStorage 값 우선 사용
   const [stats, setStats] = useState({ 
     total_games: parseInt(localStorage.getItem('cached_total_games') || '0'), 
     multi_win_rate: parseInt(localStorage.getItem('cached_win_rate') || '0'), 
@@ -78,8 +78,8 @@ export default function App() {
   const [pendingBestTime, setPendingBestTime] = useState(0);   // 광고용 시간 예약  
 
   // 오디오 컨텍스트 및 소리 데이터 저장용 Ref 
-const audioCtxRef = useRef<AudioContext | null>(null);
-const clickBufferRef = useRef<AudioBuffer | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const clickBufferRef = useRef<AudioBuffer | null>(null);
 
 
   // ------------------------------------------------------------------
@@ -99,8 +99,39 @@ const clickBufferRef = useRef<AudioBuffer | null>(null);
   };
 
 
+  // ------------------------------------------------------------------
+  // 공유하기 기능 (Web Share API 활용)
+  // ------------------------------------------------------------------
+  const handleShare = async () => {
+    const shareData = {
+      title: 'just RPS',
+      text: '인간 본연의 능력으로 플레이하는 기억력 가위바위보! 기록에 도전해보세요.',
+      url: window.location.origin,
+    };
 
-// --- 자가 치유(Self-Healing) 기능이 추가된 데이터 로드 함수 ---
+    try {
+      // 모바일 브라우저의 공유 기능을 우선 사용
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        // PC 등 미지원 환경에서는 링크 복사로 대체
+        await navigator.clipboard.writeText(window.location.origin);
+        setMsgPopup({
+          isOpen: true,
+          title: "LINK COPIED!",
+          desc: "SHARE IT WITH FRIENDS!"
+        });
+      }
+    } catch (err) {
+      console.log("Share action cancelled");
+    }
+  };
+
+
+
+  // ------------------------------------------------------------------
+  // --- 자가 치유(Self-Healing) 기능이 추가된 데이터 로드 함수 ---
+  // ------------------------------------------------------------------
   const fetchUserData = async (userId: string) => {
     console.log(`🚀 [1] fetchUserData 시작 - ID: ${userId}`);
     if (!userId) return;
@@ -244,29 +275,29 @@ const clickBufferRef = useRef<AudioBuffer | null>(null);
     };
   }, [isLoggedIn]); // 로그인 상태일 때만 동작
 
-/// ------------------------------------------------------------------
-//  통합된 세션 체크 및 데이터 로드 
-// ------------------------------------------------------------------
-useEffect(() => {
-  document.title = "just RPS";
+  /// ------------------------------------------------------------------
+  //  통합된 세션 체크 및 데이터 로드 
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    document.title = "just RPS";
 
-  // 1. 방문자 수 업데이트 (앱 실행 시 1회만)
-  const handleVisitors = async () => {
-    await supabase.rpc('increment_visitor');
-    const { data } = await supabase
-      .from('site_stats')
-      .select('today_count, total_count')
-      .eq('id', 'global')
-      .maybeSingle();
+    // 1. 방문자 수 업데이트 (앱 실행 시 1회만)
+    const handleVisitors = async () => {
+      await supabase.rpc('increment_visitor');
+      const { data } = await supabase
+        .from('site_stats')
+        .select('today_count, total_count')
+        .eq('id', 'global')
+        .maybeSingle();
 
-    if (data) {
-      setVisitorStats({ today: data.today_count, total: data.total_count });
-    }
-  };
-  handleVisitors();
+      if (data) {
+        setVisitorStats({ today: data.today_count, total: data.total_count });
+      }
+    };
+    handleVisitors();
   
 
-  // 2. [Auth 상태 감지] 컨트롤 타워 수정
+    // 2. [Auth 상태 감지] 컨트롤 타워 수정
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("🛠️ Auth Event:", event); 
 
@@ -296,7 +327,7 @@ useEffect(() => {
     });
 
   return () => { subscription.unsubscribe(); };
-}, []);
+  }, []);
 
 
 
@@ -322,7 +353,9 @@ useEffect(() => {
     }
   };
 
-// ---   심플 로그인/회원가입 (역할 완전 분리) ---
+
+
+  // ---   심플 로그인/회원가입 (역할 완전 분리) ---
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -451,6 +484,7 @@ useEffect(() => {
   }, []);
 
 
+
   // 구글 OAuth 로그인 핸들러 (오프라인 액세스 추가)
   const handleGoogleLogin = async () => {
     try {
@@ -483,6 +517,8 @@ useEffect(() => {
     }, 100);
   };
 
+
+
   // ------------------------------------------------------------------
   // 플레이나 랭킹 버튼을 누를 때, 실제 로그인이 유지되고 있는지 검사합니다.
   // ------------------------------------------------------------------
@@ -505,6 +541,7 @@ useEffect(() => {
   };
 
 
+
   // ------------------------------------------------------------------
   //  게임 세션 초기화 함수
   // ------------------------------------------------------------------
@@ -517,6 +554,7 @@ useEffect(() => {
     setContinueCount(3);
     setGameKey(Date.now());
   };
+
 
 
   // ------------------------------------------------------------------
@@ -544,6 +582,7 @@ useEffect(() => {
   };
 
 
+
   // ------------------------------------------------------------------
   //  전면 광고 실행 로직 (100시간 혜택 체크)
   // ------------------------------------------------------------------
@@ -561,6 +600,7 @@ useEffect(() => {
     console.log("🎬 전면 광고(Interstitial Ad)를 호출합니다.");
     // 실제 광고 API 연동 시 이 아래에 코드를 작성합니다.
   };
+
 
 
   // ------------------------------------------------------------------
@@ -654,6 +694,7 @@ useEffect(() => {
   };
 
 
+
   // ------------------------------------------------------------------
   // 최고 기록 시작 버튼 핸들러
   // ------------------------------------------------------------------
@@ -708,6 +749,7 @@ useEffect(() => {
   };
 
 
+
   // ------------------------------------------------------------------
   // 광고 보고 이어하기 처리
   // ------------------------------------------------------------------
@@ -728,6 +770,7 @@ useEffect(() => {
     setContinueCount(prev => prev - 1);
     setShowResultModal(false);
   };
+
 
 
   // ------------------------------------------------------------------
@@ -771,6 +814,8 @@ useEffect(() => {
     );
   }
 
+
+  
   // ------------------------------------------------------------------
   // --- 로그인 후 메인 화면 ---
   // ------------------------------------------------------------------
@@ -866,8 +911,22 @@ useEffect(() => {
 
 
         {view === 'lobby' && (
-          <div className="w-full max-w-[320px] flex flex-col items-center mt-16 space-y-3 px-4">
-             <div className="flex gap-3 mb-12">{['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}</div>
+          <div className="w-full max-w-[360px] flex flex-col items-center mt-4 space-y-3 px-4">
+
+
+              {/* 공유 버튼 영역 (다른 페이지의 back 버튼 위치와 동일) */}
+              <div className="w-full flex justify-end mb-0">
+                <button 
+                  onClick={handleShare} 
+                  className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-[#ffcc33] hover:text-black active:scale-95 transition-all border border-zinc-700"
+                >
+                  share game
+                </button>
+              </div>
+
+
+
+             <div className="flex gap-3 mb-12 mt-10 ">{['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}</div>
 
              <div className="w-full flex flex-col gap-3">
 
@@ -916,7 +975,7 @@ useEffect(() => {
                  
              </div>
 
-             <div className="mt-16 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center text-center">
+             <div className="mt-10 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center text-center">
                 <div className="grid grid-cols-3 w-full mb-1"><p className="text-[10px] text-zinc-500 uppercase font-bold">Total Play</p><p className="text-[10px] text-zinc-500 uppercase font-bold">Win Rate</p><p className="text-[10px] text-zinc-500 uppercase font-bold">Best Rank</p></div>
                 <div className="grid grid-cols-3 w-full mb-1 items-center font-mono">
                   <p className="text-2xl font-bold">{stats.total_games}</p>

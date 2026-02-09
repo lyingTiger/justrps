@@ -25,10 +25,14 @@ export default function SettingsPage({
   playClickSound 
 }: SettingsPageProps) {
   return (
-    <div className="w-full max-w-[320px] flex flex-col items-center mt-12 px-4 animate-in fade-in duration-500">
-      <h2 className="text-3xl font-black italic text-[#FF9900] uppercase mb-10 tracking-tighter">Settings</h2>
-      
-      <div className="w-full space-y-8 bg-zinc-900/50 p-6 rounded-[32px] border border-zinc-800">
+    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 px-4 animate-in fade-in duration-500">
+
+      <div className="w-full flex justify-end mb-0">
+         <button onClick={onBack} className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700">Back</button>
+      </div>
+
+ 
+      <div className="w-full space-y-8 p-6 rounded-[32px] ">
         {/* 닉네임 수정 섹션 */}
         <div className="space-y-3">
           <p className="text-[10px] font-black text-zinc-500 uppercase ml-1 tracking-widest">Profile Nickname</p>
@@ -41,7 +45,7 @@ export default function SettingsPage({
           />
           <button 
             onClick={() => onSaveNickname(userNickname)}
-            className="w-full h-12 bg-[#FF9900] text-black font-black uppercase rounded-2xl text-base active:scale-95 transition-all shadow-lg"
+            className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
           >
             Save Changes
           </button>
@@ -60,21 +64,13 @@ export default function SettingsPage({
           />
           <button 
             onClick={() => setIsMuted(!isMuted)}
-            className={`w-full h-12 border-2 font-black uppercase rounded-2xl text-[10px] transition-all
+            className={`w-full h-12 border-2 font-black uppercase rounded-2xl text-lg transition-all
               ${isMuted ? 'border-red-900/50 text-red-500 bg-red-500/5' : 'border-zinc-800 text-zinc-400 hover:text-white'}`}
           >
             {isMuted ? 'Sound Muted' : 'Sound Active'}
           </button>
         </div>
       </div>
-
-      {/* 메인으로 버튼 */}
-      <button 
-        onClick={() => { playClickSound(); onBack(); }} 
-        className="w-3/4 h-14 mt-8 rounded-md font-bold text-base bg-[#FF9900] text-black uppercase active:scale-95 transition-all shadow-lg"
-      >
-        Main
-      </button>
     </div>
   );
 }

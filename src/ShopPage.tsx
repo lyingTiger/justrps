@@ -163,7 +163,7 @@ export default function ShopPage({ onBack, userCoins, currentUserId, onUpdateCoi
           </button>
         </div>
         
-        {/* ✨ [신규] 인게임 보상 팝업 UI */}
+        {/*  인게임 보상 팝업 UI */}
         {rewardPopup.isOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             
