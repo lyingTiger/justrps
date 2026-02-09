@@ -81,6 +81,9 @@ export default function App() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const clickBufferRef = useRef<AudioBuffer | null>(null);
 
+  // 팝업 버튼 클릭 가능 상태
+  const [canClickPopup, setCanClickPopup] = useState(false);
+
 
   // ------------------------------------------------------------------
   //  상태 초기화 함수 (로그아웃 시 잔여 데이터 제거용)
@@ -274,6 +277,25 @@ export default function App() {
       window.removeEventListener('keydown', resetTimer);
     };
   }, [isLoggedIn]); // 로그인 상태일 때만 동작
+
+
+  
+
+  // ------------------------------------------------------------------
+  // 팝업 오픈 시 버튼 활성화 지연 로직 (0.5초)
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if (msgPopup.isOpen) {
+      setCanClickPopup(false); // 열릴 때 초기화
+      const timer = setTimeout(() => {
+        setCanClickPopup(true);
+      }, 500); // 0.5초 지연
+      return () => clearTimeout(timer);
+    }
+  }, [msgPopup.isOpen]);
+
+
+
 
   /// ------------------------------------------------------------------
   //  통합된 세션 체크 및 데이터 로드 
@@ -967,7 +989,7 @@ export default function App() {
                  <button 
                    onClick={() => handleLobbyNavigation('modeSelect')} 
                    /* 🔻 [수정] active:bg-[#FF9900] 등 active 속성 추가 (모바일 터치 대응) */
-                   className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
+                   className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95 "
                  >
                    Play
                  </button>
@@ -1025,7 +1047,7 @@ export default function App() {
             
             <button 
               onClick={handlePlayFromBest} 
-              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#ff3366] hover:text-black hover:border-[#ff3366] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#ff3366] active:text-black active:border-[#ff3366] active:scale-95"
+              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800  hover:bg-[#ff3366] hover:text-black hover:border-[#ff3366] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#ff3366] active:text-black active:border-[#ff3366] active:scale-95"
             >
               Play from Best
             </button>
@@ -1170,25 +1192,39 @@ export default function App() {
             </div>
             
             {/* 버튼 영역 */}
+            {/* OK 버튼: disabled 속성 및 스타일 추가 */}
             <div className="flex gap-3 w-full">
               {msgPopup.onConfirm && (
                 <button 
-                  onClick={() => msgPopup.onConfirm?.()}
-                  className="flex-1 h-12 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
+                  onClick={() => canClickPopup && msgPopup.onConfirm?.()}
+                  disabled={!canClickPopup}
+                  className={`flex-1 h-12 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 
+                    ${canClickPopup 
+                      ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:scale-95" 
+                      : "opacity-50 cursor-not-allowed" // 비활성 상태 시각화
+                    }`}
                 >
                   OK
                 </button>
               )}
-              <button 
-                onClick={() => setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }))}
-                className={`h-12 font-bold text-lg rounded-2xl uppercase active:scale-95 transition-all ${
-                  msgPopup.onConfirm 
-                    ? "flex-1 bg-zinc-900 text-white hover:bg-[#FF9900] hover:text-black" 
-                    : "w-full bg-[#FF9900] text-black hover:bg-[#FF9900]"
-                }`}
-              >
-                {msgPopup.onConfirm ? "CANCEL" : "Confirm"}
-              </button>
+
+
+              {/* CANCEL/Confirm 버튼: disabled 속성 및 스타일 추가 */}
+                <button 
+                  onClick={() => canClickPopup && setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }))}
+                  disabled={!canClickPopup}
+                  className={`h-12 font-bold text-lg rounded-2xl uppercase transition-all ${
+                    msgPopup.onConfirm 
+                      ? "flex-1 bg-zinc-900 text-white" 
+                      : "w-full bg-[#FF9900] text-black"
+                  } ${canClickPopup 
+                      ? "hover:bg-[#FF9900] hover:text-black active:scale-95" 
+                      : "opacity-50 cursor-not-allowed" // 비활성 상태 시각화
+                    }`}
+                >
+                  {msgPopup.onConfirm ? "CANCEL" : "Confirm"}
+                </button>
+
             </div>
           </div>
         </div>

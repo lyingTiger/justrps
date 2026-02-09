@@ -126,17 +126,17 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
             onChange={(e) => { setNewRoomName(e.target.value); setSearchName(e.target.value); }}
             className="flex-1 h-12 bg-black border border-zinc-800 rounded-2xl px-4 text-xs text-white outline-none focus:border-[#FF9900] font-bold" 
           />
-          <button onClick={handleCreateRoom} className="px-6 bg-[#FF9900] text-black font-black uppercase rounded-2xl text-xs active:scale-95 transition-all shadow-[0_5px_15px_rgba(255,153,0,0.3)]">Create</button>
+          <button onClick={handleCreateRoom} className="px-6 bg-zinc-800 text-white font-black uppercase rounded-2xl text-xs active:scale-95 transition-all hover:bg-[#ff9933] hover:text-black">Create</button>
         </div>
         
         <div className="flex gap-2">
           <input 
             type="password" 
             autoComplete="one-time-code" // 또는 "new-password", "one-time-code"
-            placeholder="PASSWORD (OPTIONAL)" 
+            placeholder="PASSWORD (OPTION)" 
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="flex-1 h-11 bg-black border border-zinc-800 rounded-2xl px-4 text-[10px] text-white outline-none focus:border-[#FF9900] font-bold" 
+            className="flex-1 h-11 bg-black border border-zinc-800 rounded-2xl px-4 text-xs text-white outline-none focus:border-[#FF9900] font-bold" 
           />
           <div className="flex items-center gap-1 bg-black border border-zinc-800 rounded-2xl px-2">
             {/* 🔻 [수정 2] 비활성 상태일 때 text-zinc-700 -> text-white로 변경 */}
@@ -149,7 +149,7 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
         {/* 🔻 [수정 3] 버튼 텍스트 'random join'으로 변경 */}
         <button 
           onClick={handleQuickMatch}
-          className="w-full h-11 bg-zinc-800 text-white font-black uppercase rounded-2xl text-xs active:scale-95 transition-all border border-zinc-700 hover:bg-zinc-700"
+          className="w-full h-11 bg-zinc-800 text-white font-black uppercase rounded-2xl text-xs active:scale-95 active:bg-[#ff9933] active:text-black transition-all border border-zinc-700 hover:bg-[#ff9933] hover:text-black"
         >
           random join
         </button>
@@ -168,10 +168,10 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
               <div key={room.id} onClick={() => handleJoinAttempt(room)} className="w-full p-4 bg-zinc-900 border border-zinc-800 rounded-[24px] flex justify-between items-center cursor-pointer hover:border-[#FF9900] group transition-all active:scale-[0.98]">
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    <span className="font-black text-sm italic text-white group-hover:text-[#FF9900]">{room.name}</span>
+                    <span className="font-black text-sm italic text-white ">{room.name}</span>
                     {room.password && <span className="text-[10px] opacity-40">🔒</span>}
                   </div>
-                  <span className="text-[9px] text-zinc-600 font-black uppercase tracking-tighter">{room.mode}</span>
+                  <span className="text-sm text-zinc-500 font-black uppercase tracking-tighter ">{room.mode}</span>
                 </div>
                 
                 <div className="flex flex-col items-end gap-1">

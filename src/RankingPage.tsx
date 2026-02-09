@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
+
 // 랭킹 데이터 인터페이스
 interface RankingRecord {
   id: string; 
@@ -20,15 +21,19 @@ interface RankingPageProps {
   userNickname: string;
 }
 
+
+
 export default function RankingPage({ onBack, playClickSound, userNickname }: RankingPageProps) {
   const [activeMode, setActiveMode] = useState('WIN MODE');
   const [rankings, setRankings] = useState<RankingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [myUserId, setMyUserId] = useState<string | null>(null);
-  // 🔻 [수술] 닉네임을 활용한 동적 라벨 생성
+  // 닉네임을 활용한 동적 라벨 생성
   const myBestLabel = `${userNickname}'s BEST`;
   // 처음 진입 시 activeMode를 'WIN MODE'로 설정하는 것은 유지하거나, 
   // 원한다면 이 동적 라벨을 기본값으로 할 수도 있습니다.
+
+
 
 const modes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE', myBestLabel];
 
@@ -49,7 +54,7 @@ const modes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MOD
     setLoading(true);
     
     try {
-      // 🔻 [수정] 'MY BEST' 문자열 대신 myBestLabel 변수로 체크
+      // 'MY BEST' 문자열 대신 myBestLabel 변수로 체크
       if (activeMode === myBestLabel) {
         const { data: myAllRecords, error } = await supabase
           .from('mode_records')
@@ -134,6 +139,9 @@ const modes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MOD
     }
   };
 
+  
+
+  // 랭크별 스타일 반환 함수 
   const getRankStyle = (rank: number, isMe: boolean) => {
     if (isMe) return "text-[#FFD700] font-black bg-zinc-800/50 rounded-lg border border-[#FFD700]/30"; 
     
@@ -143,6 +151,8 @@ const modes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MOD
     return "text-zinc-500 font-normal";
   };
 
+
+  
   return (
     <div className="w-full max-w-[360px] flex flex-col items-center mt-4 animate-in fade-in duration-700 font-sans">
       
