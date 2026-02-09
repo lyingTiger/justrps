@@ -200,7 +200,13 @@ export default function App() {
     }
   };
 
- // ... (상단 state 선언부 생략)
+  
+  // 뷰가 바뀔 때마다 스크롤을 맨 위로 강제 이동
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTo(0, 0);
+  }, [view]); // view가 바뀔 때마다 실행
+
 
   // ------------------------------------------------------------------
   // ✨ [신규] 자동 로그아웃 기능 (10분 미활동 시)
