@@ -108,7 +108,7 @@ export default function App() {
   const handleShare = async () => {
     const shareData = {
       title: 'just RPS',
-      text: '천재들의 놀이터! \n\n자신의 한계를 극복하고, \n친구들과 대결해 보세요!',
+      text: '기억해, 가위 바위 보!\n천재들의 놀이터! \n\n자신의 한계를 극복하고, \n친구들과 대결해 보세요!',
       url: window.location.origin,
     };
 
@@ -118,7 +118,7 @@ export default function App() {
         await navigator.share(shareData);
       } else {
         // PC 등 미지원 환경에서는 링크 복사로 대체
-        const combinedText = `${shareData.url}\n\n천재들의 놀이터! \n\n자신의 한계를 극복하고, \n친구들과 대결해 보세요!`;
+        const combinedText = `${shareData.url}\n\n기억해, 가위 바위 보!\n천재들의 놀이터! \n\n자신의 한계를 극복하고, \n친구들과 대결해 보세요!`;
         await navigator.clipboard.writeText(combinedText);
         
         setMsgPopup({
