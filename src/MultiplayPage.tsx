@@ -134,7 +134,7 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
         </button>
       </div>
 
-      <div className="w-full space-y-3 mb-8 bg-zinc-900/30 p-4 rounded-[32px] border border-zinc-800/50">
+      <div className="w-full space-y-3 mb-2 bg-zinc-900/30 p-3 rounded-[12px] border border-zinc-400/50">
         <div className="flex gap-2">
           <input 
             type="text" 
@@ -144,7 +144,7 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
             onChange={(e) => { setNewRoomName(e.target.value); setSearchName(e.target.value); }}
             className="flex-1 h-12 bg-black border border-zinc-800 rounded-2xl px-4 text-xs text-white outline-none focus:border-[#FF9900] font-bold" 
           />
-          <button onClick={handleCreateRoom} className="px-6 bg-zinc-800 text-white font-black uppercase rounded-2xl text-xs active:scale-95 transition-all hover:bg-[#ff9933] hover:text-black">Create</button>
+          <button onClick={handleCreateRoom} className="px-6 bg-zinc-800 text-white font-black uppercase rounded-2xl text-xs active:scale-95 transition-all hover:bg-[#ff9933] hover:text-black">Creat</button>
         </div>
         
         <div className="flex gap-2">
@@ -170,13 +170,13 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
           <div className="flex-1 flex items-center justify-around bg-black border border-zinc-800 rounded-2xl h-11 px-2">
             <button 
               onClick={() => setIsItemMode(true)} 
-              className={`flex-1 h-7 text-[9px] font-black rounded-lg transition-all ${isItemMode ? 'bg-[#FF9900] text-black' : 'text-zinc-500'}`}
+              className={`flex-1 h-7 text-xs font-black rounded-lg transition-all ${isItemMode ? 'bg-[#FF9900] text-black' : 'text-zinc-500'}`}
             >
               ITEM GAME
             </button>
             <button 
               onClick={() => setIsItemMode(false)} 
-              className={`flex-1 h-7 text-[9px] font-black rounded-lg transition-all ${!isItemMode ? 'bg-[#FF9900] text-black' : 'text-zinc-500'}`}
+              className={`flex-1 h-7 text-xs font-black rounded-lg transition-all ${!isItemMode ? 'bg-[#FF9900] text-black' : 'text-zinc-500'}`}
             >
               NO ITEM
             </button>
@@ -196,36 +196,36 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin }: Multipla
 
       <div className="w-full flex flex-col gap-2">
         {/* 🔻 [수정 4] 텍스트 중앙 정렬 (ml-2 제거하고 text-center w-full 추가) */}
-        <h3 className="w-full text-center text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">Active Rooms</h3>
-        <div className="w-full h-[220px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+        <h3 className="w-full text-center text-sm font-black text-[#ffcc33] uppercase tracking-[0.2em] mb-0">Active Rooms</h3>
+        <div className="w-full h-[220px] overflow-y-auto space-y- pr-1 custom-scrollbar">
           {filteredRooms.length === 0 ? (
             <div className="w-full py-10 text-center border border-dashed border-zinc-800 rounded-[24px] opacity-20">
               <p className="text-[10px] font-black uppercase tracking-widest">No Active Sessions</p>
             </div>
           ) : (
             filteredRooms.map(room => (
-              <div key={room.id} onClick={() => handleJoinAttempt(room)} className="w-full p-4 bg-zinc-900 border border-zinc-800 rounded-[24px] flex justify-between items-center cursor-pointer hover:border-[#FF9900] group transition-all active:scale-[0.98]">
+              <div key={room.id} onClick={() => handleJoinAttempt(room)} className="w-full p-2 bg-zinc-900 border border-zinc-600 rounded-[12px] flex justify-between items-center cursor-pointer hover:border-[#FF9900] group transition-all active:scale-[0.98]">
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    <span className="font-black text-sm italic text-white ">{room.name}</span>
+                    <span className="ml-2 font-black text-sm italic text-white ">{room.name}</span>
                     {room.password && <span className="text-[10px] opacity-40">🔒</span>}
                     {/* 아이템전 표시 아이콘/라벨 */}
                     {room.is_item_mode && <span className="text-[10px] text-[#FF9900] font-black">🎁</span>}
                   </div>
-                  <span className="text-sm text-zinc-500 font-black uppercase tracking-tighter ">{room.mode}</span>
+                  <span className="ml-2 text-sm text-zinc-500 font-black uppercase tracking-tighter ">{room.mode}</span>
                 </div>
                 
                 <div className="flex flex-col items-end gap-1">
                   {room.status === 'playing' ? (
-                    <span className="text-[8px] font-black text-red-500 border border-red-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider animate-pulse">
+                    <span className="mr-2 text-[8px] font-black text-red-500 border border-red-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider animate-pulse">
                       Playing
                     </span>
                   ) : (
-                    <span className="text-[8px] font-black text-green-500 border border-green-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                    <span className="mr-2 text-[8px] font-black text-green-500 border border-green-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
                       Waiting
                     </span>
                   )}
-                  <span className="text-[#FF9900] font-mono font-black text-sm italic">{room.current_players}/{room.max_players}</span>
+                  <span className="mr-2 text-white font-mono font-black text-sm italic">{room.current_players}/{room.max_players}</span>
                 </div>
               </div>
             ))
