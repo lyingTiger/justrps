@@ -32,7 +32,8 @@ export default function SettingsPage({
     <div className="w-full max-w-[360px] flex flex-col items-center mt-4 px-4 animate-in fade-in duration-500">
 
       <div className="w-full flex justify-end mb-0">
-         <button onClick={onBack} className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700">Back</button>
+         {/* 💉 번역 적용: back -> t('btn_back') */}
+         <button onClick={onBack} className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700">{t('btn_back') || 'back'}</button>
       </div>
 
 
