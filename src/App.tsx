@@ -819,7 +819,7 @@ export default function App() {
   // ------------------------------------------------------------------
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-black flex items-start justify-center pt-30">
+      <div className="min-h-screen bg-black flex items-start justify-center pt-40">
         <div className="w-full max-w-[320px]">
           
           {/* 로그인 화면용 큰 로고 (5xl + 중앙정렬 + 색상적용) */}
@@ -828,18 +828,21 @@ export default function App() {
           </h1>
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
-            {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />}
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
-            <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all shadow-[0_5px_15px_rgba(255,153,0,0.3)]">
+            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} 
+            className="mt-10 w-full h-14 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
+            
+            {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} 
+            className="w-full h-14 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />}
+            
+            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} 
+            className="w-full h-14 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
+
+            <button type="submit" className="mt-10 w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all shadow-[0_5px_15px_rgba(255,153,0,0.3)]">
               {loading ? 'Wait...' : (isSignUpMode ? t('join_btn') : t('login_btn'))}
             </button>
           </form>
 
-          <div className="flex items-center gap-2 my-4">
-             <div className="h-[1px] bg-zinc-800 flex-1"></div>
-             <span className="text-base text-zinc-600 font-bold uppercase">or</span>
-             <div className="h-[1px] bg-zinc-800 flex-1"></div>
+          <div className="flex items-center gap-2 my-2">
           </div>
 
           <button type="button" onClick={handleGoogleLogin} className="w-full h-14 bg-white text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3">
@@ -847,24 +850,35 @@ export default function App() {
             Sign in with Google
           </button>
           
-          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-base text-zinc-500 text-center underline font-bold mt-4 uppercase">
+          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-base text-zinc-400 hover:text-[#FF9900] text-center font-bold mt-4 uppercase">
             {isSignUpMode ? "Back to Login" : "Create Account"}
           </button>
 
-          {/* 언어 선택 버튼 추가 */}
-          <div className="flex justify-center gap-4 mt-6">
+
+
+          <div className="flex justify-center gap-8 mt-4  pt-2">
             <button 
               onClick={() => handleLanguageChange('en')}
-              className={`text-[10px] font-black ${lang === 'en' ? 'text-[#FF9900]' : 'text-zinc-600'}`}
+              /*  텍스트 크기를 키우고(text-2xl), 선택 여부에 따라 투명도(opacity) 조절 */
+              className={`text-3xl transition-all active:scale-90 ${lang === 'en' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}
             >
-              ENGLISH
+              🇺🇸
             </button>
             <button 
               onClick={() => handleLanguageChange('ko')}
-              className={`text-[10px] font-black ${lang === 'ko' ? 'text-[#FF9900]' : 'text-zinc-600'}`}
+              className={`text-3xl transition-all active:scale-90 ${lang === 'ko' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}
             >
-              한국어
+              🇰🇷
             </button>
+          </div>
+
+
+          <div className="flex justify-center gap-0 mt-0  border-zinc-900 pt-0">
+            {/*  flex와 gap을 추가하여 두 언어 사이의 간격을 정밀하게 조절 (gap-10) */}
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest flex gap-4 relative -left-2">
+              <span>english</span>
+              <span>한국어</span>
+            </p>
           </div>
 
         </div>
