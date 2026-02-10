@@ -47,7 +47,7 @@ export const translations = {
 
     // --- 4. 설정 페이지 (settings) ---
     settings: {
-      language: "Language Settings",
+      language: "Settings",
       game_info: "Game Info", // 💉 glameinfo 오타 수정
       profile_nickname: "Nickname",
       save_changes: "Save Changes",
@@ -131,7 +131,7 @@ export const translations = {
 
     // --- 4. 설정 페이지 (settings) ---
     settings: {
-      language: "언어 설정",
+      language: "설정",
       game_info: "게임 정보",
       profile_nickname: "닉네임",
       save_changes: "변경사항 저장",

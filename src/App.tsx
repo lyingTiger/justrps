@@ -521,7 +521,7 @@ export default function App() {
               <div className="absolute left-0 mt-3 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
                 {/* 💉 번역 적용: settings 그룹의 language 키 */}
                 <button onClick={() => setView('settings')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">{t('settings', 'language')}</button>
-                <button onClick={() => setView('info')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white">{t('settings', 'glameinfo')}</button>
+                <button onClick={() => setView('info')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white">{t('settings', 'game_info')}</button>
               </div>
             )}
           </div>
@@ -647,7 +647,7 @@ export default function App() {
             <div className="w-full flex justify-end mb-0">
               <button 
                 onClick={() => setView('lobby')} 
-                className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700"
+              className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px] transition-all hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
               >
                 {t('modeSelect', 'btn_back')}
               </button>

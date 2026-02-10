@@ -301,7 +301,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
         {/* 🔻 [수정] Leave 버튼 디자인을 MultiplayPage의 Back 버튼과 동일하게 변경 */}
         <button 
           onClick={handleManualExit} 
-          className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-zinc-700 active:scale-95 transition-all border border-zinc-700"
+          className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px] transition-all hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
         >
           Leave
         </button>
@@ -334,7 +334,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
       <div className="w-full mt-auto">
         {isCreator ? (
-          <button onClick={handleStart} disabled={participants.length < 1} className={`w-full h-16 text-black font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 transition-all ${participants.length < 2 ? 'bg-[#FF9900] hover:bg-[#ffad33]' : !isAllReady ? 'bg-green-600 opacity-80' : 'bg-[#22c55e] animate-pulse hover:bg-green-400'}`}>
+          <button onClick={handleStart} disabled={participants.length < 1} className={`w-full h-14 text-white font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 transition-all ${participants.length < 2 ? 'bg-zinc-900 hover:bg-[#FF9900] hover:text-black' : !isAllReady ? 'bg-green-600 opacity-80' : 'bg-[#22c55e] animate-pulse hover:bg-green-400'}`}>
             {participants.length < 2 ? 'Practice Start' : isAllReady ? 'Start Game' : 'Wait to Ready'}
           </button>
         ) : (
