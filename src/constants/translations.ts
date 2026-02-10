@@ -147,8 +147,8 @@ export const translations = {
     popup: {
       msg_welcome_title: "환영합니다!",
       msg_welcome_desc: "색다른 가위바위보를 즐겨보세요!",
-      msg_nick_updated: "닉네임이 \n변경되었습니다!",
-      msg_continue_title: "계속하시겠습니까?",
+      msg_nick_updated: "닉네임 변경!",
+      msg_continue_title: "이어서 플레이",
       msg_ad_start_title: "광고 시청",
       msg_watch_ad: "광고 시청",
       msg_copy_title: "복사 완료!",
@@ -166,7 +166,7 @@ export const translations = {
       WIN: " 승",
       DRAW: " 무",
       LOSE: " 패",
-      OK_GOT_IT: "기억했습니다!",
+      OK_GOT_IT: "ok! 기억 완료!",
     }
   }
 };

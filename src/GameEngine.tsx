@@ -211,7 +211,7 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
         {isMemoryPhase ? (
           <button 
             onClick={() => { playClickSound(); setIsMemoryPhase(false); }} 
-            className="w-full h-14 rounded-md font-bold uppercase transition-all bg-zinc-900 text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse border border-[#282828]"
+            className="w-full h-14 font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse active:scale-95"
           >
             {/* 💉 텍스트 번역 적용: OK_GOT_IT */}
             {t('OK_GOT_IT')}

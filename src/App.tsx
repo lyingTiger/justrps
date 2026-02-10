@@ -740,7 +740,7 @@ export default function App() {
         userCoins={userCoins} isNewRecord={resultData.isNewRecord} continueCount={continueCount} continueCost={CONTINUE_COST} 
         onContinue={() => { if(userCoins >= CONTINUE_COST) { setUserCoins(c => c - CONTINUE_COST); setContinueCount(prev => prev - 1); setShowResultModal(false); } }} 
         onRetry={() => { setShowResultModal(false); setRound(1); resetGameSession(0); setView('battle'); }} 
-        onLobby={() => { setShowResultModal(false); resetGameSession(); setView('lobby'); }} 
+        onLobby={() => { setShowResultModal(false); resetGameSession(); setView('modeSelect'); }} 
         onShop={() => { setShowResultModal(false); setView('shop'); }} 
         onWatchAd={() => setShowAdOverlay(true)}
       />
@@ -750,7 +750,7 @@ export default function App() {
         <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-[280px] bg-zinc-900 border-2 border-[#FF9900] rounded-[40px] p-8 flex flex-col items-center text-center shadow-[0_0_50px_rgba(255,153,0,0.2)] animate-in zoom-in-95 duration-200">
             
-            <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-1">{msgPopup.title}</h3>
+            <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-3">{msgPopup.title}</h3>
             
             {(msgPopup.title === t('popup', 'msg_continue_title') || msgPopup.title === t('popup', 'msg_ad_start_title')) && (
               <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-6">
@@ -772,17 +772,18 @@ export default function App() {
                 <button 
                   onClick={() => canClickPopup && msgPopup.onConfirm?.()}
                   disabled={!canClickPopup}
-                  className={`flex-1 h-12 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 
-                    ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
+                  className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 
+                    ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
                 >
-                  OK
+                  {t('settings', 'confirm')}
                 </button>
               )}
               <button 
                 onClick={() => canClickPopup && setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }))}
                 disabled={!canClickPopup}
-                className={`h-12 font-bold text-lg rounded-2xl uppercase transition-all ${msgPopup.onConfirm ? "flex-1 bg-zinc-900 text-white" : "w-full bg-[#FF9900] text-black"} 
-                  ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black active:scale-95" : "opacity-50 cursor-not-allowed"}`}
+                className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800
+                   ${msgPopup.onConfirm ? "flex-1 bg-zinc-900 text-white" : "w-full bg-[#FF9900] text-black"} 
+                  ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
               >
                 {msgPopup.onConfirm ? t('settings', 'cancel') : t('settings', 'confirm')}
               </button>

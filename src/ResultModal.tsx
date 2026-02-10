@@ -95,10 +95,9 @@ export default function ResultModal({
                             <button 
                                 onClick={onContinue}
                                 disabled={userCoins < continueCost}
-                                /* 🔻 [수정] hover:border-[#FF9900] 및 active:border-[#FF9900] 추가 */
                                 className={`h-10 rounded-2xl flex items-center justify-center gap-2 transition-all border text-sm font-black uppercase
                                 ${userCoins >= continueCost 
-                                    ? 'bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700 hover:border-[#FF9900] active:border-[#FF9900] active:scale-95' 
+                                    ? 'bg-zinc-800 border-zinc-700 text-white  hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95' 
                                     : 'bg-zinc-900 border-zinc-800 text-zinc-600 opacity-50 cursor-not-allowed'
                                 }`}
                             >
@@ -110,7 +109,7 @@ export default function ResultModal({
                             <button 
                                 onClick={onWatchAd}
                                 /* 🔻 [수정] hover:border-[#FF9900] 및 active:border-[#FF9900] 추가 */
-                                className="h-10 rounded-2xl flex items-center justify-center transition-all border bg-zinc-800 border-zinc-700 text-white text-sm font-black uppercase hover:bg-zinc-700 hover:border-[#FF9900] active:border-[#FF9900] active:scale-95"
+                                className="flex-1 h-10 rounded-2xl font-bold text-[12px] uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-700 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
                             >
                                 WATCH AD
                             </button>
@@ -126,20 +125,20 @@ export default function ResultModal({
 
             {/* 하단 공통 버튼 (Retry / Main) */}
             <div className="w-full grid grid-cols-2 gap-3">
-                {/* 🔻 [수정] Retry 버튼: hover/active 시 주황색 테두리 추가 */}
+                {/* Retry 버튼 */}
                 <button 
                     onClick={onRetry} 
-                    className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase transition-all border border-zinc-700 hover:bg-zinc-700 hover:border-[#FF9900] active:border-[#FF9900] active:scale-95"
+                    className="flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-700 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
                 >
                     Retry
                 </button>
 
-                {/* 🔻 [수정] Main 버튼: hover/active 시 주황색 테두리 추가 */}
+                {/*  Main 버튼 */}
                 <button 
                     onClick={onLobby} 
-                    className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase transition-all border border-zinc-700 hover:bg-zinc-700 hover:border-[#FF9900] active:border-[#FF9900] active:scale-95"
+                    className="flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-700 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
                 >
-                    Main
+                    game lobby
                 </button>
             </div>
         </div>
