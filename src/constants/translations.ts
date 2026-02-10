@@ -1,5 +1,5 @@
 // ------------------------------------------------------------------
-// 💉 [수정] 뷰별 그룹화된 다국어 번역 데이터 사전
+// 💉 [수정 완료] 코드 로직과 100% 일치시킨 다국어 번역 사전
 // ------------------------------------------------------------------
 export const translations = {
   en: {
@@ -47,9 +47,8 @@ export const translations = {
 
     // --- 4. 설정 페이지 (settings) ---
     settings: {
-      back:"back",
-      language: "settings",
-      glameinfo: "game info",
+      language: "Language Settings",
+      game_info: "Game Info", // 💉 glameinfo 오타 수정
       profile_nickname: "Nickname",
       save_changes: "Save Changes",
       master_volume: "Volume",
@@ -64,7 +63,7 @@ export const translations = {
     popup: {
       msg_welcome_title: "WELCOME!",
       msg_welcome_desc: "ENJOY JUST RPS!",
-      msg_nick_updated: "NICKNAME UPDATED!",
+      msg_nick_updated: "NICKNAME \nUPDATED!",
       msg_continue_title: "CONTINUE?",
       msg_ad_start_title: "WATCH AD",
       msg_watch_ad: "WATCH AD",
@@ -73,6 +72,17 @@ export const translations = {
       msg_best_record_info: "start from best record",
       msg_session_expired: "Please login again.",
       msg_signin_to_start: "PLEASE SIGN IN TO START!",
+    }, 
+
+    // --- 6. 게임 엔진 (game) : 💉 코드 로직에 맞춰 대문자 키로 수정 ---
+    game: {
+      ROUND: "Round",
+      PLAY_TIME: "Play Time",
+      SEC: "sec",
+      WIN: "WIN",
+      DRAW: "DRAW",
+      LOSE: "LOSE",
+      OK_GOT_IT: "OK, I got it",
     }
   },
 
@@ -121,9 +131,8 @@ export const translations = {
 
     // --- 4. 설정 페이지 (settings) ---
     settings: {
-      back:"뒤로",
-      language: "설정",
-      glameinfo: "게임 정보",
+      language: "언어 설정",
+      game_info: "게임 정보",
       profile_nickname: "닉네임",
       save_changes: "변경사항 저장",
       master_volume: "볼륨",
@@ -132,14 +141,13 @@ export const translations = {
       confirm: "확인",
       cancel: "취소",
       btn_back: "뒤로"
-      
     },
 
     // --- 5. 시스템 메시지 및 팝업 (popup) ---
     popup: {
       msg_welcome_title: "환영합니다!",
       msg_welcome_desc: "색다른 가위바위보를 즐겨보세요!",
-      msg_nick_updated: "닉네임 변경!",
+      msg_nick_updated: "닉네임이 \n변경되었습니다!",
       msg_continue_title: "계속하시겠습니까?",
       msg_ad_start_title: "광고 시청",
       msg_watch_ad: "광고 시청",
@@ -148,6 +156,17 @@ export const translations = {
       msg_best_record_info: "최고 기록에서 시작합니다",
       msg_session_expired: "다시 로그인해 주세요.",
       msg_signin_to_start: "시작하려면 로그인해 주세요!",
+    },
+
+    // --- 6. 게임 엔진 (game) : 💉 코드 로직에 맞춰 대문자 키로 수정 ---
+    game: {
+      ROUND: "라운드",
+      PLAY_TIME: "진행 시간",
+      SEC: "초",
+      WIN: " 승",
+      DRAW: " 무",
+      LOSE: " 패",
+      OK_GOT_IT: "기억했습니다!",
     }
   }
 };

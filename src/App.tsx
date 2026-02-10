@@ -716,7 +716,10 @@ export default function App() {
           <GameEngine 
             key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} initialTime={sessionStartTime}
             onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} 
-            onRoundClear={(next) => setRound(next)} onGameOver={handleGameOver} isModalOpen={showResultModal} 
+            onRoundClear={(next) => setRound(next)} 
+            onGameOver={handleGameOver} 
+            isModalOpen={showResultModal} 
+            t={(key: string) => t('game', key)}
           />
         )}
         

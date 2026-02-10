@@ -9,9 +9,10 @@ interface GameProps {
   onRoundClear: (nextRound: number) => void;
   onGameOver: (finalRound: number, entryTime: number) => void; // entryTime 기준
   isModalOpen: boolean; 
+  t: (key: string) => string; // 💉 언어 전환을 위해 필수적으로 추가된 Prop 외에는 건드리지 않음
 }
 
-export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin, isModalOpen, initialTime }: GameProps) {
+export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin, isModalOpen, initialTime, t }: GameProps) {
   
   // 2. [State 초기값 수정]
   const [playTime, setPlayTime] = useState(initialTime);      // 💉 0 대신 initialTime
@@ -152,8 +153,10 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
 
       {/* 💉 flex-none으로 헤더 고정 */}
       <div className="w-full text-left mt-0 flex-none"> 
-      <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {round}</h2>
-      <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">Play Time: {playTime.toFixed(2)} sec</p>
+      {/* 💉 텍스트 번역 적용: ROUND */}
+      <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">{t('ROUND')} {round}</h2>
+      {/* 💉 텍스트 번역 적용: PLAY_TIME, SEC */}
+      <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">{t('PLAY_TIME')}: {playTime.toFixed(2)} {t('SEC')}</p>
       </div>
 
 
@@ -162,17 +165,20 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
       {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
         <div className="text-center mb-6 select-none flex-none">
           <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
-            <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
+            {/* 💉 텍스트 번역 적용: WIN, DRAW, LOSE */}
+            <span>{totalTargetCounts.WIN} {t('WIN')}</span><span>{totalTargetCounts.DRAW} {t('DRAW')}</span><span>{totalTargetCounts.LOSE} {t('LOSE')}</span>
           </div>
           
             <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
-              <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
+              {/* 💉 텍스트 번역 적용: WIN, DRAW, LOSE */}
+              <span>{currentSolvedCounts.WIN} {t('WIN')}</span><span>{currentSolvedCounts.DRAW} {t('DRAW')}</span><span>{currentSolvedCounts.LOSE} {t('LOSE')}</span>
             </div>
           </div>
         ) : (
           <div className="text-center mb-10">
-            <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">{aiSelect.length} {mode.split(' ')[0]}</p>
-            <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">{questionTurn} {mode.split(' ')[0]}</p>
+            {/* 💉 텍스트 번역 적용: 모드명 (기존 로직 보존) */}
+            <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">{aiSelect.length} {t(mode.split(' ')[0])}</p>
+            <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">{questionTurn} {t(mode.split(' ')[0])}</p>
           </div>
         )}
 
@@ -185,8 +191,9 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
             const showDetails = isMemoryPhase || isSolved;
             return (
               <div key={i} className="relative flex flex-col items-center">
+                {/* 💉 텍스트 번역 적용: EXPERT MODE 조건명 */}
                 {isCurrent && mode === 'EXPERT MODE' && (
-                  <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{targetConditions[i]}</span>
+                  <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{t(targetConditions[i])}</span>
                 )}
                 <div className={`w-14 h-14 rounded-2xl overflow-hidden transition-all duration-300 bg-zinc-900 ${showDetails ? (hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 'shadow-[0_0_12px_rgba(34,197,94,0.7)]') : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
                   {isMemoryPhase ? <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center">{isSolved && <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-40" />}</div>}
@@ -206,7 +213,8 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
             onClick={() => { playClickSound(); setIsMemoryPhase(false); }} 
             className="w-full h-14 rounded-md font-bold uppercase transition-all bg-zinc-900 text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse border border-[#282828]"
           >
-            OK, I got it
+            {/* 💉 텍스트 번역 적용: OK_GOT_IT */}
+            {t('OK_GOT_IT')}
           </button> 
         ) : (
           <div className="flex gap-4 w-full px-2">
