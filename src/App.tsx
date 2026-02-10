@@ -11,6 +11,7 @@ import ShopPage from './ShopPage';
 import AdOverlay from './AdOverlay';
 import InfoPage from './InfoPage';
 import { useState, useEffect, useRef } from 'react';
+import { translations } from './constants/translations'; 
 
 export default function App() {
   // --- 1. 유저 및 세션 상태 ---
@@ -24,12 +25,28 @@ export default function App() {
   const lastFetchedId = useRef<string | null>(null);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
-  // 인게임 메시지 팝업 상태
+  // 언어 상태 (기본값은 저장된 값 또는 영어)
+  const [lang, setLang] = useState<'en' | 'ko'>(
+    (localStorage.getItem('app_lang') as 'en' | 'ko') || 'en'
+  );
+
+  //  언어 변경 핸들러 
+  const handleLanguageChange = (newLang: 'en' | 'ko') => {
+    setLang(newLang);
+    localStorage.setItem('app_lang', newLang); // 새로고침해도 유지되게 박제
+  };
+
+  //  번역 헬퍼 함수
+  const t = (key: keyof typeof translations['en']) => {
+    return translations[lang][key] || translations['en'][key];
+  };
+
+  // 인게임 메시지 팝업 상태 (키값을 넣으면 현재 언어에 맞는 문장 반환)
   const [msgPopup, setMsgPopup] = useState<{
-  isOpen: boolean;
-  title: string;
-  desc: string;
-  onConfirm?: (() => void) | null; // '?' 추가로 이전 코드들과의 호환성 확보
+    isOpen: boolean;
+    title: string;
+    desc: string;
+    onConfirm?: (() => void) | null; // '?' 추가로 이전 코드들과의 호환성 확보
   }>({ 
     isOpen: false, 
     title: '', 
@@ -802,7 +819,7 @@ export default function App() {
   // ------------------------------------------------------------------
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <div className="min-h-screen bg-black flex items-start justify-center pt-30">
         <div className="w-full max-w-[320px]">
           
           {/* 로그인 화면용 큰 로고 (5xl + 중앙정렬 + 색상적용) */}
@@ -815,7 +832,7 @@ export default function App() {
             {isSignUpMode && <input type="text" placeholder="Nickname" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />}
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
             <button type="submit" className="w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all shadow-[0_5px_15px_rgba(255,153,0,0.3)]">
-              {loading ? 'Wait...' : (isSignUpMode ? 'Join Session' : 'LOG IN')}
+              {loading ? 'Wait...' : (isSignUpMode ? t('join_btn') : t('login_btn'))}
             </button>
           </form>
 
@@ -833,6 +850,23 @@ export default function App() {
           <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-base text-zinc-500 text-center underline font-bold mt-4 uppercase">
             {isSignUpMode ? "Back to Login" : "Create Account"}
           </button>
+
+          {/* 언어 선택 버튼 추가 */}
+          <div className="flex justify-center gap-4 mt-6">
+            <button 
+              onClick={() => handleLanguageChange('en')}
+              className={`text-[10px] font-black ${lang === 'en' ? 'text-[#FF9900]' : 'text-zinc-600'}`}
+            >
+              ENGLISH
+            </button>
+            <button 
+              onClick={() => handleLanguageChange('ko')}
+              className={`text-[10px] font-black ${lang === 'ko' ? 'text-[#FF9900]' : 'text-zinc-600'}`}
+            >
+              한국어
+            </button>
+          </div>
+
         </div>
       </div>
     );
@@ -919,6 +953,9 @@ export default function App() {
             setIsMuted={setIsMuted} 
             onBack={() => setView('lobby')} 
             playClickSound={playClickSound}
+            currentLang={lang} // 💉 추가
+            onLangChange={handleLanguageChange} // 💉 추가
+            t={t}
           />
         )}
 
