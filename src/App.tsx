@@ -573,52 +573,40 @@ export default function App() {
   // ------------------------------------------------------------------
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-black flex items-start justify-center pt-30">
+      <div className="min-h-screen bg-black flex items-start justify-center pt-20">
         <div className="w-full max-w-[320px]">
           <h1 className="text-5xl font-black mb-8 text-center italic tracking-tighter uppercase">
             <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
           </h1>
 
 
-          {/* 언어 설정 파트 */}
-          <div className="flex justify-center gap-8 mt-4 pt-2">
-            <button onClick={() => { playClickSound(); handleLanguageChange('en'); }} className={`text-3xl transition-all active:scale-90 ${lang === 'en' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}>🇺🇸</button>
-            <button onClick={() => { playClickSound(); handleLanguageChange('ko'); }} className={`text-3xl transition-all active:scale-90 ${lang === 'ko' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}>🇰🇷</button>
-          </div>
-
-          <div className="flex justify-center gap-0 mt-0 border-zinc-900 pt-0">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest flex gap-4 relative -left-2">
-              <span>english</span>
-              <span>한국어</span>
-            </p>
-          </div>
+          
 
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
             <input type="email" placeholder={t('main', 'email_placeholder')} value={email} onChange={(e) => setEmail(e.target.value)} 
-            className="mt-10 w-full h-14 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
+            className="mt-10 w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
             
             {isSignUpMode && <input type="text" placeholder={t('main', 'nickname_placeholder')} value={username} onChange={(e) => setUsername(e.target.value)} 
             className="w-full h-14 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />}
             
             <input type="password" placeholder={t('main', 'password_placeholder')} value={password} onChange={(e) => setPassword(e.target.value)} 
-            className="w-full h-14 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
+            className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
 
             <button 
               type="submit" 
               onClick={() => playClickSound()} // 💉 사운드 추가
-              className="mt-10 w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all shadow-[0_5px_15px_rgba(255,153,0,0.3)]"
+              className="mt-4 w-full h-12 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all shadow-[0_5px_15px_rgba(255,153,0,0.3)]"
             >
               {loading ? t('main', 'loading_wait') : (isSignUpMode ? t('main', 'join_btn') : t('main','login_btn'))}
             </button>
           </form>
 
           <div className="flex items-center gap-2 my-2"></div>
-
           <button 
             type="button" 
             onClick={() => { playClickSound(); handleGoogleLogin(); }} // 💉 사운드 추가
-            className="w-full h-14 bg-white text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3"
+            className="w-full h-12 bg-white text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path d="M23.52 12.29C23.52 11.43 23.45 10.61 23.31 9.82H12V14.45H18.45C18.17 15.93 17.31 17.18 16.03 18.04V21.03H19.9C22.16 18.95 23.52 15.89 23.52 12.29Z" fill="#4285F4"/><path d="M12 24C15.24 24 17.96 22.92 19.9 21.03L16.03 18.04C14.95 18.76 13.58 19.18 12 19.18C8.88 19.18 6.23 17.07 5.29 14.25H1.31V17.34C3.26 21.21 7.29 24 12 24Z" fill="#34A853"/><path d="M5.29 14.25C5.05 13.53 4.92 12.77 4.92 12C4.92 11.23 5.05 10.47 5.29 9.75V6.66H1.31C0.47 8.33 0 10.11 0 12C0 13.89 0.47 15.67 1.31 17.34L5.29 14.25Z" fill="#FBBC05"/><path d="M12 4.82C13.76 4.82 15.34 5.43 16.58 6.61L20.01 3.17C17.95 1.25 15.24 0 12 0C7.29 0 3.26 2.79 1.31 6.66L5.29 9.75C6.23 6.93 8.88 4.82 12 4.82Z" fill="#EA4335"/>
@@ -634,8 +622,52 @@ export default function App() {
             {isSignUpMode ? t('main', 'back_to_login') : t('main', 'create_acc')}
           </button>
 
-          
+          {/* 💉 언어 설정 파트 (수정됨) */}
+          <div className="flex flex-col items-center mt-12">
+            {/* 1. 국기 이미지 버튼 그룹 */}
+            <div className="flex justify-center gap-10">
+              <button 
+                onClick={() => { playClickSound(); handleLanguageChange('en'); }} 
+                // 선택 여부에 따라 투명도 조절 (기존 로직 유지)
+                className={`transition-all active:scale-90 ${lang === 'en' ? 'opacity-100 scale-110' : 'opacity-30 hover:opacity-70'}`}
+              >
+                {/* 💉 이모지 대신 이미지 사용 (public/images/ 폴더에 파일 필요) */}
+                <img src="/images/eng.png" alt="English" className="w-9 h-9 object-contain drop-shadow-lg" />
+              </button>
+              <button 
+                onClick={() => { playClickSound(); handleLanguageChange('ko'); }} 
+                className={`transition-all active:scale-90 ${lang === 'ko' ? 'opacity-100 scale-110' : 'opacity-30 hover:opacity-70'}`}
+              >
+                <img src="/images/kor.png" alt="Korean" className="w-9 h-9 object-contain drop-shadow-lg" />
+              </button>
+            </div>
+
+            {/* 2. 텍스트 라벨 버튼 그룹 */}
+            <div className="flex justify-center gap-10 mt-2">
+
+              <button 
+                onClick={() => { playClickSound(); handleLanguageChange('en'); }}
+                // 💉 선택된 언어는 주황색, 아니면 회색으로 스타일 조건부 적용
+                className={`-ml-3 text-xs font-black uppercase tracking-[0.2em] transition-colors ${
+                  lang === 'en' ? 'text-[#FF9900] drop-shadow-[0_0_5px_rgba(255,153,0,0.5)]' : 'text-zinc-600 hover:text-zinc-400'
+                }`}
+              >
+                english
+              </button>
+
+              <button 
+                onClick={() => { playClickSound(); handleLanguageChange('ko'); }}
+                className={`-ml-4 text-xs font-black uppercase tracking-[0.2em] transition-colors ${
+                  lang === 'ko' ? 'text-[#FF9900] drop-shadow-[0_0_5px_rgba(255,153,0,0.5)]' : 'text-zinc-600 hover:text-zinc-400'
+                }`}
+              >
+                한국어
+              </button>
+            </div>
+          </div>
+
         </div>
+        
       </div>
     );
   }

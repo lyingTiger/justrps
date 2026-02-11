@@ -221,7 +221,7 @@ export default function RankingPage({ onBack, playClickSound, userNickname, t }:
                             <span className="text-center">{res.rank}</span>
                             <span className="text-left truncate pr-2">{res.profiles?.display_name}</span>
                             <span className="text-center font-mono">{res.best_round}{t('round_suffix')}</span>
-                            <span className="text-left pl-2 font-mono text-sm">{res.best_time.toFixed(2)}{t('time_suffix')}</span>
+                            <span className="text-right mr-2 pl-2 font-mono text-sm">{res.best_time.toFixed(2)}{t('time_suffix')}</span>
                           </>
                         )}
                       </div>
