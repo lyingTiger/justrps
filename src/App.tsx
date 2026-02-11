@@ -615,23 +615,27 @@ export default function App() {
       {/* 💉 상단 헤더 섹션 (로고, 설정, 재화 표시) */}
       <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50">
         <div className="flex items-center gap-1">
-          <h2 className="text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => { playClickSound(); setView('lobby'); }}>
-            <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
-          </h2>
+
           <div className="relative">
             <button 
               onClick={(e) => { e.stopPropagation(); playClickSound(); setIsSettingsMenuOpen(!isSettingsMenuOpen); }} // 💉 사운드 추가
-              className="w-5 h-5 flex items-center justify-center transition-transform active:scale-90 ml-2"
+              className="w-5 h-5 flex items-center justify-center transition-transform active:scale-90 -ml-2"
             >
-              <img src="/images/icon_setting.png" alt="Settings" className={`w-full h-full object-contain transition-opacity ${isSettingsMenuOpen ? 'opacity-100' : 'opacity-50 hover:opacity-100'}`} />
+              <img src="/images/menu.png" alt="Settings" className={`w-full h-full object-contain transition-opacity ${isSettingsMenuOpen ? 'opacity-100' : 'opacity-50 hover:opacity-100'}`} />
             </button>
             {isSettingsMenuOpen && (
-              <div className="absolute left-0 mt-3 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
+              <div className="absolute left-0 mt-3 w-30 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
                 <button onClick={() => { playClickSound(); setView('settings'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">{t('settings', 'language')}</button>
                 <button onClick={() => { playClickSound(); setView('info'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white">{t('settings', 'game_info')}</button>
               </div>
             )}
           </div>
+
+          {/* 💉 로고 텍스트 */}
+          <h2 className="ml-2 text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => { playClickSound(); setView('lobby'); }}>
+            <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
+          </h2>
+   
         </div>
 
         <div className="flex items-center gap-5">
@@ -640,7 +644,7 @@ export default function App() {
               {userNickname.length > 10 ? userNickname.substring(0, 10) + '...' : userNickname} 
             </button>
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-24 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
+              <div className="absolute left-0 mt-2 w-24 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
                 <button onClick={() => { playClickSound(); handleLogout(); }} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800 uppercase">Logout</button>
               </div>
             )}
@@ -692,7 +696,9 @@ export default function App() {
                    {t('lobby', 'btn_play')}
                  </button>
              </div>
-             <div className="mt-10 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 shadow-xl w-full text-center">
+
+             {/* 💉 스탯 정보 표시 영역 */}
+             <div className="mt-10 p-6 rounded-3xl  shadow-xl w-full text-center">
                 <div className="grid grid-cols-3 w-full mb-1">
                   <p className="text-[10px] text-zinc-500 uppercase font-bold">{t('lobby', 'stats_total_play')}</p>
                   <p className="text-[10px] text-zinc-500 uppercase font-bold">{t('lobby', 'stats_win_rate')}</p>
