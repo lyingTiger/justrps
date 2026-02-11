@@ -14,7 +14,10 @@ import { useState, useEffect, useRef } from 'react';
 import { translations } from './constants/translations'; 
 
 export default function App() {
-  // --- 1. 유저 및 세션 상태 ---
+
+  // ------------------------------------------------------------------
+  // 💉 [상태 관리] 유저 데이터, 게임 뷰, 시스템 상태 변수 정의
+  // ------------------------------------------------------------------
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userNickname, setUserNickname] = useState(localStorage.getItem('cached_nickname') || 'Loading...');
@@ -25,24 +28,26 @@ export default function App() {
   const lastFetchedId = useRef<string | null>(null);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
-  // 언어 상태 (기본값은 저장된 값 또는 영어)
+  // ------------------------------------------------------------------
+  // 💉 [다국어 지원] 언어 상태 설정 및 번역 헬퍼 함수 (t)
+  // ------------------------------------------------------------------
   const [lang, setLang] = useState<'en' | 'ko'>(
     (localStorage.getItem('app_lang') as 'en' | 'ko') || 'en'
   );
 
-  //  언어 변경 핸들러 
   const handleLanguageChange = (newLang: 'en' | 'ko') => {
     setLang(newLang);
-    localStorage.setItem('app_lang', newLang); // 새로고침해도 유지되게 박제
+    localStorage.setItem('app_lang', newLang); 
   };
 
-  // 💉 [수정] 번역 헬퍼 함수
   const t = (view: keyof typeof translations['en'], key: string) => {
-    // @ts-ignore (타입 추론 복잡성 방지 위해 간단히 처리)
+    // @ts-ignore
     return translations[lang][view]?.[key] || key;
   };
 
-  // 인게임 메시지 팝업 상태 (키값을 넣으면 현재 언어에 맞는 문장 반환)
+  // ------------------------------------------------------------------
+  // 💉 [팝업 시스템] 인게임 메시지 알림창 상태 정의
+  // ------------------------------------------------------------------
   const [msgPopup, setMsgPopup] = useState<{
     isOpen: boolean;
     title: string;
@@ -55,15 +60,15 @@ export default function App() {
     onConfirm: null 
   });
 
-  // --- 2. 게임 및 뷰 제어 ---
+  // ------------------------------------------------------------------
+  // 💉 [게임 엔진 제어] 뷰 전환, 라운드, 통계 데이터 관리
+  // ------------------------------------------------------------------
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle' | 'info'>('lobby');  
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); 
   const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
   const [round, setRound] = useState(1);
   const [gameKey, setGameKey] = useState(Date.now());
 
-
-  // --- 3. 통계 및 설정 ---   
   const [stats, setStats] = useState({ 
     total_games: parseInt(localStorage.getItem('cached_total_games') || '0'), 
     multi_win_rate: parseInt(localStorage.getItem('cached_win_rate') || '0'), 
@@ -74,7 +79,9 @@ export default function App() {
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
 
-  // --- 4. 로그인 폼 상태 ---
+  // ------------------------------------------------------------------
+  // 💉 [인증 & 광고] 로그인 폼, 결과 데이터, 광고 제어 상태
+  // ------------------------------------------------------------------
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
@@ -82,7 +89,6 @@ export default function App() {
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
-  // --- 5. 결과창 상태 ---
   const [resultData, setResultData] = useState({ round: 0, time: 0, coins: 0, isNewRecord: false });
   const [continueCount, setContinueCount] = useState(3);
   const [sessionCoins, setSessionCoins] = useState(0); 
@@ -98,7 +104,9 @@ export default function App() {
   const clickBufferRef = useRef<AudioBuffer | null>(null);
   const [canClickPopup, setCanClickPopup] = useState(false);
 
-
+  // ------------------------------------------------------------------
+  // 💉 [유저 상태 초기화] 로그아웃 시 클라이언트 상태 청소
+  // ------------------------------------------------------------------
   const resetUserState = () => {
     setIsLoggedIn(false);         
     setCurrentUserId(null);       
@@ -112,6 +120,9 @@ export default function App() {
     setIsUserMenuOpen(false);
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [공유 기능] Web Share API 및 클립보드 복사 로직
+  // ------------------------------------------------------------------
   const handleShare = async () => {
     const shareData = {
       title: 'just RPS',
@@ -137,6 +148,9 @@ export default function App() {
     }
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [데이터 로드] Supabase 프로필 및 통계 로드 (자가 치유 기능 포함)
+  // ------------------------------------------------------------------
   const fetchUserData = async (userId: string) => {
     if (!userId) return;
     try {
@@ -183,11 +197,17 @@ export default function App() {
     } catch (err: any) { console.error(err); }
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [내비게이션] 뷰 변경 시 스크롤 위치 초기화
+  // ------------------------------------------------------------------
   useEffect(() => {
     window.scrollTo(0, 0);
     document.documentElement.scrollTo(0, 0);
   }, [view]);
 
+  // ------------------------------------------------------------------
+  // 💉 [보안] 10분 미활동 시 자동 로그아웃 감시 로직
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (!isLoggedIn) return;
     let timer: NodeJS.Timeout;
@@ -208,6 +228,9 @@ export default function App() {
     };
   }, [isLoggedIn]); 
 
+  // ------------------------------------------------------------------
+  // 💉 [UI 인터랙션] 팝업 오픈 시 버튼 클릭 지연 (실수 방지)
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (msgPopup.isOpen) {
       setCanClickPopup(false); 
@@ -216,6 +239,9 @@ export default function App() {
     }
   }, [msgPopup.isOpen]);
 
+  // ------------------------------------------------------------------
+  // 💉 [라이프사이클] 초기 로드: 통계 업데이트 및 Auth 상태 감지 시작
+  // ------------------------------------------------------------------
   useEffect(() => {
     document.title = "just RPS";
     const handleVisitors = async () => {
@@ -244,6 +270,9 @@ export default function App() {
     return () => { subscription.unsubscribe(); };
   }, []);
 
+  // ------------------------------------------------------------------
+  // 💉 [유저 기능] 닉네임 변경 및 DB 업데이트 핸들러
+  // ------------------------------------------------------------------
   const handleSaveNickname = async (newNickname: string) => {
     if (!currentUserId) return;
     if (newNickname.length > 15) return;
@@ -258,6 +287,9 @@ export default function App() {
     }
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [인증 로직] 이메일/비밀번호 로그인 및 회원가입 제출
+  // ------------------------------------------------------------------
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -287,6 +319,9 @@ export default function App() {
     } catch (err: any) { alert("Error: " + err.message); } finally { setLoading(false); }
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [히스토리 제어] 뒤로 가기 버튼 감지 및 뷰 전환 동기화
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (view !== 'lobby') window.history.pushState({ view }, '', '');
     else window.history.replaceState({ view: 'lobby' }, '', '');
@@ -299,6 +334,9 @@ export default function App() {
     return () => { window.removeEventListener('popstate', handlePopState); };
   }, [view]);
 
+  // ------------------------------------------------------------------
+  // 💉 [오디오 제어] 효과음 파일 사전 로드 및 오디오 컨텍스트 준비
+  // ------------------------------------------------------------------
   useEffect(() => {
     const initAudio = async () => {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -312,11 +350,17 @@ export default function App() {
     initAudio();
   }, []);
 
+  // ------------------------------------------------------------------
+  // 💉 [인증] 구글 계정 간편 로그인 핸들러
+  // ------------------------------------------------------------------
   const handleGoogleLogin = async () => {
     try { await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin, queryParams: { access_type: 'offline', prompt: 'consent' } } });
     } catch (error: any) { console.error(error.message); }
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [세션 종료] 로그아웃 및 로컬 캐시 전체 삭제
+  // ------------------------------------------------------------------
   const handleLogout = () => {
     localStorage.clear();
     supabase.auth.signOut().catch(err => console.warn(err));
@@ -324,6 +368,9 @@ export default function App() {
     setTimeout(() => { window.location.reload(); }, 100);
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [내비게이션] 메뉴 이동 전 세션 유효성 강제 검사
+  // ------------------------------------------------------------------
   const handleLobbyNavigation = async (targetView: 'modeSelect' | 'ranking' | 'shop' | 'tutorial') => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -335,6 +382,9 @@ export default function App() {
     setView(targetView);
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [게임 초기화] 라운드 및 소요 시간 세팅 초기화
+  // ------------------------------------------------------------------
   const resetGameSession = (startTime = 0) => {
     if (startTime === 0) setRound(1);
     setSessionStartTime(startTime);
@@ -343,6 +393,9 @@ export default function App() {
     setGameKey(Date.now());
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [오디오] 버튼 클릭 사운드 재생
+  // ------------------------------------------------------------------
   const playClickSound = () => {
     if (isMuted || !audioCtxRef.current || !clickBufferRef.current) return;
     if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
@@ -355,15 +408,21 @@ export default function App() {
     source.start(0);
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [광고 제어] 게임 3판마다 전면 광고 호출 로직
+  // ------------------------------------------------------------------
   const showInterstitialAd = () => {
     if (adFreeUntil) {
       const now = new Date();
       const expiryDate = new Date(adFreeUntil);
       if (now < expiryDate) return; 
     }
-    console.log("🎬 Interstitial Ad...");
+    console.log("🎬 Interstitial Ad Logic...");
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [게임 로직] 결과 처리 및 신기록 DB 업서트 핸들러
+  // ------------------------------------------------------------------
   const handleGameOver = async (finalRound: number, entryTime: number) => {
     setResultData({ round: finalRound, time: entryTime, coins: sessionCoins, isNewRecord: false });
     setRound(finalRound); 
@@ -387,9 +446,13 @@ export default function App() {
     }
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [플레이 로직] 최고 기록 지점부터 시작 (코인 차감 or 광고 시청)
+  // ------------------------------------------------------------------
   const handlePlayFromBest = async () => {
     if (!currentUserId) return;
-    const { data: record } = await supabase.from('mode_records').select('best_round, best_time').eq('user_id', currentUserId).eq('mode', selectedOption).maybeSingle();
+    const { data: record } = await supabase.from('mode_records').select('best_round, best_time').eq('user_id', currentUserId)
+                                            .eq('mode', selectedOption).maybeSingle();
     const bestRound = record?.best_round || 1;
     const bestTime = record?.best_time || 0;
 
@@ -422,6 +485,9 @@ export default function App() {
     }
   };
 
+  // ------------------------------------------------------------------
+  // 💉 [광고 로직] 보상형 광고 시청 완료 후 이어하기 처리 핸들러
+  // ------------------------------------------------------------------
   const handleAdContinueSuccess = () => {
     setShowAdOverlay(false);
     if (pendingBestRound !== null) {
@@ -436,7 +502,9 @@ export default function App() {
     setShowResultModal(false);
   };
 
-  // --- [인증 화면 뷰] ---
+  // ------------------------------------------------------------------
+  // 💉 [인증 화면] 로그인하지 않은 유저에게 노출되는 시작 페이지
+  // ------------------------------------------------------------------
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-black flex items-start justify-center pt-40">
@@ -455,25 +523,39 @@ export default function App() {
             <input type="password" placeholder={t('main', 'password_placeholder')} value={password} onChange={(e) => setPassword(e.target.value)} 
             className="w-full h-14 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
 
-            <button type="submit" className="mt-10 w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all shadow-[0_5px_15px_rgba(255,153,0,0.3)]">
+            <button 
+              type="submit" 
+              onClick={() => playClickSound()} // 💉 사운드 추가
+              className="mt-10 w-full h-14 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all shadow-[0_5px_15px_rgba(255,153,0,0.3)]"
+            >
               {loading ? t('main', 'loading_wait') : (isSignUpMode ? t('main', 'join_btn') : t('main','login_btn'))}
             </button>
           </form>
 
           <div className="flex items-center gap-2 my-2"></div>
 
-          <button type="button" onClick={handleGoogleLogin} className="w-full h-14 bg-white text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">...</svg>
+          <button 
+            type="button" 
+            onClick={() => { playClickSound(); handleGoogleLogin(); }} // 💉 사운드 추가
+            className="w-full h-14 bg-white text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M23.52 12.29C23.52 11.43 23.45 10.61 23.31 9.82H12V14.45H18.45C18.17 15.93 17.31 17.18 16.03 18.04V21.03H19.9C22.16 18.95 23.52 15.89 23.52 12.29Z" fill="#4285F4"/><path d="M12 24C15.24 24 17.96 22.92 19.9 21.03L16.03 18.04C14.95 18.76 13.58 19.18 12 19.18C8.88 19.18 6.23 17.07 5.29 14.25H1.31V17.34C3.26 21.21 7.29 24 12 24Z" fill="#34A853"/><path d="M5.29 14.25C5.05 13.53 4.92 12.77 4.92 12C4.92 11.23 5.05 10.47 5.29 9.75V6.66H1.31C0.47 8.33 0 10.11 0 12C0 13.89 0.47 15.67 1.31 17.34L5.29 14.25Z" fill="#FBBC05"/><path d="M12 4.82C13.76 4.82 15.34 5.43 16.58 6.61L20.01 3.17C17.95 1.25 15.24 0 12 0C7.29 0 3.26 2.79 1.31 6.66L5.29 9.75C6.23 6.93 8.88 4.82 12 4.82Z" fill="#EA4335"/>
+            </svg>
             {t('main', 'google_login')}
           </button>
           
-          <button type="button" onClick={() => setIsSignUpMode(!isSignUpMode)} className="w-full text-base text-zinc-400 hover:text-[#FF9900] text-center font-bold mt-4 uppercase">
+          <button 
+            type="button" 
+            onClick={() => { playClickSound(); setIsSignUpMode(!isSignUpMode); }} // 💉 사운드 추가
+            className="w-full text-base text-zinc-400 hover:text-[#FF9900] text-center font-bold mt-4 uppercase"
+          >
             {isSignUpMode ? t('main', 'back_to_login') : t('main', 'create_acc')}
           </button>
 
           <div className="flex justify-center gap-8 mt-4 pt-2">
-            <button onClick={() => handleLanguageChange('en')} className={`text-3xl transition-all active:scale-90 ${lang === 'en' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}>🇺🇸</button>
-            <button onClick={() => handleLanguageChange('ko')} className={`text-3xl transition-all active:scale-90 ${lang === 'ko' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}>🇰🇷</button>
+            <button onClick={() => { playClickSound(); handleLanguageChange('en'); }} className={`text-3xl transition-all active:scale-90 ${lang === 'en' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}>🇺🇸</button>
+            <button onClick={() => { playClickSound(); handleLanguageChange('ko'); }} className={`text-3xl transition-all active:scale-90 ${lang === 'ko' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}>🇰🇷</button>
           </div>
 
           <div className="flex justify-center gap-0 mt-0 border-zinc-900 pt-0">
@@ -487,145 +569,93 @@ export default function App() {
     );
   }
 
-  // --- [로그인 후 메인 화면] ---
-  // --- [로그인 후 메인 화면] --- 이하의 전체 코드입니다. 디자인 복구는 물론, **계층화된 번역 시스템(t('그룹', '키'))**을 모든 구역에 정밀하게 이식했습니다. 👨‍⚕️🩺
-
-
-  // --- [로그인 후 메인 화면] ---
+  // ------------------------------------------------------------------
+  // 💉 [메인 앱 화면] 로그인 후 노출되는 코어 레이아웃 (헤더 + 메인 + 오버레이)
+  // ------------------------------------------------------------------
   return (
-    // 배경 클릭 시 두 메뉴가 모두 닫히도록 최상단 div에 핸들러 유지 [cite: 2026-02-01]
     <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => { setIsUserMenuOpen(false); setIsSettingsMenuOpen(false); }}>
+      
+      {/* 💉 상단 헤더 섹션 (로고, 설정, 재화 표시) */}
       <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50">
-        
-        {/* [좌측] 로고 및 시스템 설정 영역 */}
         <div className="flex items-center gap-1">
-          <h2 className="text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => setView('lobby')}>
+          <h2 className="text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => { playClickSound(); setView('lobby'); }}>
             <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
           </h2>
-
-          {/* 기어 아이콘: Settings와 Game Info 담당 */}
           <div className="relative">
             <button 
-              onClick={(e) => { e.stopPropagation(); setIsSettingsMenuOpen(!isSettingsMenuOpen); }}
+              onClick={(e) => { e.stopPropagation(); playClickSound(); setIsSettingsMenuOpen(!isSettingsMenuOpen); }} // 💉 사운드 추가
               className="w-5 h-5 flex items-center justify-center transition-transform active:scale-90 ml-2"
             >
-              <img 
-                src="/images/icon_setting.png" 
-                alt="Settings" 
-                className={`w-full h-full object-contain transition-opacity ${isSettingsMenuOpen ? 'opacity-100' : 'opacity-50 hover:opacity-100'}`}
-              />
+              <img src="/images/icon_setting.png" alt="Settings" className={`w-full h-full object-contain transition-opacity ${isSettingsMenuOpen ? 'opacity-100' : 'opacity-50 hover:opacity-100'}`} />
             </button>
-
-            {/* 시스템 메뉴 (기어 클릭 시) */}
             {isSettingsMenuOpen && (
               <div className="absolute left-0 mt-3 w-32 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
-                {/* 💉 번역 적용: settings 그룹의 language 키 */}
-                <button onClick={() => setView('settings')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">{t('settings', 'language')}</button>
-                <button onClick={() => setView('info')} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white">{t('settings', 'game_info')}</button>
+                <button onClick={() => { playClickSound(); setView('settings'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">{t('settings', 'language')}</button>
+                <button onClick={() => { playClickSound(); setView('info'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white">{t('settings', 'game_info')}</button>
               </div>
             )}
           </div>
         </div>
 
-        {/* [우측] 계정 및 재화 영역 */}
         <div className="flex items-center gap-5">
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setIsUserMenuOpen(!isUserMenuOpen); }} className="font-bold text-sm tracking-tight text-zinc-300 hover:text-white transition-colors">
+            <button onClick={(e) => { e.stopPropagation(); playClickSound(); setIsUserMenuOpen(!isUserMenuOpen); }} className="font-bold text-sm tracking-tight text-zinc-300 hover:text-white transition-colors">
               {userNickname.length > 10 ? userNickname.substring(0, 10) + '...' : userNickname} 
             </button>
-
-            {/* 계정 메뉴 (닉네임 클릭 시: 로그아웃) */}
             {isUserMenuOpen && (
               <div className="absolute right-0 mt-2 w-24 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
-                <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800 uppercase">Logout</button>
+                <button onClick={() => { playClickSound(); handleLogout(); }} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800 uppercase">Logout</button>
               </div>
             )}
           </div>
-
           <div className="flex items-center gap-1.5 ml-1">
             <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
-            <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">
-              {userCoins.toLocaleString()}
-            </span>
+            <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">{userCoins.toLocaleString()}</span>
           </div>
         </div>
       </header>
 
+      {/* 💉 메인 메인 콘텐츠 렌더링 영역 */}
       <main className="flex-1 flex flex-col items-center justify-start p-0">
-
-        {/* 세팅 페이지 뷰 전환 */}
         {view === 'settings' && (
           <SettingsPage 
-            userNickname={userNickname} 
-            setUserNickname={setUserNickname} 
-            onSaveNickname={(nick: string) => handleSaveNickname(nick)} 
-            volume={volume} 
-            setVolume={setVolume} 
-            isMuted={isMuted} 
-            setIsMuted={setIsMuted} 
-            onBack={() => setView('lobby')} 
-            playClickSound={playClickSound}
-            currentLang={lang} 
-            onLangChange={handleLanguageChange} 
-            t={(key: string) => t('settings', key)} // 💉 settings 그룹 고정 [cite: 2026-02-01]
+            userNickname={userNickname} setUserNickname={setUserNickname} onSaveNickname={(nick: string) => handleSaveNickname(nick)} 
+            volume={volume} setVolume={setVolume} isMuted={isMuted} setIsMuted={setIsMuted} 
+            onBack={() => setView('lobby')} playClickSound={playClickSound} currentLang={lang} onLangChange={handleLanguageChange} 
+            t={(key: string) => t('settings', key)} 
           />
         )}
 
-        {view === 'info' && (
-          <InfoPage 
-            onBack={() => setView('lobby')} 
-            todayCount={visitorStats.today} 
-            totalCount={visitorStats.total}
-          />
-        )}
+        {view === 'info' && <InfoPage onBack={() => { playClickSound(); setView('lobby'); }} todayCount={visitorStats.today} totalCount={visitorStats.total} />}
         
         {view === 'lobby' && (
           <div className="w-full max-w-[360px] flex flex-col items-center mt-4 space-y-3 px-4">
-
-              {/* 공유 버튼 영역 */}
               <div className="w-full flex justify-end mb-0">
                 <button 
-                  onClick={handleShare} 
-                  className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-[#ffcc33] hover:text-black active:scale-95 transition-all border border-zinc-700"
+                  onClick={() => { playClickSound(); handleShare(); }} // 💉 사운드 추가
+                  className="px-4 py-1 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-[#ffcc33] hover:text-black active:scale-95 transition-all border border-zinc-700 active:bg-[#ffcc33] active:text-black"
                 >
                   {t('lobby', 'btn_share')}
                 </button>
               </div>
-
-             <div className="flex gap-3 mb-12 mt-10 ">{['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}</div>
-
+             <div className="flex gap-3 mb-12 mt-10 ">
+               {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
+             </div>
              <div className="w-full flex flex-col gap-3">
-                 {/* 💉 복구: 로비 중앙 버튼들의 화려한 스타일과 애니메이션 복원 [cite: 2026-02-01] */}
-                 <button 
-                   onClick={() => handleLobbyNavigation('tutorial')} 
-                   className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
-                 >
+                 <button onClick={() => { playClickSound(); handleLobbyNavigation('tutorial'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
                    {t('lobby', 'btn_tutorial')}
                  </button>
-
-                 <button 
-                   onClick={() => handleLobbyNavigation('ranking')} 
-                   className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
-                 >
+                 <button onClick={() => { playClickSound(); handleLobbyNavigation('ranking'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
                    {t('lobby', 'btn_ranking')}
                  </button>
-
-                  <button 
-                   onClick={() => handleLobbyNavigation('shop')} 
-                   className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
-                 >
+                 <button onClick={() => { playClickSound(); handleLobbyNavigation('shop'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
                    {t('lobby', 'btn_inventory')}
                  </button>
-
-                 <button 
-                   onClick={() => handleLobbyNavigation('modeSelect')} 
-                   className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
-                 >
+                 <button onClick={() => { playClickSound(); handleLobbyNavigation('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
                    {t('lobby', 'btn_play')}
                  </button>
              </div>
-
-             <div className="mt-10 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800/50 backdrop-blur-sm shadow-xl w-full flex flex-col items-center text-center">
+             <div className="mt-10 p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 shadow-xl w-full text-center">
                 <div className="grid grid-cols-3 w-full mb-1">
                   <p className="text-[10px] text-zinc-500 uppercase font-bold">{t('lobby', 'stats_total_play')}</p>
                   <p className="text-[10px] text-zinc-500 uppercase font-bold">{t('lobby', 'stats_win_rate')}</p>
@@ -641,51 +671,42 @@ export default function App() {
           </div>
         )}
 
-        {/* 플레이 선택 뷰 */}
         {view === 'modeSelect' && (
           <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4">
             <div className="w-full flex justify-end mb-0">
               <button 
-                onClick={() => setView('lobby')} 
-              className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px] transition-all hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
+                onClick={() => { playClickSound(); setView('lobby'); }} // 💉 사운드 추가
+                className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px] transition-all hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
               >
                 {t('modeSelect', 'btn_back')}
               </button>
             </div>
-
             <p className="w-full text-left text-base font-black text-[#ffcc33] uppercase ml-1">{t('modeSelect', 'title_select_mode')}</p>
-
             <div className="flex flex-col gap-3 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full mt-0">
               {['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'].map(opt => (
                 <label key={opt} className="flex items-center gap-2 cursor-pointer text-[14px] font-bold">
-                  <input type="radio" checked={selectedOption === opt} onChange={() => setSelectedOption(opt)} className="accent-[#FF9900]" />
-                  {/* 💉 동적 키 생성 로직 적용: mode_win, mode_draw 등 [cite: 2026-02-09] */}
+                  <input type="radio" checked={selectedOption === opt} onChange={() => { playClickSound(); setSelectedOption(opt); }} className="accent-[#FF9900]" />
                   <span className={selectedOption === opt ? 'text-[#FF9900]' : 'text-zinc-500'}>
                     {t('modeSelect', `mode_${opt.split(' ')[0].toLowerCase()}`)}
                   </span>
                 </label>
               ))}
             </div>
-
             <p className="w-full text-left text-base font-black text-[#ffcc33] uppercase ml-1 mt-4">{t('modeSelect', 'title_start_with')}</p>
-
-            {/* 💉 복구: 플레이 시작 버튼들의 컬러 테마와 호버 효과 복원 [cite: 2026-02-01] */}
             <button 
-              onClick={() => { resetGameSession(); setView('battle'); }} 
+              onClick={() => { playClickSound(); resetGameSession(); setView('battle'); }} 
               className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#3399cc] hover:text-black hover:border-[#3399cc] hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] active:bg-[#3399cc] active:text-black active:border-[#3399cc] active:scale-95"
             >
               {t('modeSelect', 'btn_single')}
             </button>
-            
             <button 
-              onClick={() => setView('multiplay')} 
+              onClick={() => { playClickSound(); setView('multiplay'); }} 
               className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#66cc33] hover:text-black hover:border-[#66cc33] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#66cc33] active:text-black active:border-[#66cc33] active:scale-95"
             >
               {t('modeSelect', 'btn_multi')}
             </button>
-            
             <button 
-              onClick={handlePlayFromBest} 
+              onClick={() => { playClickSound(); handlePlayFromBest(); }} 
               className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800  hover:bg-[#ff3366] hover:text-black hover:border-[#ff3366] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#ff3366] active:text-black active:border-[#ff3366] active:scale-95"
             >
               {t('modeSelect', 'btn_play_from_best')}
@@ -693,85 +714,35 @@ export default function App() {
           </div>
         )}
 
-        {view === 'multiplay' && (
-          <MultiplayPage selectedMode={selectedOption} onBack={() => setView('modeSelect')} onJoin={(roomId) => { setCurrentRoomId(roomId); setView('waitingRoom'); }} />
-        )}
-
-        {view === 'waitingRoom' && currentRoomId && (
-          <WaitingRoom roomId={currentRoomId} onLeave={() => { setCurrentRoomId(null); setView('multiplay'); }} onStartGame={() => setView('multiBattle')} />
-        )}
-
-        {view === 'multiBattle' && currentRoomId && (
-          <MultiGameEngine 
-            roomId={currentRoomId} userNickname={userNickname} playClickSound={playClickSound}
-            onEarnCoin={() => setUserCoins(prev => prev + 1)} 
-            onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }}
-            onBackToLobby={() => { if (currentUserId) fetchUserData(currentUserId); setCurrentRoomId(null); setView('lobby'); }}
-          />
-        )}
-
-        {view === 'tutorial' && <TutorialPage onBack={() => setView('lobby')} />}
-        
-        {view === 'battle' && (
-          <GameEngine 
-            key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} initialTime={sessionStartTime}
-            onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} 
-            onRoundClear={(next) => setRound(next)} 
-            onGameOver={handleGameOver} 
-            isModalOpen={showResultModal} 
-            t={(key: string) => t('game', key)}
-          />
-        )}
-        
-        {view === 'ranking' && (
-          <RankingPage onBack={() => setView('lobby')} playClickSound={playClickSound} userNickname={userNickname} />
-        )}
-
-        {view === 'shop' && (
-          <ShopPage onBack={() => setView('lobby')} userCoins={userCoins} currentUserId={currentUserId} onUpdateCoins={(newAmount) => { setUserCoins(newAmount); localStorage.setItem('cached_coins', newAmount.toString()); }} />
-        )}      
+        {view === 'multiplay' && <MultiplayPage selectedMode={selectedOption} onBack={() => { playClickSound(); setView('modeSelect'); }} onJoin={(roomId) => { playClickSound(); setCurrentRoomId(roomId); setView('waitingRoom'); }} />}
+        {view === 'waitingRoom' && currentRoomId && <WaitingRoom roomId={currentRoomId} onLeave={() => { playClickSound(); setCurrentRoomId(null); setView('multiplay'); }} onStartGame={() => { playClickSound(); setView('multiBattle'); }} />}
+        {view === 'multiBattle' && currentRoomId && <MultiGameEngine roomId={currentRoomId} userNickname={userNickname} playClickSound={playClickSound} onEarnCoin={() => setUserCoins(prev => prev + 1)} onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} onBackToLobby={() => { if (currentUserId) fetchUserData(currentUserId); setCurrentRoomId(null); setView('lobby'); }} />}
+        {view === 'tutorial' && <TutorialPage onBack={() => { playClickSound(); setView('lobby'); }} />}
+        {view === 'battle' && <GameEngine key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} initialTime={sessionStartTime} onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} onRoundClear={(next) => setRound(next)} onGameOver={handleGameOver} isModalOpen={showResultModal} t={(key: string) => t('game', key)} />}
+        {view === 'ranking' && <RankingPage onBack={() => { playClickSound(); setView('lobby'); }} playClickSound={playClickSound} userNickname={userNickname} />}
+        {view === 'shop' && <ShopPage onBack={() => { playClickSound(); setView('lobby'); }} userCoins={userCoins} currentUserId={currentUserId} onUpdateCoins={(newAmount) => { setUserCoins(newAmount); localStorage.setItem('cached_coins', newAmount.toString()); }} />}      
       </main>
 
-      {/* 광고 및 모달 섹션 */}
+      {/* 💉 오버레이 모달 및 시스템 팝업 렌더링 */}
       <AdOverlay isOpen={showAdOverlay} onClose={() => { setShowAdOverlay(false); setPendingBestRound(null); }} onReward={handleAdContinueSuccess} />
+      <ResultModal isOpen={showResultModal} mode={selectedOption} round={resultData.round} time={resultData.time} earnedCoins={resultData.coins} userCoins={userCoins} isNewRecord={resultData.isNewRecord} continueCount={continueCount} continueCost={CONTINUE_COST} onContinue={() => { if(userCoins >= CONTINUE_COST) { setUserCoins(c => c - CONTINUE_COST); setContinueCount(prev => prev - 1); setShowResultModal(false); } }} onRetry={() => { setShowResultModal(false); setRound(1); resetGameSession(0); setView('battle'); }} onLobby={() => { setShowResultModal(false); resetGameSession(); setView('modeSelect'); }} onShop={() => { setShowResultModal(false); setView('shop'); }} onWatchAd={() => setShowAdOverlay(true)} />
 
-      <ResultModal 
-        isOpen={showResultModal} mode={selectedOption} round={resultData.round} time={resultData.time} earnedCoins={resultData.coins} 
-        userCoins={userCoins} isNewRecord={resultData.isNewRecord} continueCount={continueCount} continueCost={CONTINUE_COST} 
-        onContinue={() => { if(userCoins >= CONTINUE_COST) { setUserCoins(c => c - CONTINUE_COST); setContinueCount(prev => prev - 1); setShowResultModal(false); } }} 
-        onRetry={() => { setShowResultModal(false); setRound(1); resetGameSession(0); setView('battle'); }} 
-        onLobby={() => { setShowResultModal(false); resetGameSession(); setView('modeSelect'); }} 
-        onShop={() => { setShowResultModal(false); setView('shop'); }} 
-        onWatchAd={() => setShowAdOverlay(true)}
-      />
-
-      {/* 인게임 메시지 팝업 번역 적용 */}
       {msgPopup.isOpen && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-[280px] bg-zinc-900 border-2 border-[#FF9900] rounded-[40px] p-8 flex flex-col items-center text-center shadow-[0_0_50px_rgba(255,153,0,0.2)] animate-in zoom-in-95 duration-200">
-            
             <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-3">{msgPopup.title}</h3>
-            
             {(msgPopup.title === t('popup', 'msg_continue_title') || msgPopup.title === t('popup', 'msg_ad_start_title')) && (
-              <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-6">
-                {t('popup', 'msg_best_record_info')}
-              </p>
+              <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-6">{t('popup', 'msg_best_record_info')}</p>
             )}
-
             <div className="flex items-center justify-center gap-3 mb-10">
-              {msgPopup.title === t('popup', 'msg_continue_title') && (
-                <img src="/images/coin.png" alt="coin" className="w-6 h-6 object-contain" />
-              )}
-              <p className="text-2xl text-white font-black italic uppercase tracking-tighter whitespace-pre-line">
-                {msgPopup.desc}
-              </p>
+              {msgPopup.title === t('popup', 'msg_continue_title') && <img src="/images/coin.png" alt="coin" className="w-6 h-6 object-contain" />}
+              <p className="text-2xl text-white font-black italic uppercase tracking-tighter whitespace-pre-line">{msgPopup.desc}</p>
             </div>
-            
             <div className="flex gap-3 w-full">
               {msgPopup.onConfirm && (
                 <button 
-                  onClick={() => canClickPopup && msgPopup.onConfirm?.()}
-                  disabled={!canClickPopup}
+                  onClick={() => { if(canClickPopup) { playClickSound(); msgPopup.onConfirm?.(); } }} // 💉 사운드 추가
+                  disabled={!canClickPopup} 
                   className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 
                     ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
                 >
@@ -779,8 +750,8 @@ export default function App() {
                 </button>
               )}
               <button 
-                onClick={() => canClickPopup && setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }))}
-                disabled={!canClickPopup}
+                onClick={() => { if(canClickPopup) { playClickSound(); setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null })); } }} // 💉 사운드 추가
+                disabled={!canClickPopup} 
                 className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800
                    ${msgPopup.onConfirm ? "flex-1 bg-zinc-900 text-white" : "w-full bg-[#FF9900] text-black"} 
                   ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
