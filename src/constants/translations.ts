@@ -1,5 +1,5 @@
 // ------------------------------------------------------------------
-// 💉 [수정 완료] 코드 로직과 100% 일치시킨 다국어 번역 사전
+// 💉 코드 로직과 100% 일치시킨 다국어 번역 사전
 // ------------------------------------------------------------------
 export const translations = {
   en: {
@@ -99,7 +99,30 @@ export const translations = {
     LOSE: "LOSE",
     SHUFFLE: "SHUFFLE",
     EXPERT: "EXPERT"
-    }
+    },
+
+    // --- 8. 결과 모달 (resultModal) ---
+    resultModal: {
+    game_over: "Game Over",
+    round_label: "ROUND",
+    new_record: "New Record!",
+    clear_time: "Clear Time",
+    earned: "Earned",
+    continue_question: "Continue?",
+    attempts_left: "Attempts Left:",
+    watch_ad: "WATCH AD",
+    no_continues: "No Continues Left",
+    retry: "Retry",
+    game_lobby: "game lobby",
+    time_suffix: "s",
+    mode_suffix: " MODE",
+    // 모드 명칭
+    WIN: "WIN",
+    DRAW: "DRAW",
+    LOSE: "LOSE",
+    SHUFFLE: "SHUFFLE",
+    EXPERT: "EXPERT"
+    },
   },
 
   ko: {
@@ -174,7 +197,7 @@ export const translations = {
       msg_signin_to_start: "시작하려면 로그인해 주세요!",
     },
 
-    // --- 6. 게임 엔진 (game) : 💉 코드 로직에 맞춰 대문자 키로 수정 ---
+    // --- 6. 게임 엔진 (game)  ---
     game: {
       ROUND: "라운드",
       PLAY_TIME: "진행 시간",
@@ -199,6 +222,29 @@ export const translations = {
     LOSE: "패배",
     SHUFFLE: "무작위",
     EXPERT: "초고난도"                
-    }
+    },
+
+    // --- 8. 결과 모달 (resultModal) ---
+    resultModal: {
+    game_over: "게임 오버",
+    round_label: "라운드",
+    new_record: "신기록!",
+    clear_time: "클리어 타임",
+    earned: "획득 코인",
+    continue_question: "계속할까요?",
+    attempts_left: "남은 기회:",
+    watch_ad: "광고 시청",
+    no_continues: "남은 기회 없음",
+    retry: "다시하기",
+    game_lobby: "로비로",
+    time_suffix: "초",
+    mode_suffix: " 모드",
+    // 모드 명칭
+    WIN: "승리",
+    DRAW: "무승부",
+    LOSE: "패배",
+    SHUFFLE: "무작위",
+    EXPERT: "초고난도"
+    },
   }
 };
