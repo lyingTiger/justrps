@@ -102,6 +102,7 @@ export default function App() {
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const clickBufferRef = useRef<AudioBuffer | null>(null);
+  const startBufferRef = useRef<AudioBuffer | null>(null);
   const [canClickPopup, setCanClickPopup] = useState(false);
 
   // ------------------------------------------------------------------
@@ -261,6 +262,7 @@ export default function App() {
         if (currentUserId !== userId) {
             setCurrentUserId(userId);
             setIsLoggedIn(true);
+            playStartSound();
         }
         if (lastFetchedId.current === userId) return;
         lastFetchedId.current = userId;
@@ -268,7 +270,7 @@ export default function App() {
       }
     });
     return () => { subscription.unsubscribe(); };
-  }, []);
+  }, [currentUserId]);
 
   // ------------------------------------------------------------------
   // 💉 [유저 기능] 닉네임 변경 및 DB 업데이트 핸들러
@@ -334,6 +336,8 @@ export default function App() {
     return () => { window.removeEventListener('popstate', handlePopState); };
   }, [view]);
 
+
+
   // ------------------------------------------------------------------
   // 💉 [오디오 제어] 효과음 파일 사전 로드 및 오디오 컨텍스트 준비
   // ------------------------------------------------------------------
@@ -342,13 +346,41 @@ export default function App() {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       audioCtxRef.current = new AudioContextClass();
       try {
+        // 1. 클릭 사운드 로드
         const response = await fetch('/sound/mouseClick.mp3');
         const arrayBuffer = await response.arrayBuffer();
         clickBufferRef.current = await audioCtxRef.current.decodeAudioData(arrayBuffer);
-      } catch (e) { console.error("Audio Load Error:", e); }
+        // 2. 💉 시작 사운드 로드 추가
+        const startRes = await fetch('/sound/startSound.mp3');
+        const startData = await startRes.arrayBuffer();
+        startBufferRef.current = await audioCtxRef.current.decodeAudioData(startData);
+      } catch (e) {
+        console.error("Audio Load Error:", e);
+      }
     };
     initAudio();
   }, []);
+
+
+  // ------------------------------------------------------------------
+  // 💉 [오디오 시스템] 시작 사운드 재생 함수 정의
+  // ------------------------------------------------------------------
+  const playStartSound = () => {
+    if (isMuted || !audioCtxRef.current || !startBufferRef.current) return;
+    if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+
+    const source = audioCtxRef.current.createBufferSource();
+    const gainNode = audioCtxRef.current.createGain();
+
+    source.buffer = startBufferRef.current;
+    gainNode.gain.value = volume;
+
+    source.connect(gainNode);
+    gainNode.connect(audioCtxRef.current.destination);
+    source.start(0);
+  };
+
+
 
   // ------------------------------------------------------------------
   // 💉 [인증] 구글 계정 간편 로그인 핸들러
@@ -507,11 +539,26 @@ export default function App() {
   // ------------------------------------------------------------------
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-black flex items-start justify-center pt-40">
+      <div className="min-h-screen bg-black flex items-start justify-center pt-30">
         <div className="w-full max-w-[320px]">
           <h1 className="text-5xl font-black mb-8 text-center italic tracking-tighter uppercase">
             <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
           </h1>
+
+
+          {/* 언어 설정 파트 */}
+          <div className="flex justify-center gap-8 mt-4 pt-2">
+            <button onClick={() => { playClickSound(); handleLanguageChange('en'); }} className={`text-3xl transition-all active:scale-90 ${lang === 'en' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}>🇺🇸</button>
+            <button onClick={() => { playClickSound(); handleLanguageChange('ko'); }} className={`text-3xl transition-all active:scale-90 ${lang === 'ko' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}>🇰🇷</button>
+          </div>
+
+          <div className="flex justify-center gap-0 mt-0 border-zinc-900 pt-0">
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest flex gap-4 relative -left-2">
+              <span>english</span>
+              <span>한국어</span>
+            </p>
+          </div>
+
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
             <input type="email" placeholder={t('main', 'email_placeholder')} value={email} onChange={(e) => setEmail(e.target.value)} 
@@ -553,17 +600,7 @@ export default function App() {
             {isSignUpMode ? t('main', 'back_to_login') : t('main', 'create_acc')}
           </button>
 
-          <div className="flex justify-center gap-8 mt-4 pt-2">
-            <button onClick={() => { playClickSound(); handleLanguageChange('en'); }} className={`text-3xl transition-all active:scale-90 ${lang === 'en' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}>🇺🇸</button>
-            <button onClick={() => { playClickSound(); handleLanguageChange('ko'); }} className={`text-3xl transition-all active:scale-90 ${lang === 'ko' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}>🇰🇷</button>
-          </div>
-
-          <div className="flex justify-center gap-0 mt-0 border-zinc-900 pt-0">
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest flex gap-4 relative -left-2">
-              <span>english</span>
-              <span>한국어</span>
-            </p>
-          </div>
+          
         </div>
       </div>
     );
@@ -719,7 +756,7 @@ export default function App() {
         {view === 'multiBattle' && currentRoomId && <MultiGameEngine roomId={currentRoomId} userNickname={userNickname} playClickSound={playClickSound} onEarnCoin={() => setUserCoins(prev => prev + 1)} onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} onBackToLobby={() => { if (currentUserId) fetchUserData(currentUserId); setCurrentRoomId(null); setView('lobby'); }} />}
         {view === 'tutorial' && <TutorialPage onBack={() => { playClickSound(); setView('lobby'); }} />}
         {view === 'battle' && <GameEngine key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} initialTime={sessionStartTime} onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} onRoundClear={(next) => setRound(next)} onGameOver={handleGameOver} isModalOpen={showResultModal} t={(key: string) => t('game', key)} />}
-        {view === 'ranking' && <RankingPage onBack={() => { playClickSound(); setView('lobby'); }} playClickSound={playClickSound} userNickname={userNickname} />}
+        {view === 'ranking' && <RankingPage onBack={() => { playClickSound(); setView('lobby'); }} playClickSound={playClickSound} userNickname={userNickname} t={(key) => t('ranking', key)} />}
         {view === 'shop' && <ShopPage onBack={() => { playClickSound(); setView('lobby'); }} userCoins={userCoins} currentUserId={currentUserId} onUpdateCoins={(newAmount) => { setUserCoins(newAmount); localStorage.setItem('cached_coins', newAmount.toString()); }} />}      
       </main>
 

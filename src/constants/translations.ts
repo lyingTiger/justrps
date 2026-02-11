@@ -83,6 +83,22 @@ export const translations = {
       DRAW: "DRAW",
       LOSE: "LOSE",
       OK_GOT_IT: "OK, I got it",
+    },
+
+    // --- 7. 랭킹 페이지 (ranking) ---
+    ranking: {
+    title_my_best: "'s BEST",
+    loading: "Loading...",
+    no_records: "No records",
+    btn_back: "Back",
+    round_suffix: "R",
+    time_suffix: "s",
+    mode_suffix: " MODE",
+    WIN: "WIN",
+    DRAW: "DRAW",
+    LOSE: "LOSE",
+    SHUFFLE: "SHUFFLE",
+    EXPERT: "EXPERT"
     }
   },
 
@@ -167,6 +183,22 @@ export const translations = {
       DRAW: " 무",
       LOSE: " 패",
       OK_GOT_IT: "ok! 기억 완료!",
+    },
+
+    // --- 7. 랭킹 페이지 (ranking) ---
+    ranking: {
+    title_my_best: "의 최고 기록",
+    loading: "로딩 중...",
+    no_records: "기록이 없습니다",
+    btn_back: "뒤로",
+    round_suffix: "R",
+    time_suffix: "s",
+    mode_suffix: " 모드",
+    WIN: "승리",
+    DRAW: "무승부",
+    LOSE: "패배",
+    SHUFFLE: "무작위",
+    EXPERT: "초고난도"                
     }
   }
 };
