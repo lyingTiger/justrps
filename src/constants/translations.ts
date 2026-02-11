@@ -123,6 +123,31 @@ export const translations = {
     SHUFFLE: "SHUFFLE",
     EXPERT: "EXPERT"
     },
+
+    // --- 9. 멀티플레이 페이지 (multiplay) ---
+    multiplay: {
+    btn_back: "Back",
+    search_placeholder: "ROOM NAME / SEARCH",
+    btn_create: "Creat",
+    pass_placeholder: "PASSWORD (OPTION)",
+    item_game: "ITEM GAME",
+    no_item: "NO ITEM",
+    btn_quick_match: "random join",
+    title_active_rooms: "Active Rooms",
+    no_active_rooms: "No Active Sessions",
+    status_playing: "Playing",
+    status_waiting: "Waiting",
+    title_private_room: "Private Room",
+    pass_modal_placeholder: "ENTER PASSWORD",
+    btn_cancel: "Cancel",
+    btn_join: "Join",
+    // 알림 메시지
+    msg_room_full: "The room is full!",
+    msg_join_failed: "Failed to \njoin the room.",
+    msg_create_failed: "Failed to \ncreate room: ",
+    msg_no_public_rooms: "No public rooms \navailable.",
+    msg_wrong_pass: "Incorrect password."
+    },
   },
 
   ko: {
@@ -191,7 +216,7 @@ export const translations = {
       msg_ad_start_title: "광고 시청",
       msg_watch_ad: "광고 시청",
       msg_copy_title: "복사 완료!",
-      msg_copy_desc: "메시지와 링크가 복사되었습니다!",
+      msg_copy_desc: "메시지와 링크가 \n복사되었습니다!",
       msg_best_record_info: "최고 기록에서 시작합니다",
       msg_session_expired: "다시 로그인해 주세요.",
       msg_signin_to_start: "시작하려면 로그인해 주세요!",
@@ -245,6 +270,31 @@ export const translations = {
     LOSE: "패배",
     SHUFFLE: "무작위",
     EXPERT: "초고난도"
+    },
+
+    // --- 9. 멀티플레이 페이지 (multiplay) ---
+    multiplay: {
+    btn_back: "뒤로",
+    search_placeholder: "방이름 검색/생성",
+    btn_create: "생성",
+    pass_placeholder: "비밀번호(선택)",
+    item_game: "아이템전",
+    no_item: "노템전",
+    btn_quick_match: "랜덤 입장",
+    title_active_rooms: "생성된 방",
+    no_active_rooms: "생성된 방이 \n없습니다",
+    status_playing: "게임중",
+    status_waiting: "대기중",
+    title_private_room: "비밀방",
+    pass_modal_placeholder: "비밀번호를 \n입력하세요",
+    btn_cancel: "취소",
+    btn_join: "입장",
+    // 알림 메시지
+    msg_room_full: "방이 가득 찼습니다!",
+    msg_join_failed: "방 입장에 \n실패했습니다.",
+    msg_create_failed: "방 생성 실패: ",
+    msg_no_public_rooms: "입장 가능한 \n방이 없습니다.",
+    msg_wrong_pass: "비밀번호가 \n틀렸습니다."
     },
   }
 };

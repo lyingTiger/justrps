@@ -198,36 +198,65 @@ export default function App() {
     } catch (err: any) { console.error(err); }
   };
 
+
+
   // ------------------------------------------------------------------
   // 💉 [내비게이션] 뷰 변경 시 스크롤 위치 초기화
   // ------------------------------------------------------------------
   useEffect(() => {
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTo(0, 0);
-  }, [view]);
+  // 브라우저의 기본 스크롤 복원 기능을 끄고 즉시 상단으로 이동시킵니다.
+  if ('scrollRestoration' in window.history) {
+    window.history.scrollRestoration = 'manual';
+  }
+  
+  // 0ms 타임아웃을 주어 렌더링이 완료된 직후에 실행되도록 보장합니다.
+  const timer = setTimeout(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.body.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, 0);
+
+  return () => clearTimeout(timer);
+}, [view]);
+
+
 
   // ------------------------------------------------------------------
   // 💉 [보안] 10분 미활동 시 자동 로그아웃 감시 로직
   // ------------------------------------------------------------------
   useEffect(() => {
     if (!isLoggedIn) return;
+
     let timer: NodeJS.Timeout;
-    const LIMIT = 10 * 60 * 1000; 
+    const LIMIT = 10 * 60 * 1000; // 10분
+
     const resetTimer = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => { handleLogout(); }, LIMIT);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        console.log("💤 장시간 미활동으로 로그아웃됩니다.");
+        handleLogout();
+      }, LIMIT);
     };
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('click', resetTimer);
-    window.addEventListener('keydown', resetTimer);
-    resetTimer(); 
+
+    // 💉 모바일 유저를 위한 touchstart 및 좀 더 포괄적인 감시를 위해 document에 등록
+    const events = ['mousemove', 'click', 'keydown', 'touchstart', 'scroll'];
+    
+    events.forEach(event => {
+      document.addEventListener(event, resetTimer);
+    });
+
+    resetTimer(); // 초기 실행
+
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('click', resetTimer);
-      window.removeEventListener('keydown', resetTimer);
+      if (timer) clearTimeout(timer);
+      events.forEach(event => {
+        document.removeEventListener(event, resetTimer);
+      });
     };
-  }, [isLoggedIn]); 
+  }, [isLoggedIn]);
+
+
+
 
   // ------------------------------------------------------------------
   // 💉 [UI 인터랙션] 팝업 오픈 시 버튼 클릭 지연 (실수 방지)
@@ -757,13 +786,49 @@ export default function App() {
           </div>
         )}
 
-        {view === 'multiplay' && <MultiplayPage selectedMode={selectedOption} onBack={() => { playClickSound(); setView('modeSelect'); }} onJoin={(roomId) => { playClickSound(); setCurrentRoomId(roomId); setView('waitingRoom'); }} />}
-        {view === 'waitingRoom' && currentRoomId && <WaitingRoom roomId={currentRoomId} onLeave={() => { playClickSound(); setCurrentRoomId(null); setView('multiplay'); }} onStartGame={() => { playClickSound(); setView('multiBattle'); }} />}
-        {view === 'multiBattle' && currentRoomId && <MultiGameEngine roomId={currentRoomId} userNickname={userNickname} playClickSound={playClickSound} onEarnCoin={() => setUserCoins(prev => prev + 1)} onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} onBackToLobby={() => { if (currentUserId) fetchUserData(currentUserId); setCurrentRoomId(null); setView('lobby'); }} />}
-        {view === 'tutorial' && <TutorialPage onBack={() => { playClickSound(); setView('lobby'); }} />}
-        {view === 'battle' && <GameEngine key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} initialTime={sessionStartTime} onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} onRoundClear={(next) => setRound(next)} onGameOver={handleGameOver} isModalOpen={showResultModal} t={(key: string) => t('game', key)} />}
-        {view === 'ranking' && <RankingPage onBack={() => { playClickSound(); setView('lobby'); }} playClickSound={playClickSound} userNickname={userNickname} t={(key) => t('ranking', key)} />}
-        {view === 'shop' && <ShopPage onBack={() => { playClickSound(); setView('lobby'); }} userCoins={userCoins} currentUserId={currentUserId} onUpdateCoins={(newAmount) => { setUserCoins(newAmount); localStorage.setItem('cached_coins', newAmount.toString()); }} />}      
+        {view === 'multiplay' && 
+          <MultiplayPage 
+          selectedMode={selectedOption} 
+          onBack={() => { playClickSound(); setView('modeSelect'); }} 
+          onJoin={(roomId) => { playClickSound(); setCurrentRoomId(roomId); setView('waitingRoom'); }} 
+          playClickSound={playClickSound}
+          t={(key: string) => t('multiplay', key)}
+          // 🔥 [핵심 추가] 게임 내 팝업을 띄우기 위한 함수 전달
+          onShowPopup={(title: string, desc: string) => {
+            setMsgPopup({ isOpen: true, title, desc, onConfirm: null });
+          }}
+        />}
+
+        {view === 'waitingRoom' && currentRoomId && 
+          <WaitingRoom roomId={currentRoomId} 
+          onLeave={() => { playClickSound(); setCurrentRoomId(null); setView('multiplay'); }} 
+          onStartGame={() => { playClickSound(); setView('multiBattle'); }} />}
+
+        {view === 'multiBattle' && currentRoomId && 
+          <MultiGameEngine roomId={currentRoomId} 
+          userNickname={userNickname} playClickSound={playClickSound} 
+          onEarnCoin={() => setUserCoins(prev => prev + 1)} 
+          onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} 
+          onBackToLobby={() => { if (currentUserId) fetchUserData(currentUserId); setCurrentRoomId(null); setView('lobby'); }} />}
+
+        {view === 'tutorial' && 
+          <TutorialPage onBack={() => { playClickSound(); setView('lobby'); }} />}
+
+        {view === 'battle' && 
+          <GameEngine key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} initialTime={sessionStartTime} 
+          onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} 
+          onRoundClear={(next) => setRound(next)} 
+          onGameOver={handleGameOver} isModalOpen={showResultModal} t={(key: string) => t('game', key)} />}
+
+        {view === 'ranking' && 
+          <RankingPage onBack={() => { playClickSound(); setView('lobby'); }} 
+          playClickSound={playClickSound} userNickname={userNickname} t={(key) => t('ranking', key)} />}
+
+        {view === 'shop' && 
+        <ShopPage onBack={() => { playClickSound(); setView('lobby'); }} 
+        userCoins={userCoins} currentUserId={currentUserId} 
+        onUpdateCoins={(newAmount) => { setUserCoins(newAmount); localStorage.setItem('cached_coins', newAmount.toString()); }} />} 
+             
       </main>
 
       {/* 💉 오버레이 모달 및 시스템 팝업 렌더링 */}
@@ -795,7 +860,7 @@ export default function App() {
               <button 
                 onClick={() => { if(canClickPopup) { playClickSound(); setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null })); } }} // 💉 사운드 추가
                 disabled={!canClickPopup} 
-                className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800
+                className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-700 text-white border border-zinc-500
                    ${msgPopup.onConfirm ? "flex-1 bg-zinc-900 text-white" : "w-full bg-[#FF9900] text-black"} 
                   ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
               >

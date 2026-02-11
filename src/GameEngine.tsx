@@ -191,9 +191,11 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
             const showDetails = isMemoryPhase || isSolved;
             return (
               <div key={i} className="relative flex flex-col items-center">
+
+
                 {/* 💉 텍스트 번역 적용: EXPERT MODE 조건명 */}
                 {isCurrent && mode === 'EXPERT MODE' && (
-                  <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{t(targetConditions[i])}</span>
+                  <span className="absolute -top-7 text-[16px] font-black text-white ">{t(targetConditions[i])}</span>
                 )}
                 <div className={`w-14 h-14 rounded-2xl overflow-hidden transition-all duration-300 bg-zinc-900 ${showDetails ? (hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 'shadow-[0_0_12px_rgba(34,197,94,0.7)]') : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
                   {isMemoryPhase ? <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center">{isSolved && <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-40" />}</div>}
