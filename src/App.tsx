@@ -679,47 +679,51 @@ export default function App() {
     <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => { setIsUserMenuOpen(false); setIsSettingsMenuOpen(false); }}>
       
       {/* 💉 상단 헤더 섹션 (로고, 설정, 재화 표시) */}
-      <header className="w-full p-6 flex justify-between items-center border-b border-zinc-800 bg-black sticky top-0 z-50">
-        <div className="flex items-center gap-1">
+      <header className="w-full border-b border-zinc-800 bg-black sticky top-0 z-50">
+        {/* 내부 콘텐츠를 감싸는 600px 정렬용 div 추가 */}
+        <div className="max-w-[800px] w-full mx-auto p-6 flex justify-between items-center">
+          
+          {/* [좌측] 로고 및 시스템 설정 영역 */}
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <button 
+                onClick={(e) => { e.stopPropagation(); playClickSound(); setIsSettingsMenuOpen(!isSettingsMenuOpen); }}
+                className="w-5 h-5 flex items-center justify-center transition-transform active:scale-90 -ml-2"
+              >
+                <img src="/images/menu.png" alt="Settings" className={`w-full h-full object-contain transition-opacity ${isSettingsMenuOpen ? 'opacity-100' : 'opacity-50 hover:opacity-100'}`} />
+              </button>
+              {isSettingsMenuOpen && (
+                <div className="absolute left-0 mt-3 w-30 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
+                  <button onClick={() => { playClickSound(); setView('settings'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">{t('settings', 'language')}</button>
+                  <button onClick={() => { playClickSound(); setView('info'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white">{t('settings', 'game_info')}</button>
+                </div>
+              )}
+            </div>
 
-          <div className="relative">
-            <button 
-              onClick={(e) => { e.stopPropagation(); playClickSound(); setIsSettingsMenuOpen(!isSettingsMenuOpen); }} // 💉 사운드 추가
-              className="w-5 h-5 flex items-center justify-center transition-transform active:scale-90 -ml-2"
-            >
-              <img src="/images/menu.png" alt="Settings" className={`w-full h-full object-contain transition-opacity ${isSettingsMenuOpen ? 'opacity-100' : 'opacity-50 hover:opacity-100'}`} />
-            </button>
-            {isSettingsMenuOpen && (
-              <div className="absolute left-0 mt-3 w-30 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
-                <button onClick={() => { playClickSound(); setView('settings'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">{t('settings', 'language')}</button>
-                <button onClick={() => { playClickSound(); setView('info'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white">{t('settings', 'game_info')}</button>
-              </div>
-            )}
+            <h2 className="ml-2 text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => { playClickSound(); setView('lobby'); }}>
+              <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
+            </h2>
           </div>
 
-          {/* 💉 로고 텍스트 */}
-          <h2 className="ml-2 text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => { playClickSound(); setView('lobby'); }}>
-            <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
-          </h2>
-   
-        </div>
+          {/* [우측] 유저 정보 및 재화 영역 */}
+          <div className="flex items-center gap-5">
+            <div className="relative">
+              <button onClick={(e) => { e.stopPropagation(); playClickSound(); setIsUserMenuOpen(!isUserMenuOpen); }} className="font-bold text-sm tracking-tight text-zinc-300 hover:text-white transition-colors">
+                {userNickname.length > 10 ? userNickname.substring(0, 10) + '...' : userNickname} 
+              </button>
+              {isUserMenuOpen && (
+                <div className="absolute left-0 mt-2 w-24 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
+                  <button onClick={() => { playClickSound(); handleLogout(); }} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800 uppercase">Logout</button>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 ml-1">
+              <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
+              <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">{userCoins.toLocaleString()}</span>
+            </div>
+          </div>
 
-        <div className="flex items-center gap-5">
-          <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); playClickSound(); setIsUserMenuOpen(!isUserMenuOpen); }} className="font-bold text-sm tracking-tight text-zinc-300 hover:text-white transition-colors">
-              {userNickname.length > 10 ? userNickname.substring(0, 10) + '...' : userNickname} 
-            </button>
-            {isUserMenuOpen && (
-              <div className="absolute left-0 mt-2 w-24 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
-                <button onClick={() => { playClickSound(); handleLogout(); }} className="w-full text-left px-4 py-2 text-xs text-red-500 font-bold hover:bg-zinc-800 uppercase">Logout</button>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 ml-1">
-            <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
-            <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">{userCoins.toLocaleString()}</span>
-          </div>
-        </div>
+        </div> {/* 중앙 정렬 div 끝 */}
       </header>
 
       {/* 💉 메인 메인 콘텐츠 렌더링 영역 */}
