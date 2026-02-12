@@ -476,6 +476,28 @@ export default function App() {
     } catch (error: any) { console.error(error.message); }
   };
 
+
+
+  // ------------------------------------------------------------------
+  // 💉 [신규] 카카오 계정 간편 로그인 핸들러 (handleGoogleLogin 아래에 추가)
+  // ------------------------------------------------------------------
+  const handleKakaoLogin = async () => {
+    try {
+      // 💉 Supabase에 설정한 Kakao Provider를 호출합니다.
+      await supabase.auth.signInWithOAuth({ 
+        provider: 'kakao', 
+        options: { 
+          redirectTo: window.location.origin, // 로그인 완료 후 현재 도메인으로 복귀
+          queryParams: { access_type: 'offline', prompt: 'consent' } 
+        } 
+      });
+    } catch (error: any) { 
+      console.error("Kakao Login Error:", error.message); 
+    }
+  };
+
+
+
   // ------------------------------------------------------------------
   // 💉 [세션 종료] 로그아웃 및 로컬 캐시 전체 삭제
   // ------------------------------------------------------------------
@@ -672,6 +694,24 @@ export default function App() {
             {t('main', 'google_login')}
           </button>
           
+
+          {/* ------------------------------------------------------------------
+          💉 [신규] 카카오 로그인 버튼 추가 
+          ------------------------------------------------------------------ */}
+          <button 
+            type="button" 
+            onClick={() => { playClickSound(); handleKakaoLogin(); }} 
+            className="w-full h-12 bg-[#FEE500] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all flex items-center justify-center gap-3 mt-2"
+          >
+            {/* 💉 카카오 로고 이미지가 없다면 아래 SVG 코드를 사용하세요 */}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 3c-4.97 0-9 3.185-9 7.115 0 2.558 1.707 4.8 4.315 6.091l-1.098 4.035c-.05.184.158.337.311.233l4.752-3.214c.54.079 1.1.121 1.72.121 4.97 0 9-3.186 9-7.115S16.97 3 12 3z"/>
+            </svg>
+            {/* 💉 translations에 'kakao_login' 항목을 추가해야 번역이 적용됩니다. */}
+            {t('main', 'kakao_login')}
+          </button>
+
+
           <button 
             type="button" 
             onClick={() => { playClickSound(); setIsSignUpMode(!isSignUpMode); }} // 💉 사운드 추가

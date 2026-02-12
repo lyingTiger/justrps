@@ -15,6 +15,7 @@ export const translations = {
       login_btn: "LOG IN",
       back_to_login: "Back to Login",
       create_acc: "Create Account",
+      kakao_login: "LOGIN WITH KAKAO",
     },
 
     // --- 2. 메인 로비 및 헤더 (lobby) ---
@@ -163,6 +164,7 @@ export const translations = {
       login_btn: "로그인",
       back_to_login: "로그인으로 돌아가기",
       create_acc: "계정 만들기",
+      kakao_login: "카카오 로그인",
     },
 
     // --- 2. 메인 로비 및 헤더 (lobby) ---
