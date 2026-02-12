@@ -5,6 +5,9 @@ interface GameProps {
   mode: string;
   initialTime: number;
   playClickSound: () => void;
+  playTockSound: () => void;   
+  playWhickSound: () => void;  
+  playBeepSound: () => void;   
   onEarnCoin: () => void;
   onRoundClear: (nextRound: number) => void;
   onGameOver: (finalRound: number, entryTime: number) => void; // entryTime 기준
@@ -12,7 +15,11 @@ interface GameProps {
   t: (key: string) => string; // 💉 언어 전환을 위해 필수적으로 추가된 Prop 외에는 건드리지 않음
 }
 
-export default function GameEngine({ round, mode, onGameOver, onRoundClear, playClickSound, onEarnCoin, isModalOpen, initialTime, t }: GameProps) {
+export default function GameEngine({ 
+  round, mode, onGameOver, onRoundClear, playClickSound, 
+  playTockSound, playWhickSound, playBeepSound, // 💉 Destructuring 추가
+  onEarnCoin, isModalOpen, initialTime, t 
+}: GameProps) {
   
   // 2. [State 초기값 수정]
   const [playTime, setPlayTime] = useState(initialTime);      // 💉 0 대신 initialTime
@@ -102,6 +109,7 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
 
         if (needed > current) {
           onEarnCoin();
+          playTockSound(); // 💉 정답 효과음 재생
           const newSolvedIndices = [...solvedIndices, i];
           const newSatisfiedConditions = [...satisfiedConditions, result];
           setSolvedIndices(newSolvedIndices);
@@ -109,6 +117,7 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
 
           if (newSatisfiedConditions.length === aiSelect.length) {
             if (timerRef.current) clearInterval(timerRef.current);
+            // 💉 (App.tsx에서 넘겨받은 onRoundClear가 whickSound를 포함하고 있음)
             onRoundClear(round + 1);
           }
           foundMatch = true; 
@@ -118,8 +127,7 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
       
       if (!foundMatch) { 
         if (timerRef.current) clearInterval(timerRef.current); 
-        // 🔥 [수정] playTime이 아니라 entryTime(진입 시간)을 기록으로 사용
-        onGameOver(round, parseFloat(entryTime.toFixed(2))); 
+        onGameOver(round, parseFloat(entryTime.toFixed(2))); // 💉 (App.tsx에서 beepSound 처리)
       }
       return;
     }
@@ -135,6 +143,7 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
 
     if (isCorrect) {
       onEarnCoin();
+      playTockSound(); // 💉 정답 효과음 재생
       if (questionTurn + 1 === aiSelect.length) {
         if (timerRef.current) clearInterval(timerRef.current);
         onRoundClear(round + 1);
@@ -143,7 +152,6 @@ export default function GameEngine({ round, mode, onGameOver, onRoundClear, play
       }
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
-      // 🔥 [수정] entryTime(진입 시간)을 기록으로 사용
       onGameOver(round, parseFloat(entryTime.toFixed(2)));
     }
   };

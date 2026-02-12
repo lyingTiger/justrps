@@ -383,27 +383,69 @@ export default function App() {
 
 
   // ------------------------------------------------------------------
-  // 💉 [오디오 제어] 효과음 파일 사전 로드 및 오디오 컨텍스트 준비
+  // 💉 [수정] 새로운 효과음을 위한 Ref 추가
+  // ------------------------------------------------------------------
+  const tockBufferRef = useRef<AudioBuffer | null>(null);     // 정답 (tock.mp3)
+  const whickBufferRef = useRef<AudioBuffer | null>(null);    // 라운드 클리어 (whick.mp3)
+  const beepBufferRef = useRef<AudioBuffer | null>(null);     // 게임오버 (beepbeep.mp3)
+
+
+
+  // ------------------------------------------------------------------
+  // 💉 [수정] 오디오 컨텍스트 준비 및 파일 사전 로드 (initAudio 업데이트)
   // ------------------------------------------------------------------
   useEffect(() => {
     const initAudio = async () => {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       audioCtxRef.current = new AudioContextClass();
       try {
-        // 1. 클릭 사운드 로드
-        const response = await fetch('/sound/mouseClick.mp3');
-        const arrayBuffer = await response.arrayBuffer();
-        clickBufferRef.current = await audioCtxRef.current.decodeAudioData(arrayBuffer);
-        // 2. 💉 시작 사운드 로드 추가
-        const startRes = await fetch('/sound/startSound.mp3');
-        const startData = await startRes.arrayBuffer();
-        startBufferRef.current = await audioCtxRef.current.decodeAudioData(startData);
+        // 1. 기존 클릭/시작 사운드 로드
+        const [clickRes, startRes, tockRes, whickRes, beepRes] = await Promise.all([
+          fetch('/sound/mouseClick.mp3'),
+          fetch('/sound/startSound.mp3'),
+          fetch('/sound/tock.mp3'),
+          fetch('/sound/whick.mp3'),
+          fetch('/sound/beepbeep.mp3')
+        ]);
+
+        const buffers = await Promise.all([
+          clickRes.arrayBuffer(),
+          startRes.arrayBuffer(),
+          tockRes.arrayBuffer(),
+          whickRes.arrayBuffer(),
+          beepRes.arrayBuffer()
+        ]);
+
+        clickBufferRef.current = await audioCtxRef.current.decodeAudioData(buffers[0]);
+        startBufferRef.current = await audioCtxRef.current.decodeAudioData(buffers[1]);
+        tockBufferRef.current = await audioCtxRef.current.decodeAudioData(buffers[2]);
+        whickBufferRef.current = await audioCtxRef.current.decodeAudioData(buffers[3]);
+        beepBufferRef.current = await audioCtxRef.current.decodeAudioData(buffers[4]);
       } catch (e) {
         console.error("Audio Load Error:", e);
       }
     };
     initAudio();
   }, []);
+
+  // ------------------------------------------------------------------
+  // 💉 [신규] 효과음 재생 유틸리티 함수들 정의
+  // ------------------------------------------------------------------
+  const playSound = (buffer: AudioBuffer | null) => {
+    if (isMuted || !audioCtxRef.current || !buffer) return;
+    if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+    const source = audioCtxRef.current.createBufferSource();
+    const gainNode = audioCtxRef.current.createGain();
+    source.buffer = buffer;
+    gainNode.gain.value = volume;
+    source.connect(gainNode);
+    gainNode.connect(audioCtxRef.current.destination);
+    source.start(0);
+  };
+
+  const playTockSound = () => playSound(tockBufferRef.current);
+  const playWhickSound = () => playSound(whickBufferRef.current);
+  const playBeepSound = () => playSound(beepBufferRef.current);
 
 
   // ------------------------------------------------------------------
@@ -877,10 +919,18 @@ export default function App() {
           <TutorialPage onBack={() => { playClickSound(); setView('lobby'); }} />}
 
         {view === 'battle' && 
-          <GameEngine key={gameKey} round={round} mode={selectedOption} playClickSound={playClickSound} initialTime={sessionStartTime} 
-          onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} 
-          onRoundClear={(next) => setRound(next)} 
-          onGameOver={handleGameOver} isModalOpen={showResultModal} t={(key: string) => t('game', key)} />}
+          <GameEngine 
+            key={gameKey} round={round} mode={selectedOption} initialTime={sessionStartTime} 
+            playClickSound={playClickSound}
+            playTockSound={playTockSound}   // 💉 추가
+            playWhickSound={playWhickSound} // 💉 추가
+            playBeepSound={playBeepSound}   // 💉 추가
+            onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} 
+            onRoundClear={(next) => { playWhickSound(); setRound(next); }} // 💉 라운드 클리어 소리
+            onGameOver={(r, t) => { playBeepSound(); handleGameOver(r, t); }} // 💉 게임오버 소리
+            isModalOpen={showResultModal} t={(key: string) => t('game', key)} 
+          />
+        }
 
         {view === 'ranking' && 
           <RankingPage onBack={() => { playClickSound(); setView('lobby'); }} 
