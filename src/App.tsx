@@ -121,6 +121,21 @@ export default function App() {
     setIsUserMenuOpen(false);
   };
 
+
+  // ------------------------------------------------------------------
+  // 💉 [방 관리] DB 방 퇴장 처리 헬퍼 함수 (자동 로그아웃/로고 클릭용)
+  // ------------------------------------------------------------------
+  const leaveCurrentRoom = async () => {
+    if (!currentRoomId || !currentUserId) return;
+    try {
+      await supabase.from('room_participants').delete().eq('room_id', currentRoomId).eq('user_id', currentUserId);
+      setCurrentRoomId(null);
+    } catch (e) {
+      console.error("자동 퇴장 처리 중 오류:", e);
+    }
+  };
+
+
   // ------------------------------------------------------------------
   // 💉 [공유 기능] Web Share API 및 클립보드 복사 로직
   // ------------------------------------------------------------------
@@ -422,7 +437,8 @@ export default function App() {
   // ------------------------------------------------------------------
   // 💉 [세션 종료] 로그아웃 및 로컬 캐시 전체 삭제
   // ------------------------------------------------------------------
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (currentRoomId) await leaveCurrentRoom();
     localStorage.clear();
     supabase.auth.signOut().catch(err => console.warn(err));
     resetUserState();
@@ -700,7 +716,7 @@ export default function App() {
               )}
             </div>
 
-            <h2 className="ml-2 text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => { playClickSound(); setView('lobby'); }}>
+            <h2 className="ml-2 text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => { playClickSound(); if(currentRoomId) leaveCurrentRoom(); setView('lobby'); }}>
               <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
             </h2>
           </div>
@@ -842,7 +858,7 @@ export default function App() {
 
         {view === 'waitingRoom' && currentRoomId && 
           <WaitingRoom roomId={currentRoomId} 
-          onLeave={() => { playClickSound(); setCurrentRoomId(null); setView('multiplay'); }} 
+          onLeave={async () => { playClickSound(); await leaveCurrentRoom(); setView('multiplay'); }} 
           onStartGame={() => { playClickSound(); setView('multiBattle'); }} />}
 
         {view === 'multiBattle' && currentRoomId && 
@@ -850,7 +866,12 @@ export default function App() {
           userNickname={userNickname} playClickSound={playClickSound} 
           onEarnCoin={() => setUserCoins(prev => prev + 1)} 
           onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} 
-          onBackToLobby={() => { if (currentUserId) fetchUserData(currentUserId); setCurrentRoomId(null); setView('lobby'); }} />}
+          
+          onBackToLobby={() => { 
+          playClickSound();
+          if (currentUserId) fetchUserData(currentUserId); 
+          if (currentRoomId) leaveCurrentRoom(); // 💉 공통 퇴장 함수 호출
+          setView('lobby'); }} />}
 
         {view === 'tutorial' && 
           <TutorialPage onBack={() => { playClickSound(); setView('lobby'); }} />}
