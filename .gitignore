@@ -1,1 +1,16 @@
-node_modules
+
+.env
+.env.local
+.env.production
+.env.development
+
+# 의존성 라이브러리 (용량이 커서 올리지 않음)
+node_modules/
+
+# 빌드 결과물 (배포 시 생성되는 파일)
+dist/
+build/
+
+# 로그 및 시스템 파일
+*.log
+.DS_Store
