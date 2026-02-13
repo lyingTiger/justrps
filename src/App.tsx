@@ -118,7 +118,7 @@ export default function App() {
   // 💉 [유저 상태 초기화] 로그아웃 시 클라이언트 상태 청소
   // ------------------------------------------------------------------
   const resetUserState = () => {
-    setIsLoggedIn(false);         
+    setIsLoggedIn(false);        
     setCurrentUserId(null);       
     setCurrentRoomId(null);
     setUserNickname(t('lobby', 'loading_status')); 
@@ -126,7 +126,7 @@ export default function App() {
     setStats({ total_games: 0, multi_win_rate: 0, best_rank: 0, best_mode: '' });
     setEmail('');
     setPassword('');
-    setView('lobby');             
+    setView('lobby');            
     setIsUserMenuOpen(false);
   };
 
@@ -225,17 +225,7 @@ export default function App() {
 
 
   // ------------------------------------------------------------------
-  // 💉 [내비게이션] 뷰 변경 시 스크롤 위치 초기화
-  // ------------------------------------------------------------------
-  useEffect(() => {
-  // 브라우저의 기본 스크롤 복원 기능을 끄고 즉시 상단으로 이동시킵니다.
-  if ('scrollRestoration' in window.history) {
-    window.history.scrollRestoration = 'manual';
-  }
-
-
-  // ------------------------------------------------------------------
-  // 💉 [수정 완료] 보안 시스템: 독립 실행 (중첩 해제됨)
+  // 💉 [수정 완료] 보안 시스템: 독립된 useEffect로 완벽 분리
   // ------------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -257,18 +247,14 @@ export default function App() {
   }, []); // 🏁 최초 1회만 실행
 
 
-
-  // 321 에러 수정 완료  
   // ------------------------------------------------------------------
-  // 💉 [수정 완료] 내비게이션: 스크롤 위치 초기화 로직 (독립 실행)
+  // 💉 [내비게이션] 뷰 변경 시 스크롤 위치 초기화 (독립 실행)
   // ------------------------------------------------------------------
   useEffect(() => {
-    // 브라우저의 기본 스크롤 복원 기능을 끄고 즉시 상단으로 이동시킵니다.
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }
 
-    // 0ms 타임아웃을 주어 렌더링이 완료된 직후에 실행되도록 보장합니다.
     const timer = setTimeout(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       document.documentElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -276,19 +262,7 @@ export default function App() {
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [view]); // 🏁 view가 바뀔 때마다 실행
-
-
-  
-  // 0ms 타임아웃을 주어 렌더링이 완료된 직후에 실행되도록 보장합니다.
-  const timer = setTimeout(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    document.documentElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    document.body.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, 0);
-
-  return () => clearTimeout(timer);
-}, [view]);
+  }, [view]);
 
 
 
@@ -667,7 +641,7 @@ export default function App() {
   const handlePlayFromBest = async () => {
     if (!currentUserId) return;
     const { data: record } = await supabase.from('mode_records').select('best_round, best_time').eq('user_id', currentUserId)
-                                            .eq('mode', selectedOption).maybeSingle();
+                                                    .eq('mode', selectedOption).maybeSingle();
     const bestRound = record?.best_round || 1;
     const bestTime = record?.best_time || 0;
 
@@ -1061,7 +1035,7 @@ export default function App() {
         <ShopPage onBack={() => { playClickSound(); setView('lobby'); }} 
         userCoins={userCoins} currentUserId={currentUserId} 
         onUpdateCoins={(newAmount) => { setUserCoins(newAmount); localStorage.setItem('cached_coins', newAmount.toString()); }} />} 
-             
+              
       </main>
 
       {/* 💉 오버레이 모달 및 시스템 팝업 렌더링 */}
