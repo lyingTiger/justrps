@@ -16,6 +16,19 @@ import { translations } from './constants/translations';
 export default function App() {
 
   // ------------------------------------------------------------------
+  // 💉 [신규] 개발자 인증 상태 정의
+  // ------------------------------------------------------------------
+  const [isDevAuthorized, setIsDevAuthorized] = useState(false);
+  const [tempCode, setTempCode] = useState('');
+
+  {/* ------------------------------------------------------------------
+            ✨ 여기까지 개발자 인증코드- 차후 삭제
+  ------------------------------------------------------------------ */}
+
+
+
+
+  // ------------------------------------------------------------------
   // 💉 [상태 관리] 유저 데이터, 게임 뷰, 시스템 상태 변수 정의
   // ------------------------------------------------------------------
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -697,6 +710,50 @@ export default function App() {
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-black flex items-start justify-center pt-20">
+
+      {/* ------------------------------------------------------------------
+            ✨ [신규] 개발자 코드 입력 팝업 (인증 전 노출)
+           ------------------------------------------------------------------ */}
+          {!isDevAuthorized && (
+            <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+              <div className="w-full max-w-[300px] bg-zinc-900 border-2 border-[#FF9900] rounded-[30px] p-8 text-center shadow-[0_0_50px_rgba(255,153,0,0.3)]">
+                <h3 className="text-xl font-black text-white italic uppercase mb-4 tracking-tighter">
+                  Developer Access
+                </h3>
+                <p className="text-sm font-bold text-zinc-400 mb-6 break-keep">
+                  아직 개발중입니다.<br/>개발자로부터 받은 코드를 입력하십시오.
+                </p>
+                <input 
+                  type="password" 
+                  value={tempCode}
+                  onChange={(e) => setTempCode(e.target.value)}
+                  placeholder="Code"
+                  className="w-full h-12 bg-black border border-zinc-800 rounded-xl px-4 text-center text-white font-black text-xl outline-none focus:border-[#FF9900] transition-all mb-4"
+                />
+                <button 
+                  onClick={() => {
+                    if (tempCode === '2026') {
+                      playClickSound();
+                      setIsDevAuthorized(true);
+                    } else {
+                      alert('코드가 일치하지 않습니다.');
+                      setTempCode('');
+                    }
+                  }}
+                  className="w-full h-12 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ------------------------------------------------------------------
+            ✨ 여기까지 개발자 인증코드- 차후 삭제
+           ------------------------------------------------------------------ */}
+
+
+
         <div className="w-full max-w-[320px]">
           <h1 className="text-5xl font-black mb-8 text-center italic tracking-tighter uppercase">
             <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
