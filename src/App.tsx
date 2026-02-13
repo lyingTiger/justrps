@@ -65,7 +65,9 @@ export default function App() {
   // ------------------------------------------------------------------
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle' | 'info'>('lobby');  
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); 
-  const [selectedOption, setSelectedOption] = useState<string>('DRAW MODE');
+  const [selectedOption, setSelectedOption] = useState<string>(
+    localStorage.getItem('last_played_mode') || 'DRAW MODE'
+  );
   const [round, setRound] = useState(1);
   const [gameKey, setGameKey] = useState(Date.now());
 
@@ -76,8 +78,15 @@ export default function App() {
     best_mode: localStorage.getItem('cached_best_mode') || '' 
   });
 
-  const [volume, setVolume] = useState(0.5);
-  const [isMuted, setIsMuted] = useState(false);
+  // ------------------------------------------------------------------
+  // 💉 [수정] 오디오 설정 상태: 저장된 값이 있으면 불러오고, 없으면 기본값 사용
+  // ------------------------------------------------------------------
+  const [volume, setVolume] = useState(
+    parseFloat(localStorage.getItem('app_volume') || '0.5')
+  );
+  const [isMuted, setIsMuted] = useState(
+    localStorage.getItem('app_isMuted') === 'true'
+  );
 
   // ------------------------------------------------------------------
   // 💉 [인증 & 광고] 로그인 폼, 결과 데이터, 광고 제어 상태
@@ -223,6 +232,35 @@ export default function App() {
   if ('scrollRestoration' in window.history) {
     window.history.scrollRestoration = 'manual';
   }
+
+
+  // ------------------------------------------------------------------
+  // 💉 [추가] 보안 시스템: 개발자 도구 및 소스 보기 단축키 차단
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. F12 차단
+      // 2. Ctrl+Shift+I (검사), Ctrl+Shift+J (콘솔), Ctrl+Shift+C (요소 선택) 차단
+      // 3. Ctrl+U (페이지 소스 보기) 차단
+      const isDevKey = 
+        e.key === 'F12' || 
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) ||
+        (e.ctrlKey && e.key === 'u');
+
+      if (isDevKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        // 💉 시스템 팝업보다는 조용히 차단하거나 게임 내 커스텀 알림을 띄우는 것이 좋습니다.
+        console.log("🛠️ DevTools access is restricted."); 
+        return false;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+
   
   // 0ms 타임아웃을 주어 렌더링이 완료된 직후에 실행되도록 보장합니다.
   const timer = setTimeout(() => {
@@ -503,7 +541,20 @@ export default function App() {
   // ------------------------------------------------------------------
   const handleLogout = async () => {
     if (currentRoomId) await leaveCurrentRoom();
+    // 💉 [백업] 삭제 전 보존해야 할 설정값들을 수집합니다.
+    const savedLang = localStorage.getItem('app_lang');
+    const savedVol = volume.toString();
+    const savedMute = isMuted.toString();
+    const savedMode = localStorage.getItem('last_played_mode');
+    // const currentLang = localStorage.getItem('app_lang');
     localStorage.clear();
+
+    // 💉 [복구] 챙겨두었던 설정값들만 다시 저장합니다.
+    if (savedLang) localStorage.setItem('app_lang', savedLang);
+    localStorage.setItem('app_volume', savedVol);
+    localStorage.setItem('app_isMuted', savedMute);
+    if (savedMode) localStorage.setItem('last_played_mode', savedMode);
+
     supabase.auth.signOut().catch(err => console.warn(err));
     resetUserState();
     setTimeout(() => { window.location.reload(); }, 100);
@@ -774,7 +825,19 @@ export default function App() {
   // 💉 [메인 앱 화면] 로그인 후 노출되는 코어 레이아웃 (헤더 + 메인 + 오버레이)
   // ------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col font-sans" onClick={() => { setIsUserMenuOpen(false); setIsSettingsMenuOpen(false); }}>
+    // 💉 [수정] 메인 앱 화면: 드래그 방지(select-none) 및 모바일 최적화 스타일 추가
+    // ------------------------------------------------------------------
+    <div 
+      className="min-h-screen bg-black text-white flex flex-col font-sans select-none" // 💉 select-none 클래스 추가
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ 
+        WebkitUserSelect: 'none',    /* Safari/Chrome 드래그 방지 */
+        WebkitTouchCallout: 'none', /* 모바일 롱프레스 메뉴(복사 등) 방지 */
+        userSelect: 'none',          /* 표준 드래그 방지 */
+        touchAction: 'manipulation'  /* 더블탭 줌 지연 방지 (게임성 향상) */
+      }}
+      onClick={() => { setIsUserMenuOpen(false); setIsSettingsMenuOpen(false); }}
+    >
       
       {/* 💉 상단 헤더 섹션 (로고, 설정, 재화 표시) */}
       <header className="w-full border-b border-zinc-800 bg-black sticky top-0 z-50">
@@ -896,7 +959,7 @@ export default function App() {
             <div className="flex flex-col gap-3 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 w-full mt-0">
               {['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'].map(opt => (
                 <label key={opt} className="flex items-center gap-2 cursor-pointer text-[14px] font-bold">
-                  <input type="radio" checked={selectedOption === opt} onChange={() => { playClickSound(); setSelectedOption(opt); }} className="accent-[#FF9900]" />
+                  <input type="radio" checked={selectedOption === opt} onChange={() => { playClickSound(); setSelectedOption(opt); localStorage.setItem('last_played_mode', opt);}} className="accent-[#FF9900]" />
                   <span className={selectedOption === opt ? 'text-[#FF9900]' : 'text-zinc-500'}>
                     {t('modeSelect', `mode_${opt.split(' ')[0].toLowerCase()}`)}
                   </span>

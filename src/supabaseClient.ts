@@ -1,6 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://fwtggxslfborsyihpjnv.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3dGdneHNsZmJvcnN5aWhwam52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4MTEwMDMsImV4cCI6MjA4NDM4NzAwM30.u0SPi2tbtIpsdVpWuhf3Cec2XfTyk28eEtJehl7HzPU'
+// 💉 하드코딩된 문자열 대신 환경 변수를 사용하도록 교체
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
