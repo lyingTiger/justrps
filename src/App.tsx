@@ -235,13 +235,10 @@ export default function App() {
 
 
   // ------------------------------------------------------------------
-  // 💉 [추가] 보안 시스템: 개발자 도구 및 소스 보기 단축키 차단
+  // 💉 [수정 완료] 보안 시스템: 중첩된 useEffect를 밖으로 꺼내 분리했습니다.
   // ------------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 1. F12 차단
-      // 2. Ctrl+Shift+I (검사), Ctrl+Shift+J (콘솔), Ctrl+Shift+C (요소 선택) 차단
-      // 3. Ctrl+U (페이지 소스 보기) 차단
       const isDevKey = 
         e.key === 'F12' || 
         (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) ||
@@ -250,7 +247,6 @@ export default function App() {
       if (isDevKey) {
         e.preventDefault();
         e.stopPropagation();
-        // 💉 시스템 팝업보다는 조용히 차단하거나 게임 내 커스텀 알림을 띄우는 것이 좋습니다.
         console.log("🛠️ DevTools access is restricted."); 
         return false;
       }
@@ -258,7 +254,25 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, []); // 🏁 보안 시스템은 최초 1회만 등록하면 되므로 빈 배열([])을 사용합니다.
+
+
+  // ------------------------------------------------------------------
+  // 💉 [수정 완료] 내비게이션: 스크롤 위치 초기화 로직 (독립 실행)
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      document.documentElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      document.body.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [view]); // 🏁 view가 바뀔 때마다 실행됩니다.
 
 
   
