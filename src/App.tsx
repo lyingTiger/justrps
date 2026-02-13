@@ -235,7 +235,7 @@ export default function App() {
 
 
   // ------------------------------------------------------------------
-  // 💉 [수정 완료] 보안 시스템: 중첩된 useEffect를 밖으로 꺼내 분리했습니다.
+  // 💉 [수정 완료] 보안 시스템: 독립 실행 (중첩 해제됨)
   // ------------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -254,17 +254,19 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []); // 🏁 보안 시스템은 최초 1회만 등록하면 되므로 빈 배열([])을 사용합니다.
+  }, []); // 🏁 최초 1회만 실행
 
 
   // ------------------------------------------------------------------
   // 💉 [수정 완료] 내비게이션: 스크롤 위치 초기화 로직 (독립 실행)
   // ------------------------------------------------------------------
   useEffect(() => {
+    // 브라우저의 기본 스크롤 복원 기능을 끄고 즉시 상단으로 이동시킵니다.
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }
 
+    // 0ms 타임아웃을 주어 렌더링이 완료된 직후에 실행되도록 보장합니다.
     const timer = setTimeout(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       document.documentElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -272,7 +274,7 @@ export default function App() {
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [view]); // 🏁 view가 바뀔 때마다 실행됩니다.
+  }, [view]); // 🏁 view가 바뀔 때마다 실행
 
 
   
