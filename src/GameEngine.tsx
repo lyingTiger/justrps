@@ -205,8 +205,20 @@ export default function GameEngine({
                 {isCurrent && mode === 'EXPERT MODE' && (
                   <span className="absolute -top-7 text-[16px] font-black text-white ">{t(targetConditions[i])}</span>
                 )}
-                <div className={`w-14 h-14 rounded-2xl overflow-hidden transition-all duration-300 bg-zinc-900 ${showDetails ? (hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 'shadow-[0_0_12px_rgba(34,197,94,0.7)]') : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
-                  {isMemoryPhase ? <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center">{isSolved && <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-40" />}</div>}
+                {/* 💉 문제 아이콘 */}
+                <div className={`w-14 h-14 rounded-2xl  transition-all duration-300 bg-zinc-900 ${showDetails ? (
+                  hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : 
+                  hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 
+                  'shadow-[0_0_12px_rgba(34,197,94,0.7)]') : 
+                  isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
+
+                  {/* 💉 맞췄을 때 문제 아이콘 */}
+                  {isMemoryPhase ? <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} 
+                  className="w-full h-full object-cover" /> :
+                  
+                  <div className="w-full h-full flex items-center justify-center">{
+                    isSolved && <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} 
+                    className="w-full h-full object-cover opacity-100" />}</div>}
                 </div>
               </div>
             );
@@ -218,29 +230,33 @@ export default function GameEngine({
 
       {/* 하단 버튼 영역 */}
       <div className="w-full flex justify-center mt-auto flex-none pb-4">
-        {isMemoryPhase ? (
-          <button 
-            onClick={() => { playClickSound(); setIsMemoryPhase(false); }} 
-            className="w-full h-14 font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse active:scale-95"
-          >
-            {/* 💉 텍스트 번역 적용: OK_GOT_IT */}
-            {t('OK_GOT_IT')}
-          </button> 
-        ) : (
-          <div className="flex gap-4 w-full px-2">
-            {['rock', 'paper', 'scissor'].map((type) => (
-              <button 
-                key={type} 
-                onClick={() => handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0)} 
-                /* aspect-square는 유지하되 flex-none으로 압착 방지 */
-                className={`flex-1 aspect-square rounded-3xl overflow-hidden active:scale-90 transition-all bg-zinc-900 ${type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'shadow-[0_0_15px_rgba(236,72,153,0.5)]'}`}
-              >
-                <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {isMemoryPhase ? (
+        <button 
+          onClick={() => { playClickSound(); setIsMemoryPhase(false); }} 
+          className="w-full h-14 font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse active:scale-95"
+        >
+          {t('OK_GOT_IT')}
+        </button> 
+      ) : (
+        /* 💉 w-full을 w-[60%]로 변경하여 너비를 제한하고, gap을 2로 줄여 오밀조밀하게 배치 */
+        <div className="flex gap-2 w-[60%]"> 
+          {['rock', 'paper', 'scissor'].map((type) => (
+            <button 
+              key={type} 
+              onClick={() => handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0)} 
+              /* flex-1이 설정되어 있어 60% 너비 안에서 3등분으로 자동 배분됩니다 */
+              className={`flex-1 aspect-square rounded-2xl  active:scale-90 transition-all bg-zinc-900 ${
+                type === 'rock' ? 'shadow-[0_0_10px_rgba(59,130,246,0.4)]' : 
+                type === 'paper' ? 'shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 
+                'shadow-[0_0_10px_rgba(236,72,153,0.4)]'
+              }`}
+            >
+              <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
     </div>
   );
 }

@@ -742,7 +742,7 @@ export default function App() {
                   }}
                   className="w-full h-12 bg-[#FF9900] text-black font-black text-lg rounded-xl uppercase active:scale-95 transition-all"
                 >
-                  Confirm
+                  확인
                 </button>
               </div>
             </div>
@@ -960,7 +960,7 @@ export default function App() {
                 </button>
               </div>
              <div className="flex gap-3 mb-12 mt-10 ">
-               {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
+               {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800  shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
              </div>
              <div className="w-full flex flex-col gap-3">
                  <button onClick={() => { playClickSound(); handleLobbyNavigation('tutorial'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
