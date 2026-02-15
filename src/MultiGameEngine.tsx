@@ -9,14 +9,16 @@ interface MultiGameProps {
   playClickSound: () => void;
   playBeepSound: () => void;
   onEarnCoin: () => void;
+  onRoundClear: () => void;
   onGameOver: (finalRound: number, totalTime: number) => void;
   onBackToLobby: () => void;
   sessionCoins: number;
+  sessionItems: { stop: number; switch: number; color: number; heal: number };
 }
 
 
 
-export default function MultiGameEngine({ roomId, userNickname, sessionCoins, playClickSound, playBeepSound, onSaveRewards, onEarnCoin, onGameOver, onBackToLobby }: MultiGameProps) {
+export default function MultiGameEngine({ roomId, userNickname, sessionCoins, sessionItems,playClickSound, playBeepSound, onSaveRewards, onEarnCoin, onRoundClear,onGameOver, onBackToLobby }: MultiGameProps) {
   // --- 상태 관리 ---
   const [currentRound, setCurrentRound] = useState(1);
   const [playTime, setPlayTime] = useState(0); 
@@ -231,6 +233,8 @@ export default function MultiGameEngine({ roomId, userNickname, sessionCoins, pl
 
     if (isRoundClear) {
         setIsCleared(true);
+        onRoundClear();
+
         if (timerRef.current) clearInterval(timerRef.current);
         const nextRound = myRoundRef.current + 1;
         
@@ -486,6 +490,7 @@ export default function MultiGameEngine({ roomId, userNickname, sessionCoins, pl
         roomId={roomId} 
         currentUserId={currentUserId}
         sessionCoins={sessionCoins}     // 💉 App에서 받은 세션 코인 전달
+        sessionItems={sessionItems}
         onSaveRewards={onSaveRewards}   // 💉 App에서 받은 저장 함수 전달
         playClickSound={playClickSound} // 💉 App에서 받은 사운드 함수 전달
         onBackToRoom={handleBackToRoom} // 💉 내부 함수 handleBackToRoom 연결

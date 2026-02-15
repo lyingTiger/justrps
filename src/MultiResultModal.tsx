@@ -5,23 +5,18 @@ interface MultiResultModalProps {
   isOpen: boolean;
   roomId: string;
   currentUserId: string | null;
-  onBackToRoom: () => void | Promise<void>; // 💉 handleBackToRoom이 async이므로 Promise 허용
+  onBackToRoom: () => void | Promise<void>;
   onBackToLobby: () => void;
-  // 💉 [신규 추가] 에러 해결을 위한 필수 속성들
   sessionCoins: number;          
+  sessionItems: { stop: number; switch: number; color: number; heal: number }; // 💉 [필수 추가]
   onSaveRewards: () => Promise<void>; 
   playClickSound: () => void;    
 }
 
 export default function MultiResultModal({ 
-  isOpen, 
-  roomId, 
-  currentUserId, 
-  onBackToRoom, 
-  onBackToLobby,
-  sessionCoins,   // 💉 Props 추가
-  onSaveRewards,  // 💉 Props 추가
-  playClickSound  // 💉 Props 추가
+  isOpen, roomId, currentUserId, onBackToRoom, onBackToLobby,
+  sessionCoins, sessionItems, // 💉 [필수 추가] 파라미터에서 꺼내기
+  onSaveRewards, playClickSound 
 }: MultiResultModalProps) {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,64 +63,120 @@ export default function MultiResultModal({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-500">
-      <div className="w-full max-w-[360px] bg-zinc-900 border border-zinc-800 rounded-[32px] p-6 shadow-2xl flex flex-col items-center">
-        
-        {/* 헤더 및 랭킹 리스트 UI (기존과 동일) */}
-        <div className="mb-6 text-center">
-            <h2 className="text-3xl font-black text-[#FF9900] italic uppercase tracking-tighter">Play Result</h2>
-        </div>
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-500">
+        <div className="w-full max-w-[360px] bg-zinc-900 border border-zinc-800 rounded-[32px] p-6 shadow-2xl flex flex-col items-center">
+          
+          <div className="mb-6 text-center">
+              <h2 className="text-3xl font-black text-[#FF9900] italic uppercase tracking-tighter">Play Result</h2>
+          </div>
 
-        <div className="w-full space-y-3 mb-8 max-h-[400px] overflow-y-auto pr-1">
-          {loading ? (
-             <div className="text-center text-zinc-500 text-xs py-10">Calculating...</div>
-          ) : (
-             results.map((p) => {
-               const isMe = p.user_id === currentUserId;
-               return (
-                 <div key={p.user_id} className={`w-full p-3 rounded-2xl border ${isMe ? 'border-zinc-600' : 'border-zinc-800'} bg-zinc-900/50 flex items-center justify-between`}>
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-black/40 flex items-center justify-center">
-                        <span className="text-xl font-black italic text-zinc-400">{p.rank}</span>
+          {/* 💉 렌더링 영역 최적화: 이중 div 구조를 하나로 합침 */}
+          <div className="w-full mb-8 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+            {loading ? (
+              <div className="text-center text-zinc-500 text-xs py-10 italic uppercase animate-pulse">
+                  Calculating Results...
+              </div>
+            ) : (
+              <div className="w-full space-y-3">
+                {results.map((p) => {
+                  const isMe = p.user_id === currentUserId;
+                  const hasItems = isMe && Object.values(sessionItems).some(count => count > 0);
+
+                  return (
+                    <div 
+                      key={p.user_id} 
+                      className={`w-full p-4 rounded-[24px] border transition-all ${
+                        isMe ? 'border-[#FF9900] bg-[#FF9900]/5 shadow-[0_0_20px_rgba(255,153,0,0.1)]' : 'border-zinc-800 bg-zinc-900/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black italic ${
+                            isMe ? 'bg-[#FF9900] text-black' : 'bg-zinc-800 text-zinc-500'
+                          }`}>
+                            {p.rank}
+                          </div>
+                          <span className={`text-sm font-black uppercase tracking-tight ${isMe ? 'text-white' : 'text-zinc-500'}`}>
+                            {p.profiles?.display_name}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-1.5">
+                          <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
+                          <span className={`font-mono font-bold text-lg ${isMe ? 'text-[#FF9900]' : 'text-zinc-400'}`}>
+                            +{isMe ? sessionCoins : (p.earned_coins || 0)}
+                          </span>
+                        </div>
                       </div>
-                      <span className={`text-base font-black uppercase ${isMe ? 'text-white' : 'text-zinc-400'}`}>{p.profiles?.display_name}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <img src="/images/coin.png" alt="coin" className="w-3 h-3 object-contain" />
-                        <span className="text-white font-black text-sm">+{isMe ? sessionCoins : p.earned_coins}</span>
-                    </div>
-                 </div>
-               );
-             })
-          )}
-        </div>
 
-        {/* 💉 버튼 영역: 클릭 시 소리를 내고 코인을 서버에 저장한 후 이동 */}
-        <div className="grid grid-cols-2 gap-3 w-full">
-            <button 
-                onClick={async () => { 
-                  playClickSound(); 
-                  await onSaveRewards(); // 💉 퇴장 시 코인 저장
-                  onBackToLobby(); 
-                }}
-                className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] active:scale-95 transition-all"
-            >
-                Exit
-            </button>
-            <button 
-                onClick={async () => { 
-                  playClickSound(); 
-                  await onSaveRewards(); // 💉 방 복귀 시 코인 저장
-                  onBackToRoom(); 
-                }}
-                className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] active:scale-95 transition-all"
-            >
-                Back to Room
-            </button>
-        </div>
+                      {/* 아이템 획득 영역 (내 기록 아래에만 표시) */}
+                      {hasItems && (
+                        <div className="mt-3 pt-3 border-t border-white/5 flex justify-start gap-3">
+                          {sessionItems.stop > 0 && (
+                            <div className="relative">
+                              <img src="/images/itemStop3sec.png" className="w-8 h-8 object-contain" alt="stop" />
+                              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-black min-w-[14px] h-3.5 rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
+                                {sessionItems.stop}
+                              </span>
+                            </div>
+                          )}
+                          {sessionItems.switch > 0 && (
+                            <div className="relative">
+                              <img src="/images/itemSwitchBtn.png" className="w-8 h-8 object-contain" alt="switch" />
+                              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-black min-w-[14px] h-3.5 rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
+                                {sessionItems.switch}
+                              </span>
+                            </div>
+                          )}
+                          {sessionItems.color > 0 && (
+                            <div className="relative">
+                              <img src="/images/itemColor.png" className="w-8 h-8 object-contain" alt="color" />
+                              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-black min-w-[14px] h-3.5 rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
+                                {sessionItems.color}
+                              </span>
+                            </div>
+                          )}
+                          {sessionItems.heal > 0 && (
+                            <div className="relative">
+                              <img src="/images/itemHeal.png" className="w-8 h-8 object-contain" alt="heal" />
+                              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-black min-w-[14px] h-3.5 rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
+                                {sessionItems.heal}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
+          <div className="grid grid-cols-2 gap-3 w-full">
+              <button 
+                  onClick={async () => { 
+                    playClickSound(); 
+                    await onSaveRewards(); 
+                    onBackToLobby(); 
+                  }}
+                  className="h-14 bg-zinc-800 border border-zinc-600 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] hover:text-black active:scale-95 transition-all"
+              >
+                  Exit
+              </button>
+              <button 
+                  onClick={async () => { 
+                    playClickSound(); 
+                    await onSaveRewards(); 
+                    onBackToRoom(); 
+                  }}
+                  className="h-14 bg-zinc-800 border border-zinc-600 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] hover:text-black active:scale-95 transition-all"
+              >
+                  Back to Room
+              </button>
+          </div>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }

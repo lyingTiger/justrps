@@ -1296,11 +1296,22 @@ export default function App() {
           <MultiGameEngine 
             roomId={currentRoomId} 
             userNickname={userNickname} 
-            sessionCoins={sessionCoins} // 💉 추가: 실시간 표시용
+            sessionCoins={sessionCoins} 
+            sessionItems={sessionItems}
             playClickSound={playClickSound} 
             playBeepSound={playBeepSound}
             onSaveRewards={saveSessionRewards}
             onEarnCoin={() => setSessionCoins(prev => prev + 1)} // 💉 수정: 세션 코인만 증가
+
+            // 💉 [추가] 멀티플레이 라운드 클리어 시 아이템 주사위 굴리기
+            onRoundClear={() => {
+              const newItem = rollForItem(); // 2% 확률 계산 함수 (아까 만든 것)
+              if (newItem) {
+                setSessionItems(prev => ({ ...prev, [newItem]: prev[newItem] + 1 }));
+                console.log(`🎁 멀티플레이 아이템 획득: ${newItem}`);
+              }
+            }}
+
             onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} 
             onBackToLobby={async () => {
               playClickSound();
