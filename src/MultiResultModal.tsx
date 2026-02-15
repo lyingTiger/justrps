@@ -143,10 +143,11 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
         {/* 버튼 영역 */}
         <div className="grid grid-cols-2 gap-3 w-full">
             <button 
-                onClick={onBackToLobby}
+                onClick={onBackToLobby} // 💉 App.tsx에서 넘겨받은 함수 실행
                 className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] hover:text-black active:scale-95 transition-all border border-zinc-800 shadow-lg"
             >
-                Main
+                {/* 💉 [텍스트 수정] Main -> Exit 또는 Rooms */}
+                Exit Room
             </button>
             <button 
                 onClick={onBackToRoom}

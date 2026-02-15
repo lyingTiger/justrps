@@ -41,6 +41,46 @@ export default function App() {
   const lastFetchedId = useRef<string | null>(null);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
+
+  // 1. 비밀번호 변경 핸들러
+  const handleChangePassword = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) return;
+
+    // Supabase의 비밀번호 재설정 이메일 발송 기능을 활용합니다.
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: window.location.origin,
+    });
+
+    if (error) {
+      setMsgPopup({ isOpen: true, title: "Error", desc: "요청 실패:\n잠시 후 다시 시도해주세요.", onConfirm: null });
+    } else {
+      setMsgPopup({ isOpen: true, title: "Success", desc: "비밀번호 재설정 이메일이\n발송되었습니다.", onConfirm: null });
+    }
+  };
+
+  // 2. 회원 탈퇴 핸들러
+  const handleDeleteAccount = () => {
+    setMsgPopup({
+      isOpen: true,
+      title: "DANGER",
+      desc: "정말 탈퇴하시겠습니까?\n모든 기록과 재화가\n영구적으로 삭제됩니다.",
+      onConfirm: async () => {
+        if (!currentUserId) return;
+        
+        // 💉 외과적 데이터 삭제: 프로필 데이터 먼저 삭제
+        await supabase.from('profiles').delete().eq('id', currentUserId);
+        
+        // 실제 Auth 계정 삭제는 보안상 Edge Function을 권장하지만, 
+        // 여기서는 우선 로그아웃 후 초기화 처리로 진행합니다.
+        await supabase.auth.signOut();
+        window.location.reload(); 
+      }
+    });
+  };
+
+
+
   // ------------------------------------------------------------------
   // 💉 [다국어 지원] 언어 상태 설정 및 번역 헬퍼 함수 (t)
   // ------------------------------------------------------------------
@@ -57,6 +97,8 @@ export default function App() {
     // @ts-ignore
     return translations[lang][view]?.[key] || key;
   };
+
+
 
   // ------------------------------------------------------------------
   // 💉 [팝업 시스템] 인게임 메시지 알림창 상태 정의
@@ -381,37 +423,61 @@ export default function App() {
     }
   }, [msgPopup.isOpen]);
 
-  // ------------------------------------------------------------------
-  // 💉 [라이프사이클] 초기 로드: 통계 업데이트 및 Auth 상태 감지 시작
-  // ------------------------------------------------------------------
-  useEffect(() => {
-    document.title = "just RPS";
-    const handleVisitors = async () => {
-      await supabase.rpc('increment_visitor');
-      const { data } = await supabase.from('site_stats').select('today_count, total_count').eq('id', 'global').maybeSingle();
-      if (data) setVisitorStats({ today: data.today_count, total: data.total_count });
-    };
-    handleVisitors();
-  
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
-        lastFetchedId.current = null; 
-        resetUserState();
-      } 
-      else if (session?.user) {
-        const userId = session.user.id;
-        if (currentUserId !== userId) {
-            setCurrentUserId(userId);
-            setIsLoggedIn(true);
-            playStartSound();
+
+
+
+    // 💉 [교체 1] 방문자 통계 관리: 중복 방지 로직 포함
+    useEffect(() => {
+      const handleStats = async () => {
+        // 1. 로비 진입 시 + 로그인된 경우에만 방문자 수 증가 시도
+        // (DB의 increment_visitor 함수가 오늘 방문 여부를 체크해 중복을 막습니다)
+        if (view === 'lobby' && isLoggedIn) {
+          await supabase.rpc('increment_visitor');
         }
-        if (lastFetchedId.current === userId) return;
-        lastFetchedId.current = userId;
-        fetchUserData(userId); 
-      }
-    });
-    return () => { subscription.unsubscribe(); };
-  }, [currentUserId]);
+
+        // 2. 로비나 정보 페이지일 때 최신 통계 데이터를 가져옴
+        if (view === 'lobby' || view === 'info') {
+          const { data } = await supabase
+            .from('site_stats')
+            .select('today_count, total_count')
+            .eq('id', 'global')
+            .maybeSingle();
+            
+          if (data) setVisitorStats({ today: data.today_count, total: data.total_count });
+        }
+      };
+
+      handleStats();
+    }, [view, isLoggedIn]); // 💉 isLoggedIn을 추가하여 로그인 직후 카운트가 반영되게 함
+
+
+    // 💉 [교체 2] 인증 및 초기 설정 (방문자 로직 분리됨)
+    useEffect(() => {
+      document.title = "just RPS";
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_OUT' || !session) {
+          lastFetchedId.current = null; 
+          resetUserState();
+        } 
+        else if (session?.user) {
+          const userId = session.user.id;
+          if (currentUserId !== userId) {
+              setCurrentUserId(userId);
+              setIsLoggedIn(true);
+              playStartSound();
+          }
+          if (lastFetchedId.current === userId) return;
+          lastFetchedId.current = userId;
+          fetchUserData(userId); 
+        }
+      });
+
+      return () => { subscription.unsubscribe(); };
+    }, [currentUserId]);
+
+
+
 
   // ------------------------------------------------------------------
   // 💉 [유저 기능] 닉네임 변경 및 DB 업데이트 핸들러
@@ -1002,6 +1068,8 @@ export default function App() {
             volume={volume} setVolume={setVolume} isMuted={isMuted} setIsMuted={setIsMuted} 
             onBack={() => setView('lobby')} playClickSound={playClickSound} currentLang={lang} onLangChange={handleLanguageChange} 
             t={(key: string) => t('settings', key)} 
+            onChangePassword={handleChangePassword} 
+            onDeleteAccount={handleDeleteAccount}   
           />
         )}
 
@@ -1114,16 +1182,23 @@ export default function App() {
           onStartGame={() => { playClickSound(); setView('multiBattle'); }} />}
 
         {view === 'multiBattle' && currentRoomId && 
-          <MultiGameEngine roomId={currentRoomId} 
-          userNickname={userNickname} playClickSound={playClickSound} 
-          onEarnCoin={() => setUserCoins(prev => prev + 1)} 
-          onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} 
-          
-          onBackToLobby={() => { 
-          playClickSound();
-          if (currentUserId) fetchUserData(currentUserId); 
-          if (currentRoomId) leaveCurrentRoom(); // 💉 공통 퇴장 함수 호출
-          setView('lobby'); }} />}
+          <MultiGameEngine 
+            roomId={currentRoomId} 
+            userNickname={userNickname} 
+            playClickSound={playClickSound} 
+            onEarnCoin={() => setUserCoins(prev => prev + 1)} 
+            onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} 
+            
+            onBackToLobby={() => { 
+              playClickSound();
+              if (currentUserId) fetchUserData(currentUserId); 
+              if (currentRoomId) leaveCurrentRoom(); // 💉 현재 방 퇴장 처리
+              
+              // 💉 [핵심 수정] 목적지를 lobby에서 multiplay로 변경
+              setView('multiplay'); 
+            }} 
+          />
+        }
 
         {view === 'tutorial' && 
           <TutorialPage onBack={() => { playClickSound(); setView('lobby'); }} />}
@@ -1181,33 +1256,50 @@ export default function App() {
       <AdOverlay isOpen={showAdOverlay} onClose={() => { setShowAdOverlay(false); setPendingBestRound(null); }} onReward={handleAdContinueSuccess} />
       <ResultModal isOpen={showResultModal} mode={selectedOption} round={resultData.round} time={resultData.time} earnedCoins={resultData.coins} userCoins={userCoins} isNewRecord={resultData.isNewRecord} continueCount={continueCount} continueCost={CONTINUE_COST} onContinue={() => { if(userCoins >= CONTINUE_COST) { setUserCoins(c => c - CONTINUE_COST); setContinueCount(prev => prev - 1); setShowResultModal(false); } }} onRetry={() => { setShowResultModal(false); setRound(1); resetGameSession(0); setView('battle'); }} onLobby={() => { setShowResultModal(false); resetGameSession(); setView('modeSelect'); }} onShop={() => { setShowResultModal(false); setView('shop'); }} onWatchAd={() => setShowAdOverlay(true)} t={(key: string) => t('resultModal', key)}/>
 
+      {/* 1. 팝업 활성화 여부 확인: msgPopup.isOpen이 true일 때만 렌더링 시작 */}
       {msgPopup.isOpen && (
+
+        /* 2. 전체 화면 배경(Overlay): 화면을 꽉 채우고 뒷배경을 어둡고 흐리게(blur) 처리 */
         <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          
+          {/* 3. 모달 본체: 너비 제한(280px), 브랜드 컬러(주황) 테두리, 둥근 모서리, 부드러운 줌 애니메이션 */}
           <div className="w-full max-w-[280px] bg-zinc-900 border-2 border-[#FF9900] rounded-[40px] p-8 flex flex-col items-center text-center shadow-[0_0_50px_rgba(255,153,0,0.2)] animate-in zoom-in-95 duration-200">
+            
+            {/* 4. 제목(Title): 크고 굵은 이탤릭체로 강조 */}
             <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-3">{msgPopup.title}</h3>
+            
+            {/* 5. 부가 정보: '이어하기'나 '광고' 관련 팝업일 때만 보조 텍스트 출력 */}
             {(msgPopup.title === t('popup', 'msg_continue_title') || msgPopup.title === t('popup', 'msg_ad_start_title')) && (
               <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-6">{t('popup', 'msg_best_record_info')}</p>
             )}
+            
+            {/* 6. 메인 설명(Description): 줄바꿈(\n)을 지원하며, 이어하기 시 코인 아이콘을 함께 표시 */}
             <div className="flex items-center justify-center gap-3 mb-10">
               {msgPopup.title === t('popup', 'msg_continue_title') && <img src="/images/coin.png" alt="coin" className="w-6 h-6 object-contain" />}
-              <p className="text-2xl text-white font-black italic uppercase tracking-tighter whitespace-pre-line">{msgPopup.desc}</p>
+              <p className="text-2xl text-zinc-300 font-black italic uppercase tracking-tighter whitespace-pre-line">{msgPopup.desc}</p>
             </div>
+
+            {/* 7. 하단 버튼 영역: 확인/취소 버튼 배치 */}
             <div className="flex gap-3 w-full">
+              
+              {/* [왼쪽 버튼]: msgPopup.onConfirm(확인 후 실행할 함수)이 있을 때만 나타남 */}
               {msgPopup.onConfirm && (
                 <button 
-                  onClick={() => { if(canClickPopup) { playClickSound(); msgPopup.onConfirm?.(); } }} // 💉 사운드 추가
-                  disabled={!canClickPopup} 
-                  className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 
+                  onClick={() => { if(canClickPopup) { playClickSound(); msgPopup.onConfirm?.(); } }} 
+                  disabled={!canClickPopup} // 광클 방지 상태일 때 비활성화
+                  className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-600 
                     ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
                 >
                   {t('settings', 'confirm')}
                 </button>
               )}
+              
+              {/* [오른쪽 버튼]: 팝업을 닫거나 취소하는 기본 버튼. 확인 버튼 유무에 따라 스타일(색상, 너비)이 바뀜 */}
               <button 
-                onClick={() => { if(canClickPopup) { playClickSound(); setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null })); } }} // 💉 사운드 추가
+                onClick={() => { if(canClickPopup) { playClickSound(); setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null })); } }} 
                 disabled={!canClickPopup} 
-                className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-700 text-white border border-zinc-500
-                   ${msgPopup.onConfirm ? "flex-1 bg-zinc-900 text-white" : "w-full bg-[#FF9900] text-black"} 
+                className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all border border-zinc-600
+                  ${msgPopup.onConfirm ? "bg-zinc-800 text-white" : "w-full bg-[#FF9900] text-black"} 
                   ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
               >
                 {msgPopup.onConfirm ? t('settings', 'cancel') : t('settings', 'confirm')}
