@@ -62,6 +62,8 @@ export default function MultiGameEngine({
 
   // 1. 공격 상태 관리
   const [isFrozen, setIsFrozen] = useState(false);
+  const [flashingItem, setFlashingItem] = useState<string | null>(null);
+  const [freezeCount, setFreezeCount] = useState<number>(0);
 
   // 2. 💉 실시간 공격 감지 리스너 (useEffect 내부 또는 신규 추가)
   useEffect(() => {
@@ -71,14 +73,11 @@ export default function MultiGameEngine({
         event: 'UPDATE', 
         schema: 'public', 
         table: 'room_participants',
-        filter: `user_id=eq.${currentUserId}` // 내 레코드가 업데이트될 때만 감시
+        filter: `user_id=eq.${currentUserId}` 
       }, (payload) => {
-        console.log("🔥 공격 신호 감지!", payload.new); 
         const { effect_type, effect_at } = payload.new;
-        
-        // 🧊 3초 멈춤(stop) 공격을 받았을 때
         if (effect_type === 'stop' && effect_at) {
-          triggerStopEffect();
+          triggerStopEffect(); // 🧊 멈춤 공격 실행
         }
       })
       .subscribe();
@@ -86,19 +85,35 @@ export default function MultiGameEngine({
     return () => { supabase.removeChannel(channel); };
   }, [roomId, currentUserId]);
 
-  // 3. 💉 3초간 얼려버리는 함수
+  // 3. 💉 triggerStopEffect 함수 수정
   const triggerStopEffect = () => {
-    setIsFrozen(true);
-    playIceSound(); 
-    
+  // 1. 공격 아이콘 3회 깜빡임 (0.2초 * 3 = 0.6초)
+    setFlashingItem('stop');
+    if (typeof playIceSound === 'function') playIceSound();
+
     setTimeout(() => {
-      setIsFrozen(false);
-      // 💉 공격 효과 초기화 (DB)
-      supabase.from('room_participants')
-        .update({ effect_type: null, effect_at: null })
-        .eq('room_id', roomId)
-        .eq('user_id', currentUserId);
-    }, 3000);
+      setFlashingItem(null); // 깜빡임 종료
+      setFreezeCount(3);     // 버튼 사라지고 숫자 등장
+
+      // 2. 1초마다 카운트다운
+      const timer = setInterval(() => {
+        setFreezeCount((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            
+            // 3. 종료 후 DB 초기화 및 복구
+            supabase.from('room_participants')
+              .update({ effect_type: null, effect_at: null })
+              .eq('room_id', roomId)
+              .eq('user_id', currentUserId)
+              .then();
+            
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }, 600); // 깜빡임 완료 후 발동
   };
 
   const coinRef = useRef(0);
@@ -579,47 +594,76 @@ export default function MultiGameEngine({
 
 
 
-      {/* 4. 💉 하단 버튼 영역: z-index와 pointer-events 확인 */}
+      {/*  💉 하단 버튼영역 */}
+      
       <div className="w-full flex justify-center mt-auto flex-none px-4 pb-6 relative z-[20]">
-       
-        {/* 💉 첫 번째 3항 연산자의 끝에 반드시 ': null' 혹은 다른 UI가 있어야 합니다. */}
+        
+        {/* 💉 1. 아이콘 3회 깜빡임 오버레이 (가로 50% 크기) */}
+        {flashingItem && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none">
+            <img 
+              src={flashingItem === 'stop' ? "/images/itemStop3sec.png" : `/images/item${flashingItem}.png`}
+              className="w-1/2 aspect-square object-contain animate-[flash_0.2s_ease-in-out_3]"
+            />
+          </div>
+        )}
+
         {(!isEliminated && !isCleared) ? (
-          isMemoryPhase ? (
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); // App.tsx 클릭 이벤트 간섭 방지
-                playClickSound(); 
-                setIsMemoryPhase(false); 
-              }} 
-              /* 💉 pointer-events-auto를 추가하여 클릭 가능 상태 강제 */
-              className="w-full h-14 rounded-md font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse cursor-pointer pointer-events-auto"
-            >
-              OK, I got it
-            </button>
-          ) : (
-            /* 가위바위보 버튼 영역 (60% 너비 유지) */
-            <div className="flex gap-3 w-[60%] mb-2">
-              {['rock', 'paper', 'scissor'].map((type) => (
-                <button 
-                  key={type} 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0);
-                  }} 
-                  className={`flex-1 aspect-square rounded-3xl  active:scale-90 transition-all bg-zinc-900 pointer-events-auto ${
-                    type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 
-                    type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 
-                    'shadow-[0_0_15px_rgba(236,72,153,0.5)]'
-                  }`}
-                >
-                  <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
-                </button>
-              ))}
+          /* 💉 2. 멈춤 공격 카운트다운 상태일 때 */
+          freezeCount > 0 ? (
+            <div className="flex items-center justify-center h-24">
+              <span className="text-8xl font-black text-blue-500 italic animate-pulse drop-shadow-[0_0_15px_rgba(59,130,246,0.8)]">
+                {freezeCount}
+              </span>
             </div>
+          ) : (
+            /* 💉 3. 정상 상태 (기존 로직 유지) */
+            isMemoryPhase ? (
+              <button 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  playClickSound(); 
+                  setIsMemoryPhase(false); 
+                }} 
+                className="w-full h-14 rounded-md font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse cursor-pointer pointer-events-auto"
+              >
+                OK, I got it
+              </button>
+            ) : (
+              /* 가위바위보 버튼 영역 (60% 너비 유지) */
+              <div className="flex gap-3 w-[60%] mb-2">
+                {['rock', 'paper', 'scissor'].map((type) => (
+                  <button 
+                    key={type} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // 💉 멈춤 상태에서는 클릭 방지 (추가 안전장치)
+                      if (freezeCount > 0) return;
+                      handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0);
+                    }} 
+                    className={`flex-1 aspect-square rounded-3xl active:scale-90 transition-all bg-zinc-900 pointer-events-auto ${
+                      type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 
+                      type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 
+                      'shadow-[0_0_15px_rgba(236,72,153,0.5)]'
+                    }`}
+                  >
+                    <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )
           )
         ) : (
           null 
         )}
+
+        {/* 💉 4. 깜빡임 애니메이션 정의 */}
+        <style>{`
+          @keyframes flash {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0; transform: scale(1.1); }
+          }
+        `}</style>
       </div>
 
       {isFrozen && (

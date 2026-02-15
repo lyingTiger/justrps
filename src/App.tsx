@@ -52,6 +52,7 @@ export default function App() {
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [showAdLoading, setShowAdLoading] = useState(false);
 
+
   // 💉 방 만들기 아이템전 설정 저장용 상태
   const [isItemMode, setIsItemMode] = useState<boolean>(false);
   
@@ -140,6 +141,8 @@ export default function App() {
   // ------------------------------------------------------------------
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle' | 'info'>('lobby');  
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); 
+  // 💉 [신규 추가] 현재 방에 참여 중인 유저들의 목록을 저장합니다.
+  const [participants, setParticipants] = useState<any[]>([]);
   
   const [selectedOption, setSelectedOption] = useState<string>(
     localStorage.getItem('last_played_mode') || 'DRAW MODE'
@@ -153,6 +156,43 @@ export default function App() {
     best_rank: parseInt(localStorage.getItem('cached_best_rank') || '0'), 
     best_mode: localStorage.getItem('cached_best_mode') || '' 
   });
+
+
+  
+  // ------------------------------------------------------------------
+  // 💉 방 참가자 명단을 가져오고 실시간으로 업데이트하는 로직
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if (!currentRoomId) return;
+
+    // 1. 초기 명단 불러오기
+    const fetchParticipants = async () => {
+      const { data } = await supabase
+        .from('room_participants')
+        .select('*')
+        .eq('room_id', currentRoomId);
+      
+      if (data) setParticipants(data);
+    };
+
+    fetchParticipants();
+
+    // 2. 실시간 변화 감지 (누군가 라운드를 올리거나 아이템을 썼을 때)
+    const channel = supabase
+      .channel(`room_sync_${currentRoomId}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'room_participants', 
+        filter: `room_id=eq.${currentRoomId}` 
+      }, (payload) => {
+        // 💉 변화가 생기면 명단을 다시 불러와 participants 상태를 갱신합니다.
+        fetchParticipants();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentRoomId]);
 
 
 
@@ -1414,9 +1454,10 @@ export default function App() {
 
             // 💉 아이템 사용 시 실제 차감 로직
             onUseItem={async (itemType) => {
-              if (!currentUserId) return;
+              if (!currentUserId || !currentRoomId || !participants) return; // 💉 participants 추가 확인
+              
               try {
-                // 1. DB 차감 (RPC 호출)
+                // 1. DB 차감 (RPC 호출) - 기존 유지
                 await supabase.rpc('update_user_items', {
                   target_user_id: currentUserId,
                   stop_inc: itemType === 'stop' ? -1 : 0,
@@ -1425,28 +1466,44 @@ export default function App() {
                   heal_inc: itemType === 'heal' ? -1 : 0
                 });
 
-                // 2. 나를 제외한 모든 참가자에게 공격 신호 기록
-                // 공격 아이템일 경우에만 실행 (heal 제외)
+                // 🔥 [핵심 타겟팅 수술 시작]
                 if (itemType !== 'heal') {
-                  await supabase
+                  // 1등(가장 높은 라운드) 유저 찾기
+                  const sorted = [...participants].sort((a, b) => (b.current_round || 0) - (a.current_round || 0));
+                  const leaderId = sorted[0]?.user_id;
+                  const isMeLeader = leaderId === currentUserId;
+
+                  // 기본 쿼리 생성
+                  let query = supabase
                     .from('room_participants')
                     .update({ 
                       effect_type: itemType, 
                       effect_at: new Date().toISOString() 
                     })
-                    .eq('room_id', currentRoomId)
-                    .neq('user_id', currentUserId); // 💉 나만 빼고 공격!
-                }
+                    .eq('room_id', currentRoomId);
 
-                // 3. 로컬 상태 즉시 반영 (UI 업데이트용)
+                  // 조건부 타겟팅 적용
+                  if (isMeLeader) {
+                    // 💉 내가 1등이면: 나를 제외한 모든 참가자(광역 공격)
+                    query = query.neq('user_id', currentUserId);
+                  } else {
+                    // 💉 내가 1등이 아니면: 1등 유저에게만(저격 공격)
+                    query = query.eq('user_id', leaderId);
+                  }
+
+                  await query;
+                }
+                // 🔥 [핵심 타겟팅 수술 종료]
+
+                // 3. 로컬 상태 즉시 반영 (UI 업데이트용) - 기존 유지
                 setUserItems(prev => ({
                   ...prev,
                   [itemType]: Math.max(0, prev[itemType as keyof UserItems] - 1)
                 }));
 
-                console.log(`🚀 아이템 사용 차감 완료: ${itemType}`);
+                console.log(`🚀 아이템 사용 차감 및 공격 발송 완료: ${itemType}`);
               } catch (e) {
-                console.error("아이템 차감 중 오류 발생:", e);
+                console.error("아이템 처리 중 오류 발생:", e);
               }
             }}
 
