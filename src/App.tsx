@@ -51,6 +51,8 @@ export default function App() {
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [showAdLoading, setShowAdLoading] = useState(false);
 
+  // 💉 방 만들기 아이템전 설정 저장용 상태
+  const [isItemMode, setIsItemMode] = useState<boolean>(false);
   
   // App 컴포넌트 내부 상태 선언
   const [userItems, setUserItems] = useState<UserItems>({ stop: 0, switch: 0, color: 0, heal: 0 });
@@ -281,6 +283,26 @@ export default function App() {
     }
   };
 
+
+  // 💉 아이템 모드 설정 변경 시 Supabase(profiles)에 자동 저장하는 로직
+  useEffect(() => {
+      const saveUserPreferences = async () => {
+          if (!currentUserId) return;
+
+          await supabase
+              .from('profiles')
+              .update({
+                  last_selected_option: selectedOption,
+                  last_is_item_mode: isItemMode
+              })
+              .eq('id', currentUserId);
+      };
+
+      saveUserPreferences();
+  }, [selectedOption, isItemMode, currentUserId]);
+
+
+
   // ------------------------------------------------------------------
   // 💉 [데이터 로드] Supabase 프로필 및 통계 로드 (자가 치유 기능 포함)
   // ------------------------------------------------------------------
@@ -316,6 +338,14 @@ export default function App() {
       setUserNickname(newName);
       setUserCoins(newCoins);
       setAdFreeUntil(profile.ad_free_until);
+
+      // 💉 DB에서 마지막으로 선택했던 모드 설정을 가져와 상태에 주입합니다.
+      if (typeof setSelectedOption === 'function') {
+        setSelectedOption(profile.last_selected_option || 'normal');
+      }
+      if (typeof setIsItemMode === 'function') {
+        setIsItemMode(profile.last_is_item_mode ?? false);
+      }
 
       // 💉 DB에서 가져온 아이템 보유량을 상태값에 저장합니다.
       setUserItems({
@@ -604,6 +634,8 @@ export default function App() {
     } catch (err: any) { alert("Error: " + err.message); } finally { setLoading(false); }
   };
 
+
+
   // ------------------------------------------------------------------
   // 💉 [히스토리 제어] 뒤로 가기 버튼 감지 및 뷰 전환 동기화
   // ------------------------------------------------------------------
@@ -618,11 +650,32 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => { window.removeEventListener('popstate', handlePopState); };
   }, [view]);
+  
 
+  // 💉 멀티플레이 페이지에서 뒤로가기(스와이프) 시 모드 선택 화면으로 이동
+  useEffect(() => {
+    if (view === 'multiplay') {
+      // 1. 현재 히스토리에 가짜 지점을 하나 밀어넣어 '뒤로가기'가 가능하게 만듭니다.
+      window.history.pushState(null, '', window.location.href);
+
+      const handlePopState = () => {
+        // 2. 사용자가 스와이프(뒤로가기)를 하면 'modeSelect'로 뷰를 전환합니다.
+        setView('modeSelect');
+      };
+
+      // 브라우저 뒤로가기 이벤트 감시 시작
+      window.addEventListener('popstate', handlePopState);
+
+      return () => {
+        // 3. 멀티플레이 페이지를 벗어나면 감시를 중단합니다 (메모리 누수 방지)
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }
+  }, [view, setView]);
 
 
   // ------------------------------------------------------------------
-  // 💉 [수정] 새로운 효과음을 위한 Ref 추가
+  // 💉 새로운 효과음을 위한 Ref 추가
   // ------------------------------------------------------------------
   const tockBufferRef = useRef<AudioBuffer | null>(null);     // 정답 (tock.mp3)
   const whickBufferRef = useRef<AudioBuffer | null>(null);    // 라운드 클리어 (whick.mp3)
@@ -631,7 +684,7 @@ export default function App() {
 
 
   // ------------------------------------------------------------------
-  // 💉 [수정] 오디오 컨텍스트 준비 및 파일 사전 로드 (initAudio 업데이트)
+  // 💉 오디오 컨텍스트 준비 및 파일 사전 로드 (initAudio 업데이트)
   // ------------------------------------------------------------------
   useEffect(() => {
     const initAudio = async () => {
@@ -667,8 +720,10 @@ export default function App() {
     initAudio();
   }, []);
 
+
+
   // ------------------------------------------------------------------
-  // 💉 [신규] 효과음 재생 유틸리티 함수들 정의
+  // 💉 효과음 재생 유틸리티 함수들 정의
   // ------------------------------------------------------------------
   const playSound = (buffer: AudioBuffer | null) => {
     if (isMuted || !audioCtxRef.current || !buffer) return;
@@ -761,6 +816,8 @@ export default function App() {
     setTimeout(() => { window.location.reload(); }, 100);
   };
 
+
+
   // ------------------------------------------------------------------
   // 💉 [내비게이션] 메뉴 이동 전 세션 유효성 강제 검사
   // ------------------------------------------------------------------
@@ -775,6 +832,8 @@ export default function App() {
     setView(targetView);
   };
 
+
+
   // ------------------------------------------------------------------
   // 💉 [게임 초기화] 라운드 및 소요 시간 세팅 초기화
   // ------------------------------------------------------------------
@@ -785,6 +844,8 @@ export default function App() {
     setContinueCount(3);
     setGameKey(Date.now());
   };
+
+
 
   // ------------------------------------------------------------------
   // 💉 [오디오] 버튼 클릭 사운드 재생
@@ -800,6 +861,8 @@ export default function App() {
     gainNode.connect(audioCtxRef.current.destination);
     source.start(0);
   };
+
+
 
   // ------------------------------------------------------------------
   // 💉 [광고 제어] 게임 3판마다 전면 광고 호출 로직
@@ -1028,7 +1091,7 @@ export default function App() {
           
 
           {/* ------------------------------------------------------------------
-          💉 [신규] 카카오 로그인 버튼 추가 
+          💉 카카오 로그인 버튼 추가 
           ------------------------------------------------------------------ */}
           <button 
             type="button" 
@@ -1106,7 +1169,7 @@ export default function App() {
   // 💉 [메인 앱 화면] 로그인 후 노출되는 코어 레이아웃 (헤더 + 메인 + 오버레이)
   // ------------------------------------------------------------------
   return (
-    // 💉 [수정] 메인 앱 화면: 드래그 방지(select-none) 및 모바일 최적화 스타일 추가
+    // 💉 메인 앱 화면: 드래그 방지(select-none) 및 모바일 최적화 스타일 추가
     // ------------------------------------------------------------------
     <div 
     
@@ -1278,6 +1341,10 @@ export default function App() {
         {view === 'multiplay' && 
           <MultiplayPage 
           setCurrentRoomMode={setCurrentRoomMode}
+
+          isItemMode={isItemMode}           // 💉 현재 값 전달
+          setIsItemMode={setIsItemMode}     // 💉 값을 바꾸는 함수 전달
+
           selectedMode={selectedOption} 
           onBack={() => { playClickSound(); setView('modeSelect'); }} 
 

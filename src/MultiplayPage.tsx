@@ -9,15 +9,26 @@ interface MultiplayPageProps {
   t: (key: string) => string;
   onShowPopup: (title: string, desc: string) => void; // 팝업 제어 함수
   setCurrentRoomMode: (mode: 'normal' | 'item') => void;
+
+  isItemMode: boolean;               
+  setIsItemMode: (val: boolean) => void; 
 }
 
-export default function MultiplayPage({ selectedMode, onBack, onJoin, playClickSound, t, onShowPopup, setCurrentRoomMode, }: MultiplayPageProps) {
+export default function MultiplayPage({ 
+  selectedMode, 
+  onBack, 
+  onJoin, 
+  playClickSound, t, 
+  onShowPopup, 
+  setCurrentRoomMode, 
+  isItemMode, 
+  setIsItemMode 
+}: MultiplayPageProps) {
   const [rooms, setRooms] = useState<any[]>([]);
   const [searchName, setSearchName] = useState('');
   const [newRoomName, setNewRoomName] = useState('');
   const [password, setPassword] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(2);
-  const [isItemMode, setIsItemMode] = useState(false); 
 
   const [showPassModal, setShowPassModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
