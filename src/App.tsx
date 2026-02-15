@@ -877,8 +877,9 @@ export default function App() {
     // 💉 [수정] 메인 앱 화면: 드래그 방지(select-none) 및 모바일 최적화 스타일 추가
     // ------------------------------------------------------------------
     <div 
-      className="min-h-screen bg-black text-white flex flex-col font-sans select-none" // 💉 select-none 클래스 추가
-      onContextMenu={(e) => e.preventDefault()}
+    
+      className="min-h-screen bg-black text-white flex flex-col font-sans select-none overflow-x-hidden" 
+       onContextMenu={(e) => e.preventDefault()}
       style={{ 
         WebkitUserSelect: 'none',    /* Safari/Chrome 드래그 방지 */
         WebkitTouchCallout: 'none', /* 모바일 롱프레스 메뉴(복사 등) 방지 */
@@ -888,12 +889,12 @@ export default function App() {
       onClick={() => { setIsUserMenuOpen(false); setIsSettingsMenuOpen(false); }}
     >
       
+      
       {/* 💉 상단 헤더 섹션 (로고, 설정, 재화 표시) */}
-      <header className="w-full border-b border-zinc-800 bg-black sticky top-0 z-50">
-        {/* 내부 콘텐츠를 감싸는 600px 정렬용 div 추가 */}
+      {!(view === 'battle' || view === 'multiBattle') && (
+      <header className="w-full border-b border-zinc-800 bg-black sticky top-0 z-50 flex-none animate-in fade-in duration-300">
         <div className="max-w-[800px] w-full mx-auto p-6 flex justify-between items-center">
           
-          {/* [좌측] 로고 및 시스템 설정 영역 */}
           <div className="flex items-center gap-1">
             <div className="relative">
               <button 
@@ -915,7 +916,6 @@ export default function App() {
             </h2>
           </div>
 
-          {/* [우측] 유저 정보 및 재화 영역 */}
           <div className="flex items-center gap-5">
             <div className="relative">
               <button onClick={(e) => { e.stopPropagation(); playClickSound(); setIsUserMenuOpen(!isUserMenuOpen); }} className="font-bold text-sm tracking-tight text-zinc-300 hover:text-white transition-colors">
@@ -932,12 +932,16 @@ export default function App() {
               <span className="text-[#FF9900] font-bold text-sm tracking-tighter font-mono">{userCoins.toLocaleString()}</span>
             </div>
           </div>
-
-        </div> {/* 중앙 정렬 div 끝 */}
+        </div>
       </header>
+      )}
 
       {/* 💉 메인 메인 콘텐츠 렌더링 영역 */}
-      <main className="flex-1 flex flex-col items-center justify-start p-0">
+     {/* 💉 [수정] 메인 영역: min-h-[100dvh]를 주어 푸터를 아래로 밀어냄 */}
+      <main className={`flex-1 flex flex-col items-center justify-start p-0 min-h-[100dvh] ${
+        (view === 'battle' || view === 'multiBattle') ? 'overflow-hidden' : ''
+        }`}>
+
         {view === 'settings' && (
           <SettingsPage 
             userNickname={userNickname} setUserNickname={setUserNickname} onSaveNickname={(nick: string) => handleSaveNickname(nick)} 
@@ -1094,6 +1098,29 @@ export default function App() {
         onUpdateCoins={(newAmount) => { setUserCoins(newAmount); localStorage.setItem('cached_coins', newAmount.toString()); }} />} 
               
       </main>
+
+
+
+      {/* 💉 [신규] 웹 전용 푸터: 게임 중에는 숨기고, 평소에는 스크롤해야 보임 */}
+      {!(view === 'battle' || view === 'multiBattle') && (
+        <footer className="w-full py-16 bg-black border-t border-zinc-900 flex flex-col items-center justify-center gap-3 flex-none">
+          <div className="max-w-[360px] w-full text-center px-6">
+            <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
+              © 2026 just RPS. All Rights Reserved.
+            </p>
+            <div className="flex justify-center gap-6 text-zinc-500 text-[9px] font-bold uppercase tracking-widest mb-6">
+              <button className="hover:text-white transition-colors">Terms</button>
+              <button className="hover:text-white transition-colors">Privacy</button>
+              <button className="hover:text-white transition-colors">Contact</button>
+            </div>
+            <p className="text-zinc-800 text-[8px] font-mono tracking-tighter opacity-50">
+              Powered by Treasure Factory
+            </p>
+          </div>
+        </footer>
+      )}
+
+
 
       {/* 💉 오버레이 모달 및 시스템 팝업 렌더링 */}
       <AdOverlay isOpen={showAdOverlay} onClose={() => { setShowAdOverlay(false); setPendingBestRound(null); }} onReward={handleAdContinueSuccess} />

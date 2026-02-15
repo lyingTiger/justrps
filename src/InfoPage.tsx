@@ -6,6 +6,22 @@ interface InfoPageProps {
   totalCount: number;
 }
 
+const AppInfoFooter = () => (
+  <div className="mt-12 w-full pt-8 border-t border-zinc-800 flex flex-col items-center gap-4">
+    <div className="text-center">
+      <h4 className="text-zinc-500 text-[10px] font-black uppercase tracking-tighter mb-1">Developed by</h4>
+      <p className="text-white text-sm font-black italic uppercase">Treasure Factory</p>
+    </div>
+    
+    <div className="flex gap-4 text-zinc-600 text-[9px] font-bold uppercase">
+      <span>Terms of Service</span>
+      <span>Privacy Policy</span>
+    </div>
+
+    <p className="text-zinc-700 text-[8px] font-mono opacity-50">App Version 1.0.0 (2026)</p>
+  </div>
+);
+
 export default function InfoPage({ 
   onBack, 
   todayCount, 
