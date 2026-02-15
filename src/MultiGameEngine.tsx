@@ -40,9 +40,6 @@ export default function MultiGameEngine({
   onBackToLobby 
 }: MultiGameProps) {
 
-  // 🔍 [디버깅용 로그] 콘솔창(F12)에서 이 값이 true인지 확인해 보세요.
-  console.log("아이템전 여부:", isItemMatch);
-  console.log("보유 아이템:", userItems);
 
   // --- 상태 관리 ---
   const [currentRound, setCurrentRound] = useState(1);
@@ -54,6 +51,13 @@ export default function MultiGameEngine({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showResult, setShowResult] = useState(false);
+
+
+  // 이 코드는 isItemMatch나 userItems 값이 실제로 바뀔 때만 실행됩니다.
+  useEffect(() => {
+    console.log("✅ [아이템 모드 설정 확인]:", isItemMatch);
+    console.log("📦 [현재 인벤토리]:", userItems);
+  }, [isItemMatch, userItems]);
 
 
   // 1. 공격 상태 관리
@@ -69,6 +73,7 @@ export default function MultiGameEngine({
         table: 'room_participants',
         filter: `user_id=eq.${currentUserId}` // 내 레코드가 업데이트될 때만 감시
       }, (payload) => {
+        console.log("🔥 공격 신호 감지!", payload.new); 
         const { effect_type, effect_at } = payload.new;
         
         // 🧊 3초 멈춤(stop) 공격을 받았을 때
