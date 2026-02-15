@@ -24,7 +24,7 @@ interface UserItems {
 export default function App() {
 
   // ------------------------------------------------------------------
-  // 💉 [신규] 개발자 인증 상태 정의
+  // 💉 개발자 인증 상태 정의
   // ------------------------------------------------------------------
   const [isDevAuthorized, setIsDevAuthorized] = useState(false);
   const [tempCode, setTempCode] = useState('');
@@ -132,6 +132,8 @@ export default function App() {
     onConfirm: null 
   });
 
+
+
   // ------------------------------------------------------------------
   // 💉 [게임 엔진 제어] 뷰 전환, 라운드, 통계 데이터 관리
   // ------------------------------------------------------------------
@@ -151,8 +153,10 @@ export default function App() {
     best_mode: localStorage.getItem('cached_best_mode') || '' 
   });
 
+
+
   // ------------------------------------------------------------------
-  // 💉 [수정] 오디오 설정 상태: 저장된 값이 있으면 불러오고, 없으면 기본값 사용
+  // 💉 오디오 설정 상태: 저장된 값이 있으면 불러오고, 없으면 기본값 사용
   // ------------------------------------------------------------------
   const [volume, setVolume] = useState(
     parseFloat(localStorage.getItem('app_volume') || '0.5')
@@ -160,6 +164,8 @@ export default function App() {
   const [isMuted, setIsMuted] = useState(
     localStorage.getItem('app_isMuted') === 'true'
   );
+
+
 
   // ------------------------------------------------------------------
   // 💉 [인증 & 광고] 로그인 폼, 결과 데이터, 광고 제어 상태
@@ -175,7 +181,6 @@ export default function App() {
   const [continueCount, setContinueCount] = useState(3);
   const [sessionCoins, setSessionCoins] = useState(0); 
   const CONTINUE_COST = 50;
-
 
   // 세션 보상 저장 함수 (아이템 포함)
   const saveSessionRewards = async () => {
@@ -211,8 +216,6 @@ export default function App() {
     }
   };
 
-
-
   const [adFreeUntil, setAdFreeUntil] = useState<string | null>(null); 
   const [playCount, setPlayCount] = useState(0); 
   const [pendingBestRound, setPendingBestRound] = useState<number | null>(null); 
@@ -223,6 +226,8 @@ export default function App() {
   const clickBufferRef = useRef<AudioBuffer | null>(null);
   const startBufferRef = useRef<AudioBuffer | null>(null);
   const [canClickPopup, setCanClickPopup] = useState(false);
+
+
 
   // ------------------------------------------------------------------
   // 💉 [유저 상태 초기화] 로그아웃 시 클라이언트 상태 청소
@@ -386,7 +391,7 @@ export default function App() {
 
 
   // ------------------------------------------------------------------
-  // 💉 [수정 완료] 보안 시스템: 독립된 useEffect로 완벽 분리
+  // 💉 보안 시스템: 독립된 useEffect로 완벽 분리
   // ------------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -409,7 +414,7 @@ export default function App() {
 
 
   // ------------------------------------------------------------------
-  // 💉 [수정] 히스토리 제어: 뒤로 가기 제스처 시 의도치 않은 이동 방지
+  // 💉 히스토리 제어: 뒤로 가기 제스처 시 의도치 않은 이동 방지
   // ------------------------------------------------------------------
   useEffect(() => {
   // 1. 히스토리 스택 쌓기
@@ -528,8 +533,6 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [msgPopup.isOpen]);
-
-
 
 
     // 💉 [교체 1] 방문자 통계 관리: 중복 방지 로직 포함
@@ -737,9 +740,19 @@ export default function App() {
     source.start(0);
   };
 
-  const playTockSound = () => playSound(tockBufferRef.current);
-  const playWhickSound = () => playSound(whickBufferRef.current);
-  const playBeepSound = () => playSound(beepBufferRef.current);
+    const playTockSound = () => playSound(tockBufferRef.current);
+    const playWhickSound = () => playSound(whickBufferRef.current);
+    const playBeepSound = () => playSound(beepBufferRef.current);
+    const playIceSound = () => {
+    try {
+      const audio = new Audio('/sounds/ice.mp3');
+      audio.volume = 0.5; // 너무 클 수 있으니 조절
+      audio.play().catch(e => console.log("사운드 재생 차단됨:", e));
+    } catch (e) {
+      console.error("사운드 파일 로드 실패:", e);
+    }
+  };
+
 
 
   // ------------------------------------------------------------------
@@ -773,7 +786,7 @@ export default function App() {
 
 
   // ------------------------------------------------------------------
-  // 💉 [신규] 카카오 계정 간편 로그인 핸들러 (handleGoogleLogin 아래에 추가)
+  // 💉 [카카오 계정 간편 로그인 핸들러 (handleGoogleLogin 아래에 추가)
   // ------------------------------------------------------------------
   const handleKakaoLogin = async () => {
     try {
@@ -877,7 +890,6 @@ export default function App() {
   };
 
 
-
   
   // ------------------------------------------------------------------
   // 💉 [게임 로직] 결과 처리 및 신기록 DB 업서트 핸들러
@@ -965,6 +977,8 @@ export default function App() {
     }
   };
 
+
+
   // ------------------------------------------------------------------
   // 💉 [광고 로직] 보상형 광고 시청 완료 후 이어하기 처리 핸들러
   // ------------------------------------------------------------------
@@ -981,7 +995,6 @@ export default function App() {
     setContinueCount(prev => prev - 1);
     setShowResultModal(false);
   };
-
 
   const handleAdExited = () => {
     setMsgPopup({
@@ -1007,7 +1020,7 @@ export default function App() {
       <div className="min-h-screen bg-black flex items-start justify-center pt-20">
 
       {/* ------------------------------------------------------------------
-            ✨ [신규] 개발자 코드 입력 팝업 (인증 전 노출)
+            ✨ 개발자 코드 입력 팝업 (인증 전 노출)
            ------------------------------------------------------------------ */}
           {!isDevAuthorized && (
             <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
@@ -1056,8 +1069,6 @@ export default function App() {
 
 
           
-
-
           <form onSubmit={handleAuthSubmit} className="space-y-4">
             <input type="email" placeholder={t('main', 'email_placeholder')} value={email} onChange={(e) => setEmail(e.target.value)} 
             className="mt-10 w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
@@ -1165,9 +1176,8 @@ export default function App() {
     );
   }
 
-  // ------------------------------------------------------------------
-  // 💉 [메인 앱 화면] 로그인 후 노출되는 코어 레이아웃 (헤더 + 메인 + 오버레이)
-  // ------------------------------------------------------------------
+
+
   return (
     // 💉 메인 앱 화면: 드래그 방지(select-none) 및 모바일 최적화 스타일 추가
     // ------------------------------------------------------------------
@@ -1408,7 +1418,20 @@ export default function App() {
                   heal_inc: itemType === 'heal' ? -1 : 0
                 });
 
-                // 2. 로컬 상태 즉시 반영 (UI 업데이트용)
+                // 2. 나를 제외한 모든 참가자에게 공격 신호 기록
+                // 공격 아이템일 경우에만 실행 (heal 제외)
+                if (itemType !== 'heal') {
+                  await supabase
+                    .from('room_participants')
+                    .update({ 
+                      effect_type: itemType, 
+                      effect_at: new Date().toISOString() 
+                    })
+                    .eq('room_id', currentRoomId)
+                    .neq('user_id', currentUserId); // 💉 나만 빼고 공격!
+                }
+
+                // 3. 로컬 상태 즉시 반영 (UI 업데이트용)
                 setUserItems(prev => ({
                   ...prev,
                   [itemType]: Math.max(0, prev[itemType as keyof UserItems] - 1)
@@ -1420,7 +1443,7 @@ export default function App() {
               }
             }}
 
-
+            playIceSound={playIceSound}
             playClickSound={playClickSound} 
             playBeepSound={playBeepSound}
             onSaveRewards={saveSessionRewards}

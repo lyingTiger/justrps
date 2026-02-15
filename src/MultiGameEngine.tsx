@@ -17,6 +17,7 @@ interface MultiGameProps {
   isItemMatch: boolean; // 💉 아이템전 여부 추가
   userItems: { stop: number; switch: number; color: number; heal: number };
   onUseItem: (itemType: string) => void; // 아이템 사용 서버 전송용
+  playIceSound: () => void;
 }
 
 
@@ -31,6 +32,7 @@ export default function MultiGameEngine({
   sessionItems,
   playClickSound, 
   playBeepSound, 
+  playIceSound,
   onSaveRewards, 
   onEarnCoin, 
   onRoundClear,
@@ -52,6 +54,47 @@ export default function MultiGameEngine({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showResult, setShowResult] = useState(false);
+
+
+  // 1. 공격 상태 관리
+  const [isFrozen, setIsFrozen] = useState(false);
+
+  // 2. 💉 실시간 공격 감지 리스너 (useEffect 내부 또는 신규 추가)
+  useEffect(() => {
+    const channel = supabase
+      .channel(`room_attacks_${roomId}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'room_participants',
+        filter: `user_id=eq.${currentUserId}` // 내 레코드가 업데이트될 때만 감시
+      }, (payload) => {
+        const { effect_type, effect_at } = payload.new;
+        
+        // 🧊 3초 멈춤(stop) 공격을 받았을 때
+        if (effect_type === 'stop' && effect_at) {
+          triggerStopEffect();
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [roomId, currentUserId]);
+
+  // 3. 💉 3초간 얼려버리는 함수
+  const triggerStopEffect = () => {
+    setIsFrozen(true);
+    playIceSound(); 
+    
+    setTimeout(() => {
+      setIsFrozen(false);
+      // 💉 공격 효과 초기화 (DB)
+      supabase.from('room_participants')
+        .update({ effect_type: null, effect_at: null })
+        .eq('room_id', roomId)
+        .eq('user_id', currentUserId);
+    }, 3000);
+  };
 
   const coinRef = useRef(0);
   
@@ -531,10 +574,10 @@ export default function MultiGameEngine({
 
 
 
-      {/* 4. 💉 [수정] 하단 버튼 영역: z-index와 pointer-events 확인 */}
+      {/* 4. 💉 하단 버튼 영역: z-index와 pointer-events 확인 */}
       <div className="w-full flex justify-center mt-auto flex-none px-4 pb-6 relative z-[20]">
        
-        {/* 💉 [수정] 첫 번째 3항 연산자의 끝에 반드시 ': null' 혹은 다른 UI가 있어야 합니다. */}
+        {/* 💉 첫 번째 3항 연산자의 끝에 반드시 ': null' 혹은 다른 UI가 있어야 합니다. */}
         {(!isEliminated && !isCleared) ? (
           isMemoryPhase ? (
             <button 
@@ -573,6 +616,20 @@ export default function MultiGameEngine({
           null 
         )}
       </div>
+
+      {isFrozen && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-blue-400/30 backdrop-blur-md pointer-events-auto animate-in fade-in duration-300">
+          <div className="relative">
+            {/* 🧊 얼음 아이콘 애니메이션 */}
+            <img src="/images/itemStop3sec.png" className="w-32 h-32 object-contain animate-pulse" />
+            <div className="absolute inset-0 bg-gradient-to-t from-blue-500/50 to-transparent rounded-full filter blur-xl animate-ping" />
+          </div>
+          <h2 className="mt-6 text-4xl font-black text-white italic drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] uppercase">
+            Frozen!
+          </h2>
+          <p className="text-blue-100 font-bold mt-2">3 Seconds...</p>
+        </div>
+      )}
 
       <MultiResultModal 
         isOpen={showResult} 
