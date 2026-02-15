@@ -14,6 +14,13 @@ import InfoPage from './InfoPage';
 import { useState, useEffect, useRef } from 'react';
 import { translations } from './constants/translations'; 
 
+interface UserItems {
+  stop: number;
+  switch: number;
+  color: number;
+  heal: number;
+}
+
 export default function App() {
 
   // ------------------------------------------------------------------
@@ -42,6 +49,10 @@ export default function App() {
   const lastFetchedId = useRef<string | null>(null);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [showAdLoading, setShowAdLoading] = useState(false);
+
+  // App 컴포넌트 내부 상태 선언
+  const [userItems, setUserItems] = useState<UserItems>({ stop: 0, switch: 0, color: 0, heal: 0 });
+  const [sessionItems, setSessionItems] = useState<UserItems>({ stop: 0, switch: 0, color: 0, heal: 0 });
 
 
   // 1. 비밀번호 변경 핸들러
@@ -160,24 +171,42 @@ export default function App() {
   const [sessionCoins, setSessionCoins] = useState(0); 
   const CONTINUE_COST = 50;
 
-  // 서버에 획득한 코인을 최종 저장하는 함수
+
+  // 세션 보상 저장 함수 (아이템 포함)
   const saveSessionRewards = async () => {
-  if (sessionCoins <= 0) return;
+    // 코인이나 아이템 중 하나라도 획득한 게 있을 때만 실행
+    const hasItemRewards = Object.values(sessionItems).some(v => v > 0);
+    if (sessionCoins <= 0 && !hasItemRewards) return;
 
     try {
-      // 서버 RPC 호출: 임시 적립된 코인을 실제 유저 DB에 반영
-      const { error } = await supabase.rpc('increment_coin', { amount: sessionCoins });
-      
-      if (!error) {
-        console.log(`✅ ${sessionCoins} 코인이 서버에 안전하게 저장되었습니다.`);
-        // 저장 성공 후 세션 초기화 및 로컬 UI 갱신
-        if (currentUserId) fetchUserData(currentUserId); 
-        setSessionCoins(0); 
+      // 코인 저장 (기존 RPC 유지)
+      if (sessionCoins > 0) {
+        await supabase.rpc('increment_coin', { amount: sessionCoins });
       }
+
+      // 아이템 저장 (1단계에서 만든 RPC 호출)
+      if (hasItemRewards) {
+        await supabase.rpc('update_user_items', {
+          target_user_id: currentUserId,
+          stop_inc: sessionItems.stop,
+          switch_inc: sessionItems.switch,
+          color_inc: sessionItems.color,
+          heal_inc: sessionItems.heal
+        });
+      }
+      
+      console.log(`✅ 보상 저장 완료: 코인 ${sessionCoins}, 아이템 저장됨`);
+      
+      // UI 및 상태 갱신
+      if (currentUserId) fetchUserData(currentUserId); 
+      setSessionCoins(0);
+      setSessionItems({ stop: 0, switch: 0, color: 0, heal: 0 }); // 💉 아이템 세션 초기화
     } catch (e) {
-      console.error("코인 저장 중 오류 발생:", e);
+      console.error("보상 저장 중 오류 발생:", e);
     }
   };
+
+
 
   const [adFreeUntil, setAdFreeUntil] = useState<string | null>(null); 
   const [playCount, setPlayCount] = useState(0); 
@@ -277,11 +306,23 @@ export default function App() {
         setUserCoins(0);
         return;
       }
+
+      
       const newName = profile.display_name || 'Player';
       const newCoins = profile.coins || 0;
       setUserNickname(newName);
       setUserCoins(newCoins);
       setAdFreeUntil(profile.ad_free_until);
+
+      // 💉 DB에서 가져온 아이템 보유량을 상태값에 저장합니다.
+      setUserItems({
+        stop: profile.item_stop || 0,
+        switch: profile.item_switch || 0,
+        color: profile.item_color || 0,
+        heal: profile.item_heal || 0
+      });
+
+
       localStorage.setItem('cached_nickname', newName);
       localStorage.setItem('cached_coins', newCoins.toString());  
 
@@ -296,6 +337,17 @@ export default function App() {
         localStorage.setItem('cached_best_mode', newStats.best_mode);
       };
     } catch (err: any) { console.error(err); }
+  };
+
+
+  // 💉 아이템 획득 확률 계산 함수 (2%)
+  const rollForItem = () => {
+    const isHit = Math.random() < 1; // 2% 확률 (0.02)
+    if (!isHit) return null;
+
+    const itemTypes: (keyof UserItems)[] = ['stop', 'switch', 'color', 'heal'];
+    const randomIndex = Math.floor(Math.random() * itemTypes.length);
+    return itemTypes[randomIndex];
   };
 
 
@@ -1281,7 +1333,20 @@ export default function App() {
             // 💉 즉시 서버에 저장하지 않고, 세션 상태값만 올림
             onEarnCoin={() => setSessionCoins(prev => prev + 1)} 
             
-            onRoundClear={(next) => { playWhickSound(); setRound(next); }}
+
+            onRoundClear={(next) => { 
+              playWhickSound(); 
+              setRound(next);
+              
+              // 💉 라운드 클리어 시 2% 확률로 아이템 획득 시도
+              const newItem = rollForItem();
+              if (newItem) {
+                setSessionItems(prev => ({ ...prev, [newItem]: prev[newItem] + 1 }));
+                console.log(`🎁 아이템 획득: ${newItem}`);
+              }
+            }}
+
+
             onGameOver={(r, t) => { playBeepSound(); handleGameOver(r, t); }}
             
             // 💉 로고 클릭 시 로비로 가기 전 서버에 저장
@@ -1344,7 +1409,8 @@ export default function App() {
         mode={selectedOption} 
         round={resultData.round} 
         time={resultData.time} 
-        earnedCoins={sessionCoins} // 💉 기존 resultData.coins 대신 현재 세션 코인 전달
+        earnedCoins={sessionCoins}
+        sessionItems={sessionItems} // 💉 기존 resultData.coins 대신 현재 세션 코인 전달
         userCoins={userCoins} 
         isNewRecord={resultData.isNewRecord} 
         continueCount={continueCount} 

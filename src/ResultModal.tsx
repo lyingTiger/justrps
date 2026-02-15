@@ -7,6 +7,7 @@ interface ResultModalProps {
   time: number;
   earnedCoins: number;
   userCoins: number;
+  sessionItems: { stop: number; switch: number; color: number; heal: number };
   isNewRecord: boolean;
   continueCount: number;
   continueCost: number;
@@ -21,11 +22,14 @@ interface ResultModalProps {
 }
 
 export default function ResultModal({ 
-  isOpen, mode, round, time, earnedCoins, userCoins, isNewRecord, 
+  isOpen, mode, round, time, earnedCoins, sessionItems, userCoins, isNewRecord, 
   continueCount, continueCost, onContinue, onRetry, onLobby, onShop,
   onWatchAd, t,playClickSound,
   onSaveRewards
 }: ResultModalProps) {
+  // 💉 획득한 아이템이 있는지 확인하는 헬퍼
+  const hasItems = Object.values(sessionItems).some(count => count > 0);
+
   if (!isOpen) return null;
 
   // 💉 [로직 보존] 모드 텍스트 번역 처리를 위한 키 추출
@@ -36,53 +40,98 @@ export default function ResultModal({
       <div className="w-full max-w-[340px] bg-zinc-900 border-2 border-zinc-800 rounded-[40px] p-8 shadow-[0_0_60px_rgba(0,0,0,0.8)] flex flex-col items-center animate-in zoom-in-95 duration-300">
         
         {/* 1. 상단 그룹: Game Over & Mode */}
-        <div className="w-full text-center mb-4">
-            <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter leading-none mb-5">
-                {/* 💉 번역 적용: Game Over */}
+        <div className="w-full text-center mb-0">
+            <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter leading-none mb-2">
                 {t('game_over')}
             </h2>
-            <p className="text-4xl -mb-5 font-black text-[#FF9900] italic uppercase tracking-tighter leading-none text-center">
-                {/* 💉 번역 적용: 모드명 (기존 접미사 로직 유지) */}
+            <p className="text-4xl -mb-2 font-black text-[#FF9900] italic uppercase tracking-tighter leading-none text-center">
                 {t(modeKey)}{t('mode_suffix')}
             </p>
         </div>
 
-        {/* 2. 중앙 그룹: ROUND */}
-        <div className="relative my-8 text-center">
-          <div className="text-8xl font-black text-white leading-none tracking-tighter">
-            {round}
+        {/* 💉 2 & 3 통합 그룹: ROUND(L) + DATA STACK(R) */}
+        <div className="w-full flex justify-between items-center mt-8 mb-0 px-1 relative"> 
+        {/* 기존에는 my-8 이었으나, mb(margin-bottom) 값을 줄여서 아래 아이템 영역과 붙입니다. */}
+          
+          {/* [L] 라운드 숫자와 'R' 표시 */}
+          <div className="flex items-baseline gap-1">
+            <span className="text-8xl font-black text-white leading-none tracking-tighter">
+              {round}
+            </span>
+            <span className="text-4xl font-black text-white italic uppercase tracking-tighter">
+              R
+            </span>
           </div>
-          <div className="text-2xl font-black text-white uppercase italic tracking-widest mt-[-5px]">
-            {/* 💉 번역 적용: ROUND */}
-            {t('round_label')}
+
+          {/* [R] 3줄 데이터 스택 (위아래 정렬) */}
+          <div className="flex flex-col items-end gap-1">
+            {/* 1열: 진입 시간 라벨 */}
+            <span className="text-zinc-500 text-[10px] font-black uppercase tracking-widest leading-none">
+              {/* 💉 '클리어 타임' 대신 '진입 시간' (번역 키가 없다면 직접 텍스트로 표시 가능) */}
+              {t('entry_time') || "진입 시간"}
+            </span>
+            {/* 2열: 시간 기록 */}
+            <span className="text-white font-mono font-bold text-2xl leading-none">
+              {time.toFixed(2)}{t('time_suffix')}
+            </span>
+            {/* 3열: 획득 코인 (기존 스타일 유지) */}
+            <div className="flex items-center gap-1.5 mt-1">
+              <img src="/images/coin.png" className="w-5 h-5 object-contain" alt="coin" />
+              <span className="text-2xl font-black text-white italic leading-none">
+                +{earnedCoins}
+              </span>
+            </div>
           </div>
+
+          {/* 신기록 배지 (위치 조정) */}
           {isNewRecord && (
-            <div className="absolute -top-6 -right-10 bg-[#FF9900] text-black text-[10px] font-black px-3 py-1 rounded-full uppercase shadow-[0_0_20px_#FF9900] animate-bounce">
-              {/* 💉 번역 적용: New Record! */}
+            <div className="absolute -top-6 left-0 bg-[#FF9900] text-black text-[10px] font-black px-3 py-1 rounded-full uppercase shadow-[0_0_20px_#FF9900] animate-bounce">
               {t('new_record')}
             </div>
           )}
         </div>
 
-        {/* 3. 하단 그룹: 데이터 (스탯 정보) */}
-        <div className="w-full space-y-3 mb-6 bg-black/30 p-4 rounded-3xl border border-zinc-700">
-          <div className="flex justify-between items-center px-1">
-            {/* 💉 번역 적용: Clear Time */}
-            <span className="text-zinc-500 text-sm font-bold uppercase tracking-widest">{t('clear_time')}</span>
-            {/* 💉 번역 적용: 시간 접미사 (s -> 초) */}
-            <span className="text-white font-mono font-bold text-lg">{time.toFixed(2)}{t('time_suffix')}</span>
-          </div>
-          <div className="flex justify-between items-center px-1">
-            {/* 💉 번역 적용: Earned */}
-            <span className="text-zinc-500 text-sm font-bold uppercase tracking-widest">{t('earned')}</span>
-            <div className="flex items-center gap-1">
-              <span className="text-[#FF9900] font-mono font-bold text-lg">+{earnedCoins}</span>
-              <img src="/images/coin.png" alt="coin" className="w-4 h-4 object-contain" />
+        {/* 4. 아이템 영역: 기존 위치 유지하되 내부 여백 조절 */}
+        {hasItems && (
+          <div className="w-full mb-3  p-5">
+            <div className="flex justify-center gap-4">
+              {sessionItems.stop > 0 && (
+                <div className="relative">
+                  <img src="/images/itemStop3sec.png" className="w-10 h-10 object-contain" alt="stop" />
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white">
+                    {sessionItems.stop}
+                  </span>
+                </div>
+              )}
+              {sessionItems.switch > 0 && (
+                <div className="relative">
+                  <img src="/images/itemSwitchBtn.png" className="w-10 h-10 object-contain" alt="switch" />
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white">
+                    {sessionItems.switch}
+                  </span>
+                </div>
+              )}
+              {sessionItems.color > 0 && (
+                <div className="relative">
+                  <img src="/images/itemColor.png" className="w-10 h-10 object-contain" alt="color" />
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white">
+                    {sessionItems.color}
+                  </span>
+                </div>
+              )}
+              {sessionItems.heal > 0 && (
+                <div className="relative">
+                  <img src="/images/itemHeal.png" className="w-10 h-10 object-contain" alt="heal" />
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white">
+                    {sessionItems.heal}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        )}
 
-        {/* 4. 최하단: 이어하기 & 버튼 그룹 */}
+        {/* 5. 최하단: 이어하기 & 버튼 그룹 (기존 유지) */}
         <div className="w-full flex flex-col items-center">
             
             {/* 이어하기 섹션 */}
