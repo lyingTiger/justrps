@@ -38,6 +38,10 @@ export default function MultiGameEngine({
   onBackToLobby 
 }: MultiGameProps) {
 
+  // 🔍 [디버깅용 로그] 콘솔창(F12)에서 이 값이 true인지 확인해 보세요.
+  console.log("아이템전 여부:", isItemMatch);
+  console.log("보유 아이템:", userItems);
+
   // --- 상태 관리 ---
   const [currentRound, setCurrentRound] = useState(1);
   const [playTime, setPlayTime] = useState(0); 
@@ -412,7 +416,7 @@ export default function MultiGameEngine({
           <span className={`text-[10px] font-black uppercase flex items-center gap-1 ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : 'text-zinc-500'}`}>
              {p.is_dead && "💀"} {p.profiles?.display_name}
           </span>
-          <span className={`text-xs font-mono font-bold ${p.is_dead ? 'text-red-900' : 'text-white'}`}>
+          <span className={`text-xs font-mono mr-5 font-bold ${p.is_dead ? 'text-red-900' : 'text-white'}`}>
             {p.is_dead ? "FAIL" : `Round ${p.current_round || 1}`}
           </span>
         </div>

@@ -41,7 +41,7 @@ export default function App() {
   // ------------------------------------------------------------------
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentRoomMode, setCurrentRoomMode] = useState<'normal' | 'item'>('normal');
+  const [currentRoomMode, setCurrentRoomMode] = useState<string>('normal');
   const [userNickname, setUserNickname] = useState(localStorage.getItem('cached_nickname') || 'Loading...');
   const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached_coins') || '0'));
   const [showResultModal, setShowResultModal] = useState(false);
@@ -1277,6 +1277,7 @@ export default function App() {
 
         {view === 'multiplay' && 
           <MultiplayPage 
+          setCurrentRoomMode={setCurrentRoomMode}
           selectedMode={selectedOption} 
           onBack={() => { playClickSound(); setView('modeSelect'); }} 
 
@@ -1322,8 +1323,9 @@ export default function App() {
             userNickname={userNickname} 
             sessionCoins={sessionCoins} 
             sessionItems={sessionItems}
-            isItemMatch={currentRoomMode === 'item'}
-            userItems={userItems}
+            isItemMatch={currentRoomMode === 'item' || currentRoomMode === 'ITEM'} 
+            userItems={userItems || { stop: 0, switch: 0, color: 0, heal: 0 }}
+            
 
 
             // 💉 아이템 사용 시 실제 차감 로직
