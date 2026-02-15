@@ -340,7 +340,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   if (isLoading) return <div className="text-white text-center mt-20 animate-pulse">Loading Battle...</div>;
 
   return (
-    <div className="w-full max-w-[360px] mx-auto flex flex-col h-screen justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden select-none">
+    <div className="w-full max-w-[360px] flex flex-col h-[100dvh] justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto">
     
     {/* 1. 헤더 영역 */}
     <div className="w-full flex justify-between items-start flex-none mb-4 px-4">

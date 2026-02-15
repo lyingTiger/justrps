@@ -160,7 +160,7 @@ export default function GameEngine({
   };
 
   return (
-    <div className="w-full max-w-[360px] flex flex-col h-screen justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto">     
+    <div className="w-full max-w-[360px] flex flex-col h-[100dvh] justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto">    
 
       {/* 1. 헤더 영역 (로고 및 라운드 정보) - 고정 높이 */}
       <div className="w-full flex justify-between items-start flex-none mb-6 px-4">
@@ -188,10 +188,10 @@ export default function GameEngine({
 
 
       {/* 2. 💉 [수정] 문제 영역: flex-1을 주어 버튼 위쪽까지 공간을 모두 확장 */}
-    <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center justify-center min-h-0">
-      {/* justify-center를 추가하여 문제가 적을 때는 중앙에, 많을 때는 위에서부터 스크롤되게 함 */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center justify-center min-h-0">
+        {/* justify-center를 추가하여 문제가 적을 때는 중앙에, 많을 때는 위에서부터 스크롤되게 함 */}
 
-      {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
+        {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
         <div className="text-center mb-8 flex-none">
           <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
             {/* 💉 텍스트 번역 적용: WIN, DRAW, LOSE */}
@@ -214,52 +214,52 @@ export default function GameEngine({
 
         {/* 문제 아이콘 리스트 - 이제 flex-1 내부에서 더 넓은 공간을 가짐 */}
         <div className="flex flex-wrap justify-center gap-3 mb-10 w-full px-4">
-  {aiSelect.map((hand, i) => { // 💉 [수정] '('를 '{'로 변경 (변수 선언을 위해)
-    const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
-    const isCurrent = i === questionTurn && !isMemoryPhase;
-    const showDetails = isMemoryPhase || isSolved;
+          {aiSelect.map((hand, i) => { // 💉 [수정] '('를 '{'로 변경 (변수 선언을 위해)
+            const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
+            const isCurrent = i === questionTurn && !isMemoryPhase;
+            const showDetails = isMemoryPhase || isSolved;
 
-    return ( // 💉 명시적 return 필요
-      <div key={i} className="relative flex flex-col items-center">
+          return ( // 💉 명시적 return 필요
+            <div key={i} className="relative flex flex-col items-center">
 
-        {/* 💉 EXPERT MODE 조건명 */}
-        {isCurrent && mode === 'EXPERT MODE' && (
-          <span className="absolute -top-7 text-[16px] font-black text-white ">
-            {t(targetConditions[i])}
-          </span>
-        )}
-
-        {/* 💉 문제 아이콘 컨테이너 */}
-        <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900 ${
-          showDetails ? (
-            hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : 
-            hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 
-            'shadow-[0_0_12px_rgba(34,197,94,0.7)]'
-          ) : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'
-        }`}>
-
-          {/* 💉 이미지 출력 로직 */}
-          {isMemoryPhase ? (
-            <img 
-              src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} 
-              className="w-full h-full object-cover" 
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              {isSolved && (
-                <img 
-                  src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} 
-                  className="w-full h-full object-cover opacity-100" // 💉 유저 요청대로 opacity-100 적용
-                />
+              {/* 💉 EXPERT MODE 조건명 */}
+              {isCurrent && mode === 'EXPERT MODE' && (
+                <span className="absolute -top-7 text-[16px] font-black text-white ">
+                  {t(targetConditions[i])}
+                </span>
               )}
+
+              {/* 💉 문제 아이콘 컨테이너 */}
+              <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900 ${
+                showDetails ? (
+                  hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : 
+                  hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 
+                  'shadow-[0_0_12px_rgba(34,197,94,0.7)]'
+                ) : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'
+              }`}>
+
+                {/* 💉 이미지 출력 로직 */}
+                {isMemoryPhase ? (
+                  <img 
+                    src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} 
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    {isSolved && (
+                      <img 
+                        src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} 
+                        className="w-full h-full object-cover opacity-100" // 💉 유저 요청대로 opacity-100 적용
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+          );
+          })} 
         </div>
       </div>
-    );
-    })} {/* 💉 [수정] ')'를 '}'로 닫음 */}
-  </div>
-</div>
 
 
 
@@ -291,7 +291,7 @@ export default function GameEngine({
           ))}
         </div>
       )}
-    </div>
+      </div>
     </div>
   );
 }

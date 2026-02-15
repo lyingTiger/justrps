@@ -878,7 +878,7 @@ export default function App() {
     // ------------------------------------------------------------------
     <div 
     
-      className="min-h-screen bg-black text-white flex flex-col font-sans select-none overflow-x-hidden" 
+      className="min-h-[100dvh] bg-black text-white flex flex-col font-sans select-none overflow-x-hidden" 
        onContextMenu={(e) => e.preventDefault()}
       style={{ 
         WebkitUserSelect: 'none',    /* Safari/Chrome 드래그 방지 */
