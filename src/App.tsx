@@ -261,21 +261,75 @@ export default function App() {
 
 
   // ------------------------------------------------------------------
-  // 💉 [내비게이션] 뷰 변경 시 스크롤 위치 초기화 (독립 실행)
+  // 💉 [수정] 히스토리 제어: 뒤로 가기 제스처 시 의도치 않은 이동 방지
   // ------------------------------------------------------------------
   useEffect(() => {
-    if ('scrollRestoration' in window.history) {
-      window.history.scrollRestoration = 'manual';
-    }
+  // 1. 히스토리 스택 쌓기
+  // 로비에서도 pushState를 사용하여 뒤로 가기 제스처를 '낚아챌' 수 있는 지점을 만듭니다.
+    window.history.pushState({ view }, '', '');
 
-    const timer = setTimeout(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      document.documentElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      document.body.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    }, 0);
+    const handlePopState = async (event: PopStateEvent) => {
+        // [A] 결과창 모달이 열려있는 경우 (싱글 모드)
+        if (showResultModal) {
+          setShowResultModal(false);
+          resetGameSession();
+          setView('modeSelect');
+          return;
+        }
 
-    return () => clearTimeout(timer);
-  }, [view]);
+        // [B] 현재 뷰에 따른 커스텀 뒤로 가기 액션
+        switch (view) {
+          case 'lobby':
+            // 💉 [수정] 로비에서 뒤로 가기 시 새로고침 실행
+            console.log("🔄 Lobby swipe detected: Refreshing page...");
+            window.location.reload();
+            break;
+
+          case 'modeSelect':
+            // 셀렉트 모드 -> 로비
+            setView('lobby');
+            break;
+
+          case 'multiplay':
+            // 멀티플레이 페이지 -> 셀렉트 모드
+            setView('modeSelect');
+            break;
+
+          case 'waitingRoom':
+            // 웨이팅룸 -> 방 퇴장 후 멀티플레이 페이지
+            playClickSound();
+            await leaveCurrentRoom();
+            setView('multiplay');
+            break;
+
+          case 'multiBattle':
+            // 멀티 게임 중/결과창 -> 방(waitingRoom)으로 복귀
+            if (currentUserId) fetchUserData(currentUserId);
+            setView('waitingRoom'); 
+            break;
+
+          case 'battle':
+            // 싱글 게임 중 -> 셀렉트 모드
+            setView('modeSelect');
+            break;
+
+          default:
+            if (event.state && event.state.view) {
+              setView(event.state.view);
+            } else {
+              setView('lobby');
+            }
+            break;
+        }
+      };
+
+      // 이벤트 리스너 등록
+      window.addEventListener('popstate', handlePopState);
+      
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+      };
+  }, [view, showResultModal, currentRoomId, currentUserId]);
 
 
 
