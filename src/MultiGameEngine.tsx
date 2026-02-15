@@ -340,19 +340,34 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
   if (isLoading) return <div className="text-white text-center mt-20 animate-pulse">Loading Battle...</div>;
 
   return (
-    <div className="w-full max-w-[360px] mx-auto flex flex-col h-[calc(100dvh-120px)] justify-start py-6 animate-in fade-in duration-500 overflow-hidden select-none">
+    <div className="w-full max-w-[360px] mx-auto flex flex-col h-screen justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden select-none">
     
-    {/* 💉 [수정] 헤더 영역: flex-none으로 위치 고정 */}
-    <div className="w-full text-left mt-0 mb-4 flex-none relative">
-      <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Round {currentRound}</h2>
-      <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-0">Total Time: {playTime.toFixed(2)} sec</p>
-      {roomData?.first_cleared_at && !isCleared && !isEliminated && (
-        <div className="text-red-500 text-[10px] font-black uppercase animate-pulse border border-red-500/30 px-2 py-1 rounded w-fit mt-2">Hurry Up!</div>
-      )}
+    {/* 1. 헤더 영역 */}
+    <div className="w-full flex justify-between items-start flex-none mb-4 px-4">
+      
+      {/* [좌측] 로고 버튼 */}
+      <button 
+        onClick={() => { playClickSound(); onBackToLobby(); }}
+        className="active:scale-95 transition-transform text-left pt-0"
+      >
+        <h2 className="text-3xl font-bold tracking-tighter uppercase italic leading-none">
+          <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
+        </h2>
+      </button>
+      
+      {/* [우측] 정보 영역 */}
+      <div className="text-right flex flex-col items-end pt-0">
+        <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">Round {currentRound}</h2>
+        <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-1 leading-none">{playTime.toFixed(2)} sec</p>
+        
+        {roomData?.first_cleared_at && !isCleared && !isEliminated && (
+          <div className="text-red-500 text-[10px] font-black uppercase animate-pulse border border-red-500/30 px-2 py-1 rounded w-fit mt-2">Hurry Up!</div>
+        )}
+      </div>
     </div>
 
-    {/* 💉 [수정] 플레이어 현황판: flex-none으로 고정 및 간격 최적화 */}  {/* border border-zinc-800 */}
-    <div className="w-full bg-zinc-900/50 rounded-3xl p-0 mb-0 flex-none space-y-2">
+    {/* 2. 플레이어 현황판 - 멀티 전용 (고정 높이) */}
+    <div className="w-full bg-zinc-900/50 rounded-3xl p-3 mb-4 flex-none space-y-2 mx-4 w-[calc(100%-32px)]">
       <div className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Other Players</div>
       {participants.filter(p => p.user_id !== currentUserId).map(p => (
         <div key={p.user_id} className="flex justify-between items-center opacity-80">
@@ -366,8 +381,10 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
       ))}
     </div>
 
-      {/* 💉 [수정] 메인 콘텐츠 영역: flex-1과 overflow-y-auto로 이 영역만 스크롤 */}
-    <div className="flex-1 overflow-y-auto my-4 custom-scrollbar pr-1 flex flex-col items-center">
+
+
+      {/* 3. 💉 [수정] 문제 영역 확장 */}
+    <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center justify-center min-h-0">
        {(isEliminated || isCleared) ? (
           <div className="text-center animate-in zoom-in py-10">
               {isEliminated && <div className="text-6xl mb-4">💀</div>}
@@ -409,7 +426,7 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
                             {isCurrent && mode === 'EXPERT MODE' && (
                               <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{targetConditions[i]}</span>
                             )}
-                            <div className={`w-14 h-14 rounded-2xl overflow-hidden transition-all duration-300 bg-zinc-900 ${showDetails ? (hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 'shadow-[0_0_12px_rgba(34,197,94,0.7)]') : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
+                            <div className={`w-14 h-14 rounded-2xl  transition-all duration-300 bg-zinc-900 ${showDetails ? (hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 'shadow-[0_0_12px_rgba(34,197,94,0.7)]') : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
                                 {isMemoryPhase ? <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center">{isSolved && <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-40" />}</div>}
                             </div>
                         </div>
@@ -422,36 +439,46 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
 
 
 
-      {/* 하단 버튼 영역: mt-auto 및 flex-none으로 크기 고정 */}
-
-      <div className="w-full flex justify-center mt-auto flex-none pb-4">
-        {(!isEliminated && !isCleared) && (
-            isMemoryPhase ? (
-              <button 
-                onClick={() => { playClickSound(); setIsMemoryPhase(false); }} 
-                className="w-full h-14 rounded-md font-bold uppercase transition-all bg-zinc-900 text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse border border-[#282828]"
-              >
-                OK, I got it
-              </button>
-            ) : (
-              /* 💉 px-2와 gap-4를 유지하여 싱글플레이와 동일한 간격 확보 */
-              <div className="flex gap-4 w-full px-2">
-                {['rock', 'paper', 'scissor'].map((type) => (
-                  <button 
-                    key={type} 
-                    onClick={() => handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0)} 
-                    /* 💉 [핵심] flex-none 제거, flex-1과 aspect-square로 전체 너비 균등 분할 */
-                    className={`flex-1 aspect-square rounded-3xl overflow-hidden active:scale-90 transition-all bg-zinc-900 ${
-                      type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 
-                      type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 
-                      'shadow-[0_0_15px_rgba(236,72,153,0.5)]'
-                    }`}
-                  >
-                    <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )
+      {/* 4. 💉 [수정] 하단 버튼 영역: z-index와 pointer-events 확인 */}
+      <div className="w-full flex justify-center mt-auto flex-none px-4 pb-6 relative z-[20]">
+       
+        {/* 💉 [수정] 첫 번째 3항 연산자의 끝에 반드시 ': null' 혹은 다른 UI가 있어야 합니다. */}
+        {(!isEliminated && !isCleared) ? (
+          isMemoryPhase ? (
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); // App.tsx 클릭 이벤트 간섭 방지
+                playClickSound(); 
+                setIsMemoryPhase(false); 
+              }} 
+              /* 💉 pointer-events-auto를 추가하여 클릭 가능 상태 강제 */
+              className="w-full h-14 rounded-md font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse cursor-pointer pointer-events-auto"
+            >
+              OK, I got it
+            </button>
+          ) : (
+            /* 가위바위보 버튼 영역 (60% 너비 유지) */
+            <div className="flex gap-3 w-[60%] mb-2">
+              {['rock', 'paper', 'scissor'].map((type) => (
+                <button 
+                  key={type} 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0);
+                  }} 
+                  className={`flex-1 aspect-square rounded-3xl  active:scale-90 transition-all bg-zinc-900 pointer-events-auto ${
+                    type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 
+                    type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 
+                    'shadow-[0_0_15px_rgba(236,72,153,0.5)]'
+                  }`}
+                >
+                  <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )
+        ) : (
+          null 
         )}
       </div>
 

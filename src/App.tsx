@@ -1084,6 +1084,7 @@ export default function App() {
             onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} 
             onRoundClear={(next) => { playWhickSound(); setRound(next); }} // 💉 라운드 클리어 소리
             onGameOver={(r, t) => { playBeepSound(); handleGameOver(r, t); }} // 💉 게임오버 소리
+            onBackToLobby={() => setView('lobby')}
             isModalOpen={showResultModal} t={(key: string) => t('game', key)} 
           />
         }
