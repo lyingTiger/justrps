@@ -26,8 +26,9 @@ export default function App() {
   // ------------------------------------------------------------------
   // 💉 개발자 인증 상태 정의
   // ------------------------------------------------------------------
-  const [isDevAuthorized, setIsDevAuthorized] = useState(false);
-  const [tempCode, setTempCode] = useState('');
+
+  // const [isDevAuthorized, setIsDevAuthorized] = useState(false);
+  // const [tempCode, setTempCode] = useState('');
 
   {/* ------------------------------------------------------------------
             ✨ 여기까지 개발자 인증코드- 차후 삭제
@@ -605,6 +606,8 @@ export default function App() {
     }
   };
 
+
+
   // ------------------------------------------------------------------
   // 💉 [인증 로직] 이메일/비밀번호 로그인 및 회원가입 제출
   // ------------------------------------------------------------------
@@ -655,6 +658,7 @@ export default function App() {
   }, [view]);
   
 
+
   // 💉 멀티플레이 페이지에서 뒤로가기(스와이프) 시 모드 선택 화면으로 이동
   useEffect(() => {
     if (view === 'multiplay') {
@@ -675,6 +679,7 @@ export default function App() {
       };
     }
   }, [view, setView]);
+
 
 
   // ------------------------------------------------------------------
@@ -1022,7 +1027,9 @@ export default function App() {
       {/* ------------------------------------------------------------------
             ✨ 개발자 코드 입력 팝업 (인증 전 노출)
            ------------------------------------------------------------------ */}
-          {!isDevAuthorized && (
+
+
+          {/* {!isDevAuthorized && (
             <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
               <div className="w-full max-w-[300px] bg-zinc-900 border-2 border-[#FF9900] rounded-[30px] p-8 text-center shadow-[0_0_50px_rgba(255,153,0,0.3)]">
                 <h3 className="text-xl font-black text-white italic uppercase mb-4 tracking-tighter">
@@ -1054,7 +1061,7 @@ export default function App() {
                 </button>
               </div>
             </div>
-          )}
+          )} */}
 
           {/* ------------------------------------------------------------------
             ✨ 여기까지 개발자 인증코드- 차후 삭제
