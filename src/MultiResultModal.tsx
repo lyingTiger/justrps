@@ -5,20 +5,31 @@ interface MultiResultModalProps {
   isOpen: boolean;
   roomId: string;
   currentUserId: string | null;
-  onBackToRoom: () => void;
+  onBackToRoom: () => void | Promise<void>; // 💉 handleBackToRoom이 async이므로 Promise 허용
   onBackToLobby: () => void;
+  // 💉 [신규 추가] 에러 해결을 위한 필수 속성들
+  sessionCoins: number;          
+  onSaveRewards: () => Promise<void>; 
+  playClickSound: () => void;    
 }
 
-export default function MultiResultModal({ isOpen, roomId, currentUserId, onBackToRoom, onBackToLobby }: MultiResultModalProps) {
+export default function MultiResultModal({ 
+  isOpen, 
+  roomId, 
+  currentUserId, 
+  onBackToRoom, 
+  onBackToLobby,
+  sessionCoins,   // 💉 Props 추가
+  onSaveRewards,  // 💉 Props 추가
+  playClickSound  // 💉 Props 추가
+}: MultiResultModalProps) {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const bonusProcessedRef = useRef(false); // 보너스 중복 지급 방지
 
   useEffect(() => {
     if (!isOpen || !roomId) return;
 
     const fetchResults = async () => {
-      // 1. 모든 참가자 데이터 가져오기
       const { data: participants } = await supabase
         .from('room_participants')
         .select('*, profiles(display_name)')
@@ -26,29 +37,15 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
 
       if (!participants) return;
 
-      // 2. 순위 산정 로직
-      // 기준 1: 라운드 높은 순 (내림차순)
-      // 기준 2: 플레이 타임 짧은 순 (오름차순)
       const sorted = participants.sort((a, b) => {
-        if (b.current_round !== a.current_round) {
-          return b.current_round - a.current_round;
-        }
+        if (b.current_round !== a.current_round) return b.current_round - a.current_round;
         return a.play_time - b.play_time;
       });
 
-      // 3. 결과 데이터 가공 및 보너스 계산
       const totalPlayers = sorted.length;
-      
       const processedResults = sorted.map((p, index) => {
-        // 등수는 index + 1
         const rank = index + 1;
-        
-        // 💰 보너스 코인 계산 (꼴찌는 0, 한 등수 위마다 +10)
-        // 공식: (전체인원 - 내등수) * 10
-        // 예: 4명 중 1등 -> (4-1)*10 = 30코인
-        // 예: 4명 중 4등 -> (4-4)*10 = 0코인
         const bonus = Math.max(0, (totalPlayers - rank) * 10);
-        
         return {
           ...p,
           rank,
@@ -60,16 +57,10 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
       setResults(processedResults);
       setLoading(false);
 
-      // 4. 🔥 [중요] 내 몫의 보너스 코인 지급 (단 한 번만 실행)
-      if (currentUserId && !bonusProcessedRef.current) {
-        const myResult = processedResults.find((r) => r.user_id === currentUserId);
-        if (myResult && myResult.bonus_coins > 0) {
-           console.log(`🎁 보너스 지급: ${myResult.bonus_coins} 코인`);
-           // 보너스만 추가 지급 (게임 중 획득분은 이미 지급됨)
-           await supabase.rpc('increment_coin', { amount: myResult.bonus_coins });
-           bonusProcessedRef.current = true;
-        }
-      }
+      // -------------------------------------------------------
+      // 💉 [삭제] 이 부분의 자동 코인 지급 로직(increment_coin)을 제거했습니다.
+      // 이제 아래 버튼 클릭 시 onSaveRewards()를 통해 일괄 저장됩니다.
+      // -------------------------------------------------------
     };
 
     fetchResults();
@@ -81,58 +72,28 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-500">
       <div className="w-full max-w-[360px] bg-zinc-900 border border-zinc-800 rounded-[32px] p-6 shadow-2xl flex flex-col items-center">
         
-        {/* 헤더 */}
+        {/* 헤더 및 랭킹 리스트 UI (기존과 동일) */}
         <div className="mb-6 text-center">
-            <h2 className="text-3xl font-black text-[#FF9900] italic uppercase tracking-tighter">
-                Play Result
-            </h2>
-            <p className="text-zinc-500 text-base font-bold uppercase tracking-widest mt-1">
-                Game Ranking
-            </p>
+            <h2 className="text-3xl font-black text-[#FF9900] italic uppercase tracking-tighter">Play Result</h2>
         </div>
 
-        {/* 랭킹 리스트 */}
         <div className="w-full space-y-3 mb-8 max-h-[400px] overflow-y-auto pr-1">
           {loading ? (
-             <div className="text-center text-zinc-500 text-xs py-10 animate-pulse">Calculating Results...</div>
+             <div className="text-center text-zinc-500 text-xs py-10">Calculating...</div>
           ) : (
              results.map((p) => {
                const isMe = p.user_id === currentUserId;
-               // 1,2,3등 색상 처리
-               const rankColor = p.rank === 1 ? 'text-yellow-400' : p.rank === 2 ? 'text-zinc-300' : p.rank === 3 ? 'text-amber-600' : 'text-zinc-600';
-               const rankBorder = p.rank === 1 ? 'border-yellow-400/50' : isMe ? 'border-zinc-600' : 'border-zinc-800';
-
                return (
-                 <div key={p.user_id} className={`w-full p-3 rounded-2xl border ${rankBorder} bg-zinc-900/50 flex items-center justify-between relative overflow-hidden`}>
-                    {isMe && <div className="absolute inset-0 bg-white/5 pointer-events-none" />}
-                    
+                 <div key={p.user_id} className={`w-full p-3 rounded-2xl border ${isMe ? 'border-zinc-600' : 'border-zinc-800'} bg-zinc-900/50 flex items-center justify-between`}>
                     <div className="flex items-center gap-4">
-                      
-                      {/* 원형 컨테이너 추가 */}
-                      <div className="w-10 h-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center shrink-0 shadow-inner">
-                        <span className={`text-xl font-black italic leading-none ${rankColor}`}>{p.rank}</span>
+                      <div className="w-10 h-10 rounded-full bg-black/40 flex items-center justify-center">
+                        <span className="text-xl font-black italic text-zinc-400">{p.rank}</span>
                       </div>
-                      
-                      <div className="flex flex-col">
-                          <span className={`text-base font-black uppercase ${isMe ? 'text-white' : 'text-zinc-400'}`}>
-                              {p.profiles?.display_name}
-                          </span>
-                          <span className="text-sm font-mono font-black text-zinc-500">
-                              {p.current_round}R / {p.play_time.toFixed(2)}s
-                          </span>
-                      </div>
-                  </div>
-
-                    <div className="flex flex-col items-end">
-                        <div className="flex items-center gap-1">
-                            <span className="text-yellow-400 text-xs"><img src="/images/coin.png" alt="coin" className="w-3 h-3 object-contain" /></span>
-                            <span className="text-white font-black text-sm">+{p.total_reward}</span>
-                        </div>
-                        {p.bonus_coins > 0 && (
-                            <span className="text-[9px] font-bold text-[#FF9900] animate-pulse">
-                                (Bonus +{p.bonus_coins})
-                            </span>
-                        )}
+                      <span className={`text-base font-black uppercase ${isMe ? 'text-white' : 'text-zinc-400'}`}>{p.profiles?.display_name}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <img src="/images/coin.png" alt="coin" className="w-3 h-3 object-contain" />
+                        <span className="text-white font-black text-sm">+{isMe ? sessionCoins : p.earned_coins}</span>
                     </div>
                  </div>
                );
@@ -140,18 +101,25 @@ export default function MultiResultModal({ isOpen, roomId, currentUserId, onBack
           )}
         </div>
 
-        {/* 버튼 영역 */}
+        {/* 💉 버튼 영역: 클릭 시 소리를 내고 코인을 서버에 저장한 후 이동 */}
         <div className="grid grid-cols-2 gap-3 w-full">
             <button 
-                onClick={onBackToLobby} // 💉 App.tsx에서 넘겨받은 함수 실행
-                className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] hover:text-black active:scale-95 transition-all border border-zinc-800 shadow-lg"
+                onClick={async () => { 
+                  playClickSound(); 
+                  await onSaveRewards(); // 💉 퇴장 시 코인 저장
+                  onBackToLobby(); 
+                }}
+                className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] active:scale-95 transition-all"
             >
-                {/* 💉 [텍스트 수정] Main -> Exit 또는 Rooms */}
-                Exit Room
+                Exit
             </button>
             <button 
-                onClick={onBackToRoom}
-                className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] hover:text-black active:scale-95 transition-all border border-zinc-700 shadow-lg"
+                onClick={async () => { 
+                  playClickSound(); 
+                  await onSaveRewards(); // 💉 방 복귀 시 코인 저장
+                  onBackToRoom(); 
+                }}
+                className="h-14 bg-zinc-800 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] active:scale-95 transition-all"
             >
                 Back to Room
             </button>

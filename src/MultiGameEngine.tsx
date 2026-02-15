@@ -5,13 +5,18 @@ import MultiResultModal from './MultiResultModal';
 interface MultiGameProps {
   roomId: string;
   userNickname: string;
+  onSaveRewards: () => Promise<void>;
   playClickSound: () => void;
+  playBeepSound: () => void;
   onEarnCoin: () => void;
   onGameOver: (finalRound: number, totalTime: number) => void;
   onBackToLobby: () => void;
+  sessionCoins: number;
 }
 
-export default function MultiGameEngine({ roomId, userNickname, playClickSound, onEarnCoin, onGameOver, onBackToLobby }: MultiGameProps) {
+
+
+export default function MultiGameEngine({ roomId, userNickname, sessionCoins, playClickSound, playBeepSound, onSaveRewards, onEarnCoin, onGameOver, onBackToLobby }: MultiGameProps) {
   // --- 상태 관리 ---
   const [currentRound, setCurrentRound] = useState(1);
   const [playTime, setPlayTime] = useState(0); 
@@ -240,15 +245,12 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
 
   const handleElimination = async (reason: string) => {
     setIsEliminated(true);
+    playBeepSound();
     if (timerRef.current) clearInterval(timerRef.current);
     
-    // 🔥 [중요] 탈락 시 기록 저장: 전체 시간이 아니라 '라운드 진입 시간'을 저장
+    // 탈락 기록 저장 로직...
     await updateMyStatus(myRoundRef.current, false, roundEntryTimeRef.current, true); 
-    
-    // 리더보드에도 진입 시간으로 기록
     saveRecordToLeaderboard(myRoundRef.current, roundEntryTimeRef.current);
-
-    finalizeGame();
   };
 
   
@@ -308,13 +310,6 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
       .eq('room_id', roomId).eq('user_id', currentUserId);
   };
 
-  const finalizeGame = async () => {
-    if (coinRef.current > 0) {
-        try {
-            await supabase.rpc('increment_coin', { amount: coinRef.current });
-        } catch (err) { console.error(err); }
-    }
-  };
 
   const handleBackToRoom = async () => {
     if (!currentUserId || !roomId) return;
@@ -344,16 +339,20 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
     
     {/* 1. 헤더 영역 */}
     <div className="w-full flex justify-between items-start flex-none mb-4 px-4">
-      
-      {/* [좌측] 로고 버튼 */}
-      <button 
-        onClick={() => { playClickSound(); onBackToLobby(); }}
-        className="active:scale-95 transition-transform text-left pt-0"
-      >
+      {/* [좌측] 로고 및 획득 코인 표시 */}
+      <div className="flex flex-col items-start">
         <h2 className="text-3xl font-bold tracking-tighter uppercase italic leading-none">
           <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
         </h2>
-      </button>
+        
+        {/* 💉 획득 코인이 0보다 클 때만 표시하거나, 항상 표시하여 긴장감 유도 */}
+        <div className="flex items-center gap-1.5 mt-2 ml-1 ">
+          <img src="/images/coin.png" alt="earned coin" className="w-4 h-4 object-contain" />
+          <span className="text-white font-black text-sm font-mono">
+            +{sessionCoins}
+          </span>
+        </div>
+      </div>
       
       {/* [우측] 정보 영역 */}
       <div className="text-right flex flex-col items-end pt-0">
@@ -486,8 +485,11 @@ export default function MultiGameEngine({ roomId, userNickname, playClickSound, 
         isOpen={showResult} 
         roomId={roomId} 
         currentUserId={currentUserId}
-        onBackToLobby={onBackToLobby}
-        onBackToRoom={handleBackToRoom}
+        sessionCoins={sessionCoins}     // 💉 App에서 받은 세션 코인 전달
+        onSaveRewards={onSaveRewards}   // 💉 App에서 받은 저장 함수 전달
+        playClickSound={playClickSound} // 💉 App에서 받은 사운드 함수 전달
+        onBackToRoom={handleBackToRoom} // 💉 내부 함수 handleBackToRoom 연결
+        onBackToLobby={onBackToLobby}   // 💉 App에서 받은 로비 이동 함수 연결
       />
     </div>
   );

@@ -9,6 +9,7 @@ import WaitingRoom from './WaitingRoom';
 import MultiGameEngine from './MultiGameEngine'; 
 import ShopPage from './ShopPage';
 import AdOverlay from './AdOverlay';
+import AdLoadingOverlay from './AdLoadingOverlay';
 import InfoPage from './InfoPage';
 import { useState, useEffect, useRef } from 'react';
 import { translations } from './constants/translations'; 
@@ -40,6 +41,7 @@ export default function App() {
   const [visitorStats, setVisitorStats] = useState({ today: 0, total: 0 });
   const lastFetchedId = useRef<string | null>(null);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const [showAdLoading, setShowAdLoading] = useState(false);
 
 
   // 1. 비밀번호 변경 핸들러
@@ -157,6 +159,25 @@ export default function App() {
   const [continueCount, setContinueCount] = useState(3);
   const [sessionCoins, setSessionCoins] = useState(0); 
   const CONTINUE_COST = 50;
+
+  // 서버에 획득한 코인을 최종 저장하는 함수
+  const saveSessionRewards = async () => {
+  if (sessionCoins <= 0) return;
+
+    try {
+      // 서버 RPC 호출: 임시 적립된 코인을 실제 유저 DB에 반영
+      const { error } = await supabase.rpc('increment_coin', { amount: sessionCoins });
+      
+      if (!error) {
+        console.log(`✅ ${sessionCoins} 코인이 서버에 안전하게 저장되었습니다.`);
+        // 저장 성공 후 세션 초기화 및 로컬 UI 갱신
+        if (currentUserId) fetchUserData(currentUserId); 
+        setSessionCoins(0); 
+      }
+    } catch (e) {
+      console.error("코인 저장 중 오류 발생:", e);
+    }
+  };
 
   const [adFreeUntil, setAdFreeUntil] = useState<string | null>(null); 
   const [playCount, setPlayCount] = useState(0); 
@@ -749,6 +770,7 @@ export default function App() {
     setShowResultModal(true); 
     if (!currentUserId) return;
     try {
+      // 1. 신기록 체크 및 업데이트 로직
       const { data: record, error: fetchError } = await supabase.from('mode_records').select('*').eq('user_id', currentUserId).eq('mode', selectedOption).maybeSingle();
       if (fetchError) throw fetchError;
       const isNewRecord = !record || finalRound > record.best_round || (finalRound === record.best_round && entryTime < record.best_time);
@@ -756,13 +778,31 @@ export default function App() {
         setResultData(prev => ({ ...prev, isNewRecord: true }));
         await supabase.from('mode_records').upsert({ user_id: currentUserId, mode: selectedOption, best_round: finalRound, best_time: entryTime, updated_at: new Date().toISOString() }, { onConflict: 'user_id, mode' });
       }
+
+      // 2. 게임 로그 기록
       await supabase.from('game_logs').insert({ user_id: currentUserId, mode: selectedOption, reached_round: finalRound, play_time: entryTime });
-      if (sessionCoins > 0) await supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: sessionCoins });
-      fetchUserData(currentUserId);
     } catch (err) { console.error(err); } finally {
       const newPlayCount = playCount + 1;
       setPlayCount(newPlayCount);
       if (newPlayCount >= 3) { showInterstitialAd(); setPlayCount(0); }
+    }
+
+    const newPlayCount = playCount + 1;
+    setPlayCount(newPlayCount);
+
+    // 💉 5판이 되었을 때 광고 시퀀스 시작
+    if (newPlayCount >= 5 && !adFreeUntil) { // 광고 제거 상품 미구매 시
+      setShowAdLoading(true); // 1. 로딩 오버레이 먼저 표시
+      setPlayCount(0); // 카운트 초기화
+
+      // 1.5초 뒤에 실제 광고 오버레이로 교체
+      setTimeout(() => {
+        setShowAdLoading(false);
+        setShowAdOverlay(true); 
+      }, 1500);
+    } else {
+      // 5판이 안 됐을 때는 바로 결과창
+      setShowResultModal(true);
     }
   };
 
@@ -823,6 +863,23 @@ export default function App() {
     setContinueCount(prev => prev - 1);
     setShowResultModal(false);
   };
+
+
+  const handleAdExited = () => {
+    setMsgPopup({
+      isOpen: true,
+      title: "WAIT!",
+      desc: "지금 종료하면\n획득한 코인과 아이템을\n모두 잃게 됩니다.",
+      onConfirm: () => {
+        // 유저가 알겠다고 하면 코인 버리고 로비로 이동
+        setSessionCoins(0);
+        setView('lobby');
+      }
+      // 취소(cancel) 버튼을 누르면 광고 화면으로 다시 복귀하는 흐름
+    });
+  };
+
+
 
   // ------------------------------------------------------------------
   // 💉 [인증 화면] 로그인하지 않은 유저에게 노출되는 시작 페이지
@@ -1181,20 +1238,23 @@ export default function App() {
           onLeave={async () => { playClickSound(); await leaveCurrentRoom(); setView('multiplay'); }} 
           onStartGame={() => { playClickSound(); setView('multiBattle'); }} />}
 
+
+        {/* 멀티플레이 게임 엔진 */}
         {view === 'multiBattle' && currentRoomId && 
           <MultiGameEngine 
             roomId={currentRoomId} 
             userNickname={userNickname} 
+            sessionCoins={sessionCoins} // 💉 추가: 실시간 표시용
             playClickSound={playClickSound} 
-            onEarnCoin={() => setUserCoins(prev => prev + 1)} 
+            playBeepSound={playBeepSound}
+            onSaveRewards={saveSessionRewards}
+            onEarnCoin={() => setSessionCoins(prev => prev + 1)} // 💉 수정: 세션 코인만 증가
             onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} 
-            
-            onBackToLobby={() => { 
+            onBackToLobby={async () => {
               playClickSound();
+              await saveSessionRewards(); // 💉 추가: 나가기 전 저장
               if (currentUserId) fetchUserData(currentUserId); 
-              if (currentRoomId) leaveCurrentRoom(); // 💉 현재 방 퇴장 처리
-              
-              // 💉 [핵심 수정] 목적지를 lobby에서 multiplay로 변경
+              if (currentRoomId) leaveCurrentRoom();
               setView('multiplay'); 
             }} 
           />
@@ -1205,16 +1265,33 @@ export default function App() {
 
         {view === 'battle' && 
           <GameEngine 
-            key={gameKey} round={round} mode={selectedOption} initialTime={sessionStartTime} 
+            key={gameKey} 
+            round={round} 
+            mode={selectedOption} 
+            initialTime={sessionStartTime} 
+            
+            // 💉 추가된 세션 코인 값 (UI 표시용)
+            sessionCoins={sessionCoins} 
+            
             playClickSound={playClickSound}
-            playTockSound={playTockSound}   // 💉 추가
-            playWhickSound={playWhickSound} // 💉 추가
-            playBeepSound={playBeepSound}   // 💉 추가
-            onEarnCoin={() => { setUserCoins(c => c + 1); setSessionCoins(s => s + 1); }} 
-            onRoundClear={(next) => { playWhickSound(); setRound(next); }} // 💉 라운드 클리어 소리
-            onGameOver={(r, t) => { playBeepSound(); handleGameOver(r, t); }} // 💉 게임오버 소리
-            onBackToLobby={() => setView('lobby')}
-            isModalOpen={showResultModal} t={(key: string) => t('game', key)} 
+            playTockSound={playTockSound}
+            playWhickSound={playWhickSound}
+            playBeepSound={playBeepSound}
+            
+            // 💉 즉시 서버에 저장하지 않고, 세션 상태값만 올림
+            onEarnCoin={() => setSessionCoins(prev => prev + 1)} 
+            
+            onRoundClear={(next) => { playWhickSound(); setRound(next); }}
+            onGameOver={(r, t) => { playBeepSound(); handleGameOver(r, t); }}
+            
+            // 💉 로고 클릭 시 로비로 가기 전 서버에 저장
+            onBackToLobby={async () => {
+              await saveSessionRewards(); 
+              setView('lobby');
+            }}
+            
+            isModalOpen={showResultModal} 
+            t={(key: string) => t('game', key)} 
           />
         }
 
@@ -1253,8 +1330,56 @@ export default function App() {
 
 
       {/* 💉 오버레이 모달 및 시스템 팝업 렌더링 */}
-      <AdOverlay isOpen={showAdOverlay} onClose={() => { setShowAdOverlay(false); setPendingBestRound(null); }} onReward={handleAdContinueSuccess} />
-      <ResultModal isOpen={showResultModal} mode={selectedOption} round={resultData.round} time={resultData.time} earnedCoins={resultData.coins} userCoins={userCoins} isNewRecord={resultData.isNewRecord} continueCount={continueCount} continueCost={CONTINUE_COST} onContinue={() => { if(userCoins >= CONTINUE_COST) { setUserCoins(c => c - CONTINUE_COST); setContinueCount(prev => prev - 1); setShowResultModal(false); } }} onRetry={() => { setShowResultModal(false); setRound(1); resetGameSession(0); setView('battle'); }} onLobby={() => { setShowResultModal(false); resetGameSession(); setView('modeSelect'); }} onShop={() => { setShowResultModal(false); setView('shop'); }} onWatchAd={() => setShowAdOverlay(true)} t={(key: string) => t('resultModal', key)}/>
+      <AdOverlay 
+        isOpen={showAdOverlay} 
+        onClose={handleAdExited} // 아까 만든 경고 팝업 로직 연결
+        onReward={handleAdContinueSuccess} 
+      />
+
+      <AdLoadingOverlay isOpen={showAdLoading} />
+
+
+      <ResultModal 
+        isOpen={showResultModal} 
+        mode={selectedOption} 
+        round={resultData.round} 
+        time={resultData.time} 
+        earnedCoins={sessionCoins} // 💉 기존 resultData.coins 대신 현재 세션 코인 전달
+        userCoins={userCoins} 
+        isNewRecord={resultData.isNewRecord} 
+        continueCount={continueCount} 
+        continueCost={CONTINUE_COST} 
+        
+        // 💉 [신규 추가] 잃어버린 도구들을 여기서 쥐어줍니다.
+        playClickSound={playClickSound}
+        onSaveRewards={saveSessionRewards} 
+        
+        onContinue={() => { 
+          if(userCoins >= CONTINUE_COST) { 
+            setUserCoins(c => c - CONTINUE_COST); 
+            setContinueCount(prev => prev - 1); 
+            setShowResultModal(false); 
+          } 
+        }} 
+        onRetry={() => { 
+          setShowResultModal(false); 
+          setRound(1); 
+          resetGameSession(0); 
+          setView('battle'); 
+        }} 
+        onLobby={() => { 
+          setShowResultModal(false); 
+          resetGameSession(); 
+          setView('modeSelect'); 
+        }} 
+        onShop={() => { 
+          setShowResultModal(false); 
+          setView('shop'); 
+        }} 
+        onWatchAd={() => setShowAdOverlay(true)} 
+        t={(key: string) => t('resultModal', key)}
+      />
+
 
       {/* 1. 팝업 활성화 여부 확인: msgPopup.isOpen이 true일 때만 렌더링 시작 */}
       {msgPopup.isOpen && (

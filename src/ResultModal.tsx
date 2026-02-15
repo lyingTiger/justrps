@@ -16,12 +16,15 @@ interface ResultModalProps {
   onShop: () => void;
   onWatchAd: () => void;
   t: (key: string) => string; // 💉 [추가] 다국어 번역 함수 Prop
+  playClickSound: () => void; 
+  onSaveRewards: () => Promise<void>;
 }
 
 export default function ResultModal({ 
   isOpen, mode, round, time, earnedCoins, userCoins, isNewRecord, 
   continueCount, continueCost, onContinue, onRetry, onLobby, onShop,
-  onWatchAd, t // 💉 [추가]
+  onWatchAd, t,playClickSound,
+  onSaveRewards
 }: ResultModalProps) {
   if (!isOpen) return null;
 
@@ -130,7 +133,11 @@ export default function ResultModal({
 
             <div className="w-full grid grid-cols-2 gap-3">
                 <button 
-                    onClick={onRetry} 
+                    onClick={async () => {
+                      playClickSound();
+                      await onSaveRewards(); // 💉 App.tsx에서 전달받은 saveSessionRewards 실행
+                      onRetry(); 
+                    }}
                     className="flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-700 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
                 >
                     {/* 💉 번역 적용: Retry */}
@@ -138,7 +145,11 @@ export default function ResultModal({
                 </button>
 
                 <button 
-                    onClick={onLobby} 
+                    onClick={async () => {
+                      playClickSound();
+                      await onSaveRewards(); // 💉 로비로 갈 때도 저장
+                      onLobby(); 
+                    }}
                     className="flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-700 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
                 >
                     {/* 💉 번역 적용: game lobby */}

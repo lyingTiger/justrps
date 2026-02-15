@@ -4,6 +4,7 @@ interface GameProps {
   round: number;
   mode: string;
   initialTime: number;
+  sessionCoins: number;
   playClickSound: () => void;
   playTockSound: () => void;   
   playWhickSound: () => void;  
@@ -21,7 +22,7 @@ export default function GameEngine({
   round, mode, onGameOver, onRoundClear, playClickSound, 
   playTockSound, playWhickSound, playBeepSound, // 💉 Destructuring 추가
   onEarnCoin, isModalOpen, initialTime, t,
-  onBackToLobby 
+  onBackToLobby, sessionCoins 
 }: GameProps) {
   
   // 2. [State 초기값 수정]
@@ -163,23 +164,26 @@ export default function GameEngine({
     <div className="w-full max-w-[360px] flex flex-col h-[100dvh] justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto">    
 
       {/* 1. 헤더 영역 (로고 및 라운드 정보) - 고정 높이 */}
-      <div className="w-full flex justify-between items-start flex-none mb-6 px-4">
+      <div className="w-full flex justify-between items-start mt-0 flex-none mb-4 px-4">
         
-        {/* [좌측] 로고 버튼 - 클릭 시 로비로 이동 */}
-        <button 
-          onClick={() => { playClickSound(); onBackToLobby(); }}
-          className="active:scale-95 transition-transform text-left pt-0"
-        >
-          <h2 className="text-3xl font-bold tracking-tighter uppercase italic leading-none">
-            <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
-          </h2>
-        </button>
+        {/* [좌측] 로고 및 획득 코인 표시 */}
+        <div className="flex flex-col items-start">
+          <button onClick={() => { playClickSound(); onBackToLobby(); }} className="active:scale-95 transition-transform">
+            <h2 className="text-3xl font-bold tracking-tighter uppercase italic leading-none">
+              <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
+            </h2>
+          </button>
+
+          {/* 💉 [추가] 로고 아래 획득 코인 애니메이션 UI */}
+          <div className="flex items-center gap-1.5 mt-2 ml-1 animate-bounce-subtle">
+            <img src="/images/coin.png" alt="earned coin" className="w-4 h-4 object-contain" />
+            <span className="text-white font-black text-sm font-mono">+{sessionCoins}</span>
+          </div>
+        </div>
 
         {/* [우측] 라운드 및 시간 (상단 정렬) */}
         <div className="text-right flex flex-col items-end pt-0">
-          <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">
-            {t('ROUND')} {round}
-          </h2>
+          <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">{t('ROUND')} {round}</h2>
           <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-1 leading-none">
             {playTime.toFixed(2)} {t('SEC')}
           </p>
