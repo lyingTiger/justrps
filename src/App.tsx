@@ -41,6 +41,7 @@ export default function App() {
   // ------------------------------------------------------------------
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentRoomMode, setCurrentRoomMode] = useState<'normal' | 'item'>('normal');
   const [userNickname, setUserNickname] = useState(localStorage.getItem('cached_nickname') || 'Loading...');
   const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached_coins') || '0'));
   const [showResultModal, setShowResultModal] = useState(false);
@@ -50,6 +51,7 @@ export default function App() {
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [showAdLoading, setShowAdLoading] = useState(false);
 
+  
   // App 컴포넌트 내부 상태 선언
   const [userItems, setUserItems] = useState<UserItems>({ stop: 0, switch: 0, color: 0, heal: 0 });
   const [sessionItems, setSessionItems] = useState<UserItems>({ stop: 0, switch: 0, color: 0, heal: 0 });
@@ -133,6 +135,7 @@ export default function App() {
   // ------------------------------------------------------------------
   const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle' | 'info'>('lobby');  
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); 
+  
   const [selectedOption, setSelectedOption] = useState<string>(
     localStorage.getItem('last_played_mode') || 'DRAW MODE'
   );
@@ -342,7 +345,7 @@ export default function App() {
 
   // 💉 아이템 획득 확률 계산 함수 (2%)
   const rollForItem = () => {
-    const isHit = Math.random() < 1; // 2% 확률 (0.02)
+    const isHit = Math.random() < 0.02; // 2% 확률 (0.02)
     if (!isHit) return null;
 
     const itemTypes: (keyof UserItems)[] = ['stop', 'switch', 'color', 'heal'];
@@ -1276,7 +1279,28 @@ export default function App() {
           <MultiplayPage 
           selectedMode={selectedOption} 
           onBack={() => { playClickSound(); setView('modeSelect'); }} 
-          onJoin={(roomId) => { playClickSound(); setCurrentRoomId(roomId); setView('waitingRoom'); }} 
+
+          // 💉 [수술 시작] 기존 한 줄을 아래와 같이 async 블록으로 확장합니다.
+          onJoin={async (roomId) => { 
+            playClickSound(); 
+
+            // 1. Supabase에서 해당 방의 아이템 모드 여부를 확인합니다.
+            const { data: room } = await supabase
+              .from('rooms')
+              .select('is_item_mode')
+              .eq('id', roomId)
+              .single();
+
+            if (room) {
+              // 2. 방 정보를 바탕으로 현재 모드 저장
+              // (App.tsx 상단에 setCurrentRoomMode가 정의되어 있어야 합니다)
+              setCurrentRoomMode(room.is_item_mode ? 'item' : 'normal');
+            }
+
+            setCurrentRoomId(roomId); 
+            setView('waitingRoom'); 
+          }}
+
           playClickSound={playClickSound}
           t={(key: string) => t('multiplay', key)}
           // 🔥 [핵심 추가] 게임 내 팝업을 띄우기 위한 함수 전달
@@ -1298,12 +1322,42 @@ export default function App() {
             userNickname={userNickname} 
             sessionCoins={sessionCoins} 
             sessionItems={sessionItems}
+            isItemMatch={currentRoomMode === 'item'}
+            userItems={userItems}
+
+
+            // 💉 아이템 사용 시 실제 차감 로직
+            onUseItem={async (itemType) => {
+              if (!currentUserId) return;
+              try {
+                // 1. DB 차감 (RPC 호출)
+                await supabase.rpc('update_user_items', {
+                  target_user_id: currentUserId,
+                  stop_inc: itemType === 'stop' ? -1 : 0,
+                  switch_inc: itemType === 'switch' ? -1 : 0,
+                  color_inc: itemType === 'color' ? -1 : 0,
+                  heal_inc: itemType === 'heal' ? -1 : 0
+                });
+
+                // 2. 로컬 상태 즉시 반영 (UI 업데이트용)
+                setUserItems(prev => ({
+                  ...prev,
+                  [itemType]: Math.max(0, prev[itemType as keyof UserItems] - 1)
+                }));
+
+                console.log(`🚀 아이템 사용 차감 완료: ${itemType}`);
+              } catch (e) {
+                console.error("아이템 차감 중 오류 발생:", e);
+              }
+            }}
+
+
             playClickSound={playClickSound} 
             playBeepSound={playBeepSound}
             onSaveRewards={saveSessionRewards}
             onEarnCoin={() => setSessionCoins(prev => prev + 1)} // 💉 수정: 세션 코인만 증가
 
-            // 💉 [추가] 멀티플레이 라운드 클리어 시 아이템 주사위 굴리기
+            // 💉 멀티플레이 라운드 클리어 시 아이템 주사위 굴리기
             onRoundClear={() => {
               const newItem = rollForItem(); // 2% 확률 계산 함수 (아까 만든 것)
               if (newItem) {
@@ -1315,7 +1369,7 @@ export default function App() {
             onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} 
             onBackToLobby={async () => {
               playClickSound();
-              await saveSessionRewards(); // 💉 추가: 나가기 전 저장
+              await saveSessionRewards(); 
               if (currentUserId) fetchUserData(currentUserId); 
               if (currentRoomId) leaveCurrentRoom();
               setView('multiplay'); 
@@ -1375,10 +1429,44 @@ export default function App() {
           <RankingPage onBack={() => { playClickSound(); setView('lobby'); }} 
           playClickSound={playClickSound} userNickname={userNickname} t={(key) => t('ranking', key)} />}
 
+
+
+        {/* 💉 ShopPage 호출부 수정 */}
         {view === 'shop' && 
-        <ShopPage onBack={() => { playClickSound(); setView('lobby'); }} 
-        userCoins={userCoins} currentUserId={currentUserId} 
-        onUpdateCoins={(newAmount) => { setUserCoins(newAmount); localStorage.setItem('cached_coins', newAmount.toString()); }} />} 
+          <ShopPage 
+            onBack={() => { playClickSound(); setView('lobby'); }} 
+            userCoins={userCoins} 
+            userItems={userItems} // ✨ [추가] 보유 아이템 정보 전달
+            currentUserId={currentUserId} 
+            onUpdateCoins={(newAmount) => { 
+              setUserCoins(newAmount); 
+              localStorage.setItem('cached_coins', newAmount.toString()); 
+            }}
+            // ✨ [신규] 아이템 구매 처리 함수
+            onPurchaseItem={async (type, amount) => {
+              if (!currentUserId) return;
+              try {
+                // DB의 아이템 수량 업데이트 (우리가 만든 RPC 호출)
+                await supabase.rpc('update_user_items', {
+                  target_user_id: currentUserId,
+                  stop_inc: (type === 'all' || type === 'stop') ? amount : 0,
+                  switch_inc: (type === 'all' || type === 'switch') ? amount : 0,
+                  color_inc: (type === 'all' || type === 'color') ? amount : 0,
+                  heal_inc: (type === 'all' || type === 'heal') ? amount : 0
+                });
+
+                // 구매 후 최신 유저 데이터 다시 불러오기
+                await fetchUserData(currentUserId);
+                
+                // 팝업창보다는 게임 내 알림 시스템이 있다면 그것을 사용하는 것이 좋지만, 
+                // 우선은 동작 확인을 위해 간단한 안내를 띄웁니다.
+                console.log(`🎁 ${type} 아이템 ${amount}개 구매 완료!`);
+              } catch (e) {
+                console.error("구매 처리 중 오류:", e);
+              }
+            }}
+          />
+        }
               
       </main>
 

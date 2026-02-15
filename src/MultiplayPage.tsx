@@ -7,10 +7,11 @@ interface MultiplayPageProps {
   onJoin: (roomId: string) => void;
   playClickSound: () => void;
   t: (key: string) => string;
-  onShowPopup: (title: string, desc: string) => void; // 💉 [추가] 팝업 제어 함수
+  onShowPopup: (title: string, desc: string) => void; // 팝업 제어 함수
+  setCurrentRoomMode: (mode: 'normal' | 'item') => void;
 }
 
-export default function MultiplayPage({ selectedMode, onBack, onJoin, playClickSound, t, onShowPopup }: MultiplayPageProps) {
+export default function MultiplayPage({ selectedMode, onBack, onJoin, playClickSound, t, onShowPopup, setCurrentRoomMode, }: MultiplayPageProps) {
   const [rooms, setRooms] = useState<any[]>([]);
   const [searchName, setSearchName] = useState('');
   const [newRoomName, setNewRoomName] = useState('');
@@ -106,9 +107,15 @@ export default function MultiplayPage({ selectedMode, onBack, onJoin, playClickS
 
     if (room) {
       await supabase.from('room_participants').insert({ room_id: room.id, user_id: user.id });
+      // 💉 [추가] 방이 성공적으로 생성되었을 때, App의 상태에 모드 정보를 저장합니다.
+      // room.is_item_mode가 true라면 'item', 아니면 'normal'로 설정합니다.
+      if (typeof setCurrentRoomMode === 'function') {
+        setCurrentRoomMode(room.is_item_mode ? 'item' : 'normal');
+      }
       onJoin(room.id);
     }
   };
+
 
   // ------------------------------------------------------------------
   // 💉 [빠른 시작] 랜덤 입장 로직 및 커스텀 안내창 적용

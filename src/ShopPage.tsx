@@ -3,13 +3,31 @@ import { supabase } from './supabaseClient';
 import AdOverlay from './AdOverlay';
 
 interface ShopPageProps {
-  onBack: () => void;
   userCoins: number;
+  userItems: { stop: number; switch: number; color: number; heal: number };
+  onPurchaseItem: (type: string, amount: number) => Promise<void>;
+  // onClose: () => void;
+  onBack: () => void;
   currentUserId: string | null;
   onUpdateCoins: (newAmount: number) => void;
 }
 
-export default function ShopPage({ onBack, userCoins, currentUserId, onUpdateCoins }: ShopPageProps) {
+export default function ShopPage({ 
+  userCoins, 
+  userItems, 
+  onPurchaseItem, 
+  onBack, // 💉 [수정] onClose 대신 onBack을 꺼내옵니다.
+  currentUserId,
+  onUpdateCoins
+}: ShopPageProps) {
+  // 아이템 데이터 정의
+  const itemData = [
+    { id: 'stop', img: 'itemStop3sec.png', count: userItems.stop },
+    { id: 'switch', img: 'itemSwitchBtn.png', count: userItems.switch },
+    { id: 'color', img: 'itemColor.png', count: userItems.color },
+    { id: 'heal', img: 'itemHeal.png', count: userItems.heal },
+  ];
+
   const [isAdOpen, setIsAdOpen] = useState(false);
   const [adType, setAdType] = useState<'coins' | 'remove_ads'>('coins');
   const [adCooldown, setAdCooldown] = useState(0);
@@ -102,14 +120,78 @@ export default function ShopPage({ onBack, userCoins, currentUserId, onUpdateCoi
     };
 
   return (
-    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4">
+    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4 pb-10">
       <AdOverlay isOpen={isAdOpen} onClose={() => setIsAdOpen(false)} onReward={handleAdReward} />
 
       {/* 상단 헤더 */}
-      <div className="w-full flex justify-end mb-0">
-        
-        <button onClick={onBack} className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px] transition-all hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">Back</button>
+      <div className="w-full flex justify-end mb-2">
+        <button onClick={onBack} className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px] transition-all hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
+          Back
+        </button>
       </div>
+
+      {/* 💉 아이템 보유량 표시 (최상단) */}
+      <div className="w-full grid grid-cols-4 gap-2 mb-2  p-3 rounded-[8px] border-2 border-[#ffcc33]">
+        {[
+          { id: 'stop', img: 'itemStop3sec.png', count: userItems.stop },
+          { id: 'switch', img: 'itemSwitchBtn.png', count: userItems.switch },
+          { id: 'color', img: 'itemColor.png', count: userItems.color },
+          { id: 'heal', img: 'itemHeal.png', count: userItems.heal }
+        ].map((item) => (
+          <div key={item.id} className="relative flex flex-col items-center">
+            <img src={`/images/${item.img}`} alt={item.id} className="w-12 h-12 object-contain" />
+            {/* 빨간 동그라미 보유량 배지 */}
+            <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black min-w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-zinc-900 px-1 shadow-lg">
+              {item.count}
+            </div>
+          </div>
+        ))}
+      </div>
+
+
+
+      {/* 💉 아이템 구매 버튼 5종 (한 줄 나열) */}
+      <div className="w-full flex justify-between gap-1.5 mb-6">
+
+
+        {/* 모든 아이템 10개 구매 버튼 */}
+        <button 
+          onClick={() => onPurchaseItem('all', 10)}
+          className="flex-1 flex flex-col items-center py-3 border border-zinc-600 bg-zinc-900/80 rounded-[5px] active:scale-95 transition-all"
+        >
+          <span className="text-[9px] font-black text-amber-500 uppercase leading-none mb-1">각 10개씩</span>
+            <div className="flex -space-x-1.5 my-1.5">
+              <img src="/images/itemAll.png" className="w-7 h-7 object-contain" />
+            </div>
+          <span className="text-[11px] font-black text-white">$0.99</span>
+        </button>
+
+        {/* 개별 아이템 30개씩 구매 */}
+        {[
+            { id: 'stop', img: 'itemStop3sec.png', label: '3sec' }, // 💉 label 추가
+            { id: 'switch', img: 'itemSwitchBtn.png', label: 'swch' }, // 💉 label 추가
+            { id: 'color', img: 'itemColor.png', label: 'colr' }, // 💉 label 추가
+            { id: 'heal', img: 'itemHeal.png', label: 'heal' }  // 💉 label 추가
+          ].map((item) => (
+            
+            <button 
+              key={item.id}
+              onClick={() => onPurchaseItem(item.id, 30)}
+              className="flex-1 flex flex-col items-center border border-zinc-600 py-3 bg-zinc-900/80 rounded-[5px] active:scale-95 transition-all"
+            >
+            <span className="text-[9px] font-black text-amber-500 uppercase leading-none mb-1">
+              30개
+            </span>
+            <img src={`/images/${item.img}`} className="w-7 h-7 object-contain my-1.5" alt={item.id} />
+            <span className="text-[11px] font-black text-white">$0.99</span>
+          </button>
+        ))}
+      </div>
+
+
+
+      {/* 구분선 */}
+      <div className="w-full border-t border-zinc-800/50 my-2" />
 
       <div className="w-full space-y-4">
         {/* --- FREE REWARDS --- */}

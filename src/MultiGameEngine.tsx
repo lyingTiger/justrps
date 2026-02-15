@@ -14,11 +14,30 @@ interface MultiGameProps {
   onBackToLobby: () => void;
   sessionCoins: number;
   sessionItems: { stop: number; switch: number; color: number; heal: number };
+  isItemMatch: boolean; // 💉 아이템전 여부 추가
+  userItems: { stop: number; switch: number; color: number; heal: number };
+  onUseItem: (itemType: string) => void; // 아이템 사용 서버 전송용
 }
 
 
 
-export default function MultiGameEngine({ roomId, userNickname, sessionCoins, sessionItems,playClickSound, playBeepSound, onSaveRewards, onEarnCoin, onRoundClear,onGameOver, onBackToLobby }: MultiGameProps) {
+export default function MultiGameEngine({ 
+  isItemMatch, // 💉 꺼내기
+  userItems,
+  onUseItem,
+  roomId, 
+  userNickname, 
+  sessionCoins, 
+  sessionItems,
+  playClickSound, 
+  playBeepSound, 
+  onSaveRewards, 
+  onEarnCoin, 
+  onRoundClear,
+  onGameOver, 
+  onBackToLobby 
+}: MultiGameProps) {
+
   // --- 상태 관리 ---
   const [currentRound, setCurrentRound] = useState(1);
   const [playTime, setPlayTime] = useState(0); 
@@ -34,6 +53,22 @@ export default function MultiGameEngine({ roomId, userNickname, sessionCoins, se
   
   // 멀티플레이도 '라운드 진입 시간'을 기준으로 기록
   const roundEntryTimeRef = useRef(0);
+
+  // 💉 현재 라운드에서 '사용 예약'한 아이템 상태
+  const [pendingAttack, setPendingAttack] = useState<string | null>(null);
+  const [pendingHeal, setPendingHeal] = useState(false);
+
+  // 아이템 클릭 핸들러
+  const handleItemClick = (type: string) => {
+    if (userItems[type as keyof typeof userItems] <= 0) return;
+    
+    if (type === 'heal') {
+      setPendingHeal(!pendingHeal);
+    } else {
+      // 공격 아이템은 하나만 선택 가능 (토글)
+      setPendingAttack(prev => prev === type ? null : type);
+    }
+  };
 
   // 게임 로직 관련
   const [aiSelect, setAiSelect] = useState<number[]>([]);
@@ -439,6 +474,56 @@ export default function MultiGameEngine({ roomId, userNickname, sessionCoins, se
            </div>
        )}
     </div>
+
+
+       {/* 💉 아이템전일 때만 나타나는 아이템 버튼 영역 */}
+        {isItemMatch && !isCleared && !isEliminated && (
+          <div className="w-full px-4 mb-4 animate-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center justify-between bg-black/60 backdrop-blur-md p-3 rounded-[24px] border border-white/10 shadow-2xl">
+              
+              {/* 1. 공격 아이템 그룹 (3종) */}
+              <div className="flex gap-3">
+                {[
+                  { id: 'stop', img: 'itemStop3sec.png' },
+                  { id: 'switch', img: 'itemSwitchBtn.png' },
+                  { id: 'color', img: 'itemColor.png' }
+                ].map((item) => (
+                  <button 
+                    key={item.id}
+                    disabled={pendingAttack !== null && pendingAttack !== item.id} // 하나 선택 시 나머지 비활성화
+                    onClick={() => handleItemClick(item.id)}
+                    className={`relative p-1 rounded-xl transition-all duration-200 
+                      ${pendingAttack === item.id ? 'bg-[#FF9900] ring-2 ring-[#FF9900] scale-110 shadow-[0_0_15px_rgba(255,153,0,0.5)]' : 'bg-zinc-800/50 opacity-50'}
+                      ${userItems[item.id as keyof typeof userItems] <= 0 ? 'grayscale opacity-20 pointer-events-none' : 'hover:opacity-100'}
+                    `}
+                  >
+                    <img src={`/images/${item.img}`} className="w-8 h-8 object-contain" alt={item.id} />
+                    <div className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[8px] font-black min-w-[15px] h-[15px] rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
+                      {userItems[item.id as keyof typeof userItems]}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* 구분선 */}
+              <div className="w-[1px] h-6 bg-zinc-700 mx-1"></div>
+
+              {/* 2. 치유 아이템 (1종) */}
+              <button 
+                onClick={() => handleItemClick('heal')}
+                className={`relative p-1 rounded-xl transition-all duration-200 
+                  ${pendingHeal ? 'bg-green-500 ring-2 ring-green-500 scale-110 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'bg-zinc-800/50 opacity-50'}
+                  ${userItems.heal <= 0 ? 'grayscale opacity-20 pointer-events-none' : 'hover:opacity-100'}
+                `}
+              >
+                <img src="/images/itemHeal.png" className="w-8 h-8 object-contain" alt="heal" />
+                <div className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[8px] font-black min-w-[15px] h-[15px] rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
+                  {userItems.heal}
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
 
 
 
