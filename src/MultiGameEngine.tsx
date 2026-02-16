@@ -90,36 +90,41 @@ export default function MultiGameEngine({
   }, [roomId, currentUserId]); 
       
 
-  // 3. 💉 triggerStopEffect 함수 수정
+  // 💉  3초간 얼려버리는 발동 함수
   const triggerStopEffect = () => {
-  // 1. 공격 아이콘 3회 깜빡임 (0.2초 * 3 = 0.6초)
-    setFlashingItem('stop');
+    console.log("❄️ triggerStopEffect 진입"); 
+    setFlashingItem('stop'); // 1. 아이콘 깜빡임 시작
     if (typeof playIceSound === 'function') playIceSound();
 
+    // 0.6초(깜빡임 3회 시간) 뒤에 카운트다운 시작
     setTimeout(() => {
-      setFlashingItem(null); // 깜빡임 종료
-      setFreezeCount(3);     // 버튼 사라지고 숫자 등장
+      console.log("⏱️ 카운트다운 상태 진입 (freezeCount = 3)");
+      setFlashingItem(null); 
+      setFreezeCount(3); 
+    }, 600);
+  };
 
-      // 2. 1초마다 카운트다운
+  // 💉 freezeCount 숫자를 1초마다 줄이는 전용 감시자
+  useEffect(() => {
+    if (freezeCount > 0) {
       const timer = setInterval(() => {
         setFreezeCount((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            
-            // 3. 종료 후 DB 초기화 및 복구
+            // 3초 종료 후 DB 초기화
             supabase.from('room_participants')
               .update({ effect_type: null, effect_at: null })
               .eq('room_id', roomId)
               .eq('user_id', currentUserId)
-              .then();
-            
+              .then(() => console.log("✅ 공격 효과 종료 및 DB 초기화"));
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
-    }, 600); // 깜빡임 완료 후 발동
-  };
+      return () => clearInterval(timer); // 메모리 누수 방지
+    }
+  }, [freezeCount, roomId, currentUserId]);
 
   const coinRef = useRef(0);
   
@@ -601,6 +606,7 @@ export default function MultiGameEngine({
 
       {/*  💉 하단 버튼영역 */}
       
+      * 💉 [수정] 버튼 렌더링 영역 (전체 코드 유지하며 조건문 정밀 교정) */
       <div className="w-full flex justify-center mt-auto flex-none px-4 pb-6 relative z-[20]">
         
         {/* 💉 1. 아이콘 3회 깜빡임 오버레이 (가로 50% 크기) */}
@@ -608,13 +614,16 @@ export default function MultiGameEngine({
           <div className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none">
             <img 
               src={flashingItem === 'stop' ? "/images/itemStop3sec.png" : `/images/item${flashingItem}.png`}
+              alt="attack effect"
               className="w-1/2 aspect-square object-contain animate-[flash_0.2s_ease-in-out_3]"
+              /* 💉 이미지가 안 뜰 경우를 대비해 콘솔 로그 확인용 */
+              onError={() => console.error("❌ 아이콘 이미지 로드 실패:", flashingItem)}
             />
           </div>
         )}
 
         {(!isEliminated && !isCleared) ? (
-          /* 💉 2. 멈춤 공격 카운트다운 상태일 때 */
+          /* 💉 2. 멈춤 공격 카운트다운 상태일 때 (최우선 순위) */
           freezeCount > 0 ? (
             <div className="flex items-center justify-center h-24">
               <span className="text-8xl font-black text-blue-500 italic animate-pulse drop-shadow-[0_0_15px_rgba(59,130,246,0.8)]">
@@ -622,7 +631,7 @@ export default function MultiGameEngine({
               </span>
             </div>
           ) : (
-            /* 💉 3. 정상 상태 (기존 로직 유지) */
+            /* 💉 3. 정상 상태 (기존 로직 보존) */
             isMemoryPhase ? (
               <button 
                 onClick={(e) => { 
@@ -630,7 +639,7 @@ export default function MultiGameEngine({
                   playClickSound(); 
                   setIsMemoryPhase(false); 
                 }} 
-                className="w-full h-14 rounded-md font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic uppercase hover:scale-105 transition-transform animate-pulse cursor-pointer pointer-events-auto"
+                className="w-full h-14 rounded-md font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic hover:scale-105 transition-transform animate-pulse cursor-pointer pointer-events-auto"
               >
                 OK, I got it
               </button>
@@ -642,7 +651,7 @@ export default function MultiGameEngine({
                     key={type} 
                     onClick={(e) => {
                       e.stopPropagation();
-                      // 💉 멈춤 상태에서는 클릭 방지 (추가 안전장치)
+                      /* 💉 추가 안전장치: freezeCount가 떠있는 동안 클릭 방지 */
                       if (freezeCount > 0) return;
                       handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0);
                     }} 
@@ -662,7 +671,7 @@ export default function MultiGameEngine({
           null 
         )}
 
-        {/* 💉 4. 깜빡임 애니메이션 정의 */}
+        {/* 💉 4. 깜빡임 애니메이션 정의 (Tailwind 커스텀 애니메이션 미설정 대비) */}
         <style>{`
           @keyframes flash {
             0%, 100% { opacity: 1; transform: scale(1); }
