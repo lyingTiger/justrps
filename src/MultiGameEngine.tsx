@@ -606,7 +606,6 @@ export default function MultiGameEngine({
 
       {/*  💉 하단 버튼영역 */}
       
-      * 💉 [수정] 버튼 렌더링 영역 (전체 코드 유지하며 조건문 정밀 교정) */
       <div className="w-full flex justify-center mt-auto flex-none px-4 pb-6 relative z-[20]">
         
         {/* 💉 1. 아이콘 3회 깜빡임 오버레이 (가로 50% 크기) */}
