@@ -98,11 +98,12 @@ export default function MultiplayPage({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // 1. 방 생성
     const { data: room, error: roomError } = await supabase.from('rooms').insert({
       name: newRoomName,
       password: password || null,
       max_players: maxPlayers,
-      current_players: 1,
+      current_players: 1, // 방장은 일단 1명으로 시작
       mode: selectedMode,
       is_item_mode: isItemMode, 
       creator_id: user.id,
@@ -110,21 +111,27 @@ export default function MultiplayPage({
       seed: Math.random()
     }).select().single();
 
-    if (!room || roomError) {
-      // 💉 시스템 alert 대신 게임 내 팝업 사용
-      onShowPopup(t('btn_create'), t('msg_create_failed') + (roomError?.message || ""));
+    if (roomError || !room) {
+      onShowPopup(t('btn_create'), t('msg_create_failed'));
       return;
     }
 
-    if (room) {
-      await supabase.from('room_participants').insert({ room_id: room.id, user_id: user.id });
-      // 💉 [추가] 방이 성공적으로 생성되었을 때, App의 상태에 모드 정보를 저장합니다.
-      // room.is_item_mode가 true라면 'item', 아니면 'normal'로 설정합니다.
-      if (typeof setCurrentRoomMode === 'function') {
-        setCurrentRoomMode(room.is_item_mode ? 'item' : 'normal');
-      }
-      onJoin(room.id);
+    // 2. 💉 방장을 참여자 명단에 등록 (await로 완료 보장)
+    const { error: partError } = await supabase.from('room_participants')
+      .insert({ room_id: room.id, user_id: user.id });
+
+    if (partError) {
+      onShowPopup(t('btn_create'), "참여자 등록 실패");
+      return;
     }
+
+    // 3. 앱 상태 동기화 및 뷰 전환
+    if (typeof setCurrentRoomMode === 'function') {
+      setCurrentRoomMode(room.is_item_mode ? 'item' : 'normal');
+    }
+    
+    // 💉 모든 DB 작업이 확실히 끝난 후 입장 시킵니다.
+    onJoin(room.id);
   };
 
 

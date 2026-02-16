@@ -49,28 +49,32 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
   // 🔄 2. 방 상태 조회 (🔥 납치 방지 로직 적용)
   const fetchRoomStatus = async () => {
     if (!roomId) return;
-    const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single();
-    if (room) {
-        setRoomInfo(room);
-        if (userIdRef.current) isCreatorRef.current = (room.creator_id === userIdRef.current);
+    
+    // maybeSingle()을 사용하여 방이 없을 경우 에러 대신 null을 받습니다.
+    const { data: room, error } = await supabase.from('rooms').select('*').eq('id', roomId).maybeSingle();
+    
+    if (error || !room) {
+      console.warn("방을 찾을 수 없습니다.");
+      onLeave();
+      return;
+    }
+
+    setRoomInfo(room);
+    if (userIdRef.current) isCreatorRef.current = (room.creator_id === userIdRef.current);
+    
+    // 🔥 [핵심] 방이 게임 중이고 내가 Ready 상태일 때만 게임 화면으로 진입
+    if (room.status === 'playing' && userIdRef.current) {
+      const { data: me } = await supabase
+        .from('room_participants')
+        .select('is_ready')
+        .eq('room_id', roomId)
+        .eq('user_id', userIdRef.current)
+        .maybeSingle();
         
-        // 🔥 [핵심 수정] 방이 게임 중(playing)이라도, 내가 'Ready' 상태일 때만 따라들어감!
-        if (room.status === 'playing' && userIdRef.current) {
-            const { data: me } = await supabase
-                .from('room_participants')
-                .select('is_ready')
-                .eq('room_id', roomId)
-                .eq('user_id', userIdRef.current)
-                .single();
-            
-            // "나 레디 했어?" 확인 후 진입
-            if (me && me.is_ready) {
-                console.log("⏰ Polling: Room is playing & I am Ready -> Joining!");
-                onStartGame();
-            } else {
-                console.log("🛡️ Polling: Room is playing but I am NOT Ready -> Stay.");
-            }
-        }
+      if (me && me.is_ready) {
+        console.log("⏰ Polling: Room is playing & I am Ready -> Joining!");
+        onStartGame();
+      }
     }
   };
 
@@ -161,13 +165,12 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
           }
         })
         // (E) 유저 이탈
-        .on('presence', { event: 'leave' }, async ({ leftPresences }) => {
-            if (isCreatorRef.current) {
-                for (const leftUser of leftPresences) {
-                    await supabase.from('room_participants').delete().eq('room_id', roomId).eq('user_id', leftUser.user_id);
-                }
-            }
+        .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+            // 💉 [수술] DB에서 삭제하는 로직을 완전히 들어냅니다. 
+            // 유저가 나갔다는 사실은 'postgres_changes'나 폴링이 알아서 처리하게 둡니다.
+            console.log("👋 누군가 연결이 끊겼습니다:", leftPresences);
         })
+
         .subscribe((status) => {
            if (status === 'SUBSCRIBED') {
               channelRef.current = channel;
@@ -198,13 +201,18 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
   // --- 강퇴 감지 ---
   useEffect(() => {
-    if (!currentUserId || participants.length === 0) return;
+  // 💉 내 ID가 없거나 참가자 명단이 아직 로딩 전(0명)이면 판단을 유보합니다.
+  if (!currentUserId || participants.length === 0) return;
+
     const isMeInList = participants.some(p => p.user_id === currentUserId);
+    
     if (isMeInList) {
       hasJoinedRef.current = true; 
     } else {
+      // 💉 'hasJoinedRef'가 확실히 true인 상태(한번이라도 명단에 있었음)에서만 킥으로 간주
       if (hasJoinedRef.current && !isExiting.current) {
-         setShowKickedModal(true); 
+        console.log("🚨 강퇴당함이 감지되었습니다.");
+        setShowKickedModal(true); 
       }
     }
   }, [participants, currentUserId]);
