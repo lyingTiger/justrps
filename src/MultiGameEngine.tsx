@@ -75,15 +75,20 @@ export default function MultiGameEngine({
         table: 'room_participants',
         filter: `user_id=eq.${currentUserId}` 
       }, (payload) => {
+        console.log("🚨 실시간 신호 수신 성공! 데이터:", payload.new);
         const { effect_type, effect_at } = payload.new;
         if (effect_type === 'stop' && effect_at) {
           triggerStopEffect(); // 🧊 멈춤 공격 실행
         }
       })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [roomId, currentUserId]);
+      .subscribe((status) => {
+        console.log(`📡 채널 연결 상태: ${status}`);
+      }); 
+    return () => { 
+      supabase.removeChannel(channel); 
+    };
+  }, [roomId, currentUserId]); 
+      
 
   // 3. 💉 triggerStopEffect 함수 수정
   const triggerStopEffect = () => {

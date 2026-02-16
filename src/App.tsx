@@ -158,7 +158,7 @@ export default function App() {
   });
 
 
-  
+
   // ------------------------------------------------------------------
   // 💉 방 참가자 명단을 가져오고 실시간으로 업데이트하는 로직
   // ------------------------------------------------------------------
@@ -1454,11 +1454,20 @@ export default function App() {
 
             // 💉 아이템 사용 시 실제 차감 로직
             onUseItem={async (itemType) => {
-              if (!currentUserId || !currentRoomId || !participants) return; // 💉 participants 추가 확인
+              console.log("🛠️ onUseItem 진입:", { itemType, currentUserId, currentRoomId, hasParticipants: !!participants });
+              if (!currentUserId || !currentRoomId || !participants) 
+                console.warn("⚠️ 필수 데이터 누락으로 중단됨");
+              return; // 💉 participants 추가 확인
+
+              // 💉 즉시 로컬 UI 차감 (사용자가 취소할 수 없게 함)
+              setUserItems(prev => ({
+                ...prev,
+                [itemType]: Math.max(0, prev[itemType as keyof UserItems] - 1)
+              }));
               
               try {
-                // 1. DB 차감 (RPC 호출) - 기존 유지
-                await supabase.rpc('update_user_items', {
+                // DB 차감 (RPC 호출) 
+                const { error: rpcError } = await supabase.rpc('update_user_items', {
                   target_user_id: currentUserId,
                   stop_inc: itemType === 'stop' ? -1 : 0,
                   switch_inc: itemType === 'switch' ? -1 : 0,
@@ -1466,46 +1475,39 @@ export default function App() {
                   heal_inc: itemType === 'heal' ? -1 : 0
                 });
 
-                // 🔥 [핵심 타겟팅 수술 시작]
-                if (itemType !== 'heal') {
-                  // 1등(가장 높은 라운드) 유저 찾기
-                  const sorted = [...participants].sort((a, b) => (b.current_round || 0) - (a.current_round || 0));
-                  const leaderId = sorted[0]?.user_id;
-                  const isMeLeader = leaderId === currentUserId;
+                if (rpcError) throw rpcError;
 
-                  // 기본 쿼리 생성
-                  let query = supabase
-                    .from('room_participants')
-                    .update({ 
+                // 🔥 [핵심 타겟팅]
+                if (itemType !== 'heal') {
+                  //  공격 대상 정밀 타겟팅
+                    const sorted = [...participants].sort((a, b) => (b.current_round || 0) - (a.current_round || 0));
+                    const leaderId = sorted[0]?.user_id;
+                    const isMeLeader = leaderId === currentUserId;
+
+                    console.log(`🎯 공격 발사! 아이템: ${itemType}, 나는 1등인가?: ${isMeLeader}`);
+
+                    let query = supabase.from('room_participants').update({ 
                       effect_type: itemType, 
                       effect_at: new Date().toISOString() 
-                    })
-                    .eq('room_id', currentRoomId);
+                    }).eq('room_id', currentRoomId);
 
-                  // 조건부 타겟팅 적용
-                  if (isMeLeader) {
-                    // 💉 내가 1등이면: 나를 제외한 모든 참가자(광역 공격)
-                    query = query.neq('user_id', currentUserId);
-                  } else {
-                    // 💉 내가 1등이 아니면: 1등 유저에게만(저격 공격)
-                    query = query.eq('user_id', leaderId);
+                    if (isMeLeader) {
+                      // 내가 1등이면 나머지 모두 공격
+                      query = query.neq('user_id', currentUserId);
+                      console.log("📢 광역 공격 실행 (나 제외 모두)");
+                    } else {
+                      // 내가 1등이 아니면 1등 한 명만 저격
+                      query = query.eq('user_id', leaderId);
+                      console.log(`🎯 저격 공격 실행 (대상: ${leaderId})`);
+                    }
+
+                    const { error: updateError } = await query;
+                    if (updateError) console.error("📡 공격 신호 발송 실패:", updateError);
                   }
-
-                  await query;
-                }
-                // 🔥 [핵심 타겟팅 수술 종료]
-
-                // 3. 로컬 상태 즉시 반영 (UI 업데이트용) - 기존 유지
-                setUserItems(prev => ({
-                  ...prev,
-                  [itemType]: Math.max(0, prev[itemType as keyof UserItems] - 1)
-                }));
-
-                console.log(`🚀 아이템 사용 차감 및 공격 발송 완료: ${itemType}`);
-              } catch (e) {
-                console.error("아이템 처리 중 오류 발생:", e);
-              }
-            }}
+                } catch (e) {
+                  console.error("🏥 아이템 처리 중 오류 발생:", e);
+                } // 💉 [수정] 누락되었던 catch 블록 닫는 괄호 추가
+              }} // 💉 [수정] 누락되었던 async 함수 및 Props 닫는 괄호 추가
 
             playIceSound={playIceSound}
             playClickSound={playClickSound} 
