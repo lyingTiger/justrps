@@ -1455,59 +1455,63 @@ export default function App() {
             // 💉 아이템 사용 시 실제 차감 로직
             onUseItem={async (itemType) => {
               console.log("🛠️ onUseItem 진입:", { itemType, currentUserId, currentRoomId, hasParticipants: !!participants });
-              if (!currentUserId || !currentRoomId || !participants) 
-                console.warn("⚠️ 필수 데이터 누락으로 중단됨");
-              return; // 💉 participants 추가 확인
+              
+              // 💉 [수정] 중괄호 {}를 추가하여 조건을 만족할 때만 return하게 합니다.
+              if (!currentUserId || !currentRoomId || !participants || participants.length === 0) {
+                console.warn("⚠️ 필수 데이터 미준비로 중단됨");
+                return; 
+              }
 
-              // 💉 즉시 로컬 UI 차감 (사용자가 취소할 수 없게 함)
+              // 1. 즉시 로컬 UI 차감 (취소 불가)
               setUserItems(prev => ({
                 ...prev,
                 [itemType]: Math.max(0, prev[itemType as keyof UserItems] - 1)
-              }));
-              
-              try {
-                // DB 차감 (RPC 호출) 
-                const { error: rpcError } = await supabase.rpc('update_user_items', {
-                  target_user_id: currentUserId,
-                  stop_inc: itemType === 'stop' ? -1 : 0,
-                  switch_inc: itemType === 'switch' ? -1 : 0,
-                  color_inc: itemType === 'color' ? -1 : 0,
-                  heal_inc: itemType === 'heal' ? -1 : 0
-                });
+            }));
+            
+            try {
+              // 2. DB 차감 (RPC 호출) 
+              const { error: rpcError } = await supabase.rpc('update_user_items', {
+                target_user_id: currentUserId,
+                stop_inc: itemType === 'stop' ? -1 : 0,
+                switch_inc: itemType === 'switch' ? -1 : 0,
+                color_inc: itemType === 'color' ? -1 : 0,
+                heal_inc: itemType === 'heal' ? -1 : 0
+              });
 
-                if (rpcError) throw rpcError;
+              if (rpcError) throw rpcError;
 
-                // 🔥 [핵심 타겟팅]
-                if (itemType !== 'heal') {
-                  //  공격 대상 정밀 타겟팅
-                    const sorted = [...participants].sort((a, b) => (b.current_round || 0) - (a.current_round || 0));
-                    const leaderId = sorted[0]?.user_id;
-                    const isMeLeader = leaderId === currentUserId;
+              // 🔥 [핵심 타겟팅 로직]
+              if (itemType !== 'heal') {
+                // 1등 찾기 (가장 높은 라운드)
+                const sorted = [...participants].sort((a, b) => (b.current_round || 0) - (a.current_round || 0));
+                const leaderId = sorted[0]?.user_id;
+                const isMeLeader = leaderId === currentUserId;
 
-                    console.log(`🎯 공격 발사! 아이템: ${itemType}, 나는 1등인가?: ${isMeLeader}`);
+                console.log(`🎯 타겟 분석 - 내 ID: ${currentUserId}, 1등 ID: ${leaderId}, 나는 1등?: ${isMeLeader}`);
 
-                    let query = supabase.from('room_participants').update({ 
-                      effect_type: itemType, 
-                      effect_at: new Date().toISOString() 
-                    }).eq('room_id', currentRoomId);
+                let query = supabase.from('room_participants').update({ 
+                  effect_type: itemType, 
+                  effect_at: new Date().toISOString() 
+                }).eq('room_id', currentRoomId);
 
-                    if (isMeLeader) {
-                      // 내가 1등이면 나머지 모두 공격
-                      query = query.neq('user_id', currentUserId);
-                      console.log("📢 광역 공격 실행 (나 제외 모두)");
-                    } else {
-                      // 내가 1등이 아니면 1등 한 명만 저격
-                      query = query.eq('user_id', leaderId);
-                      console.log(`🎯 저격 공격 실행 (대상: ${leaderId})`);
-                    }
+                // 타겟 분기
+                if (isMeLeader) {
+                  query = query.neq('user_id', currentUserId); // 나 빼고 모두
+                  console.log("📢 1등의 광역 공격 발사!");
+                } else {
+                  query = query.eq('user_id', leaderId); // 1등만 저격
+                  console.log(`🎯 추격자의 저격 공격 발사! (대상: ${leaderId})`);
+                }
 
-                    const { error: updateError } = await query;
-                    if (updateError) console.error("📡 공격 신호 발송 실패:", updateError);
-                  }
-                } catch (e) {
-                  console.error("🏥 아이템 처리 중 오류 발생:", e);
-                } // 💉 [수정] 누락되었던 catch 블록 닫는 괄호 추가
-              }} // 💉 [수정] 누락되었던 async 함수 및 Props 닫는 괄호 추가
+                const { error: updateError, data } = await query.select();
+                if (updateError) console.error("📡 DB 업데이트 실패:", updateError);
+                else console.log("✅ DB 업데이트 성공 (수정된 행):", data);
+              }
+            } catch (e) {
+              console.error("🏥 아이템 처리 중 오류 발생:", e);
+            }
+          }}
+
 
             playIceSound={playIceSound}
             playClickSound={playClickSound} 

@@ -65,29 +65,60 @@ export default function MultiGameEngine({
   const [flashingItem, setFlashingItem] = useState<string | null>(null);
   const [freezeCount, setFreezeCount] = useState<number>(0);
 
-  // 2. 💉 실시간 공격 감지 리스너 (useEffect 내부 또는 신규 추가)
+
+  // 버튼 순서 상태 추가 (0: scissor, 1: rock, 2: paper)
+  const [buttonOrder, setButtonOrder] = useState<number[]>([1, 2, 0]); // 바위, 보, 가위 순서
+
+
+
   useEffect(() => {
-    const channel = supabase
-      .channel(`room_attacks_${roomId}`)
+    if (!currentUserId || !roomId) return; 
+
+    const channel = supabase.channel(`room_attacks_${roomId}`)
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
         table: 'room_participants',
         filter: `user_id=eq.${currentUserId}` 
       }, (payload) => {
-        console.log("🚨 실시간 신호 수신 성공! 데이터:", payload.new);
+        console.log("🚨 [공격 감지]:", payload.new.effect_type);
         const { effect_type, effect_at } = payload.new;
-        if (effect_type === 'stop' && effect_at) {
-          triggerStopEffect(); // 🧊 멈춤 공격 실행
-        }
+        if (!effect_at) return;
+
+        if (effect_type === 'stop') triggerStopEffect();
+        else if (effect_type === 'switch') triggerSwitchEffect();
       })
       .subscribe((status) => {
-        console.log(`📡 채널 연결 상태: ${status}`);
-      }); 
-    return () => { 
-      supabase.removeChannel(channel); 
-    };
-  }, [roomId, currentUserId]); 
+        console.log(`📡 공격 수신 안테나 상태: ${status}`);
+      });
+
+    return () => { supabase.removeChannel(channel); };
+  }, [roomId, currentUserId]);
+    
+
+
+  const triggerSwitchEffect = () => {
+    setFlashingItem('switch'); // 1. 스위치 아이콘 3회 깜빡임
+    if (typeof playBeepSound === 'function') playBeepSound();
+
+    setTimeout(() => {
+      setFlashingItem(null);
+      // 2. 버튼 순서 무작위 셔플 (Fisher-Yates)
+      setButtonOrder(prev => {
+        const newOrder = [...prev];
+        for (let i = newOrder.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [newOrder[i], newOrder[j]] = [newOrder[j], newOrder[i]];
+        }
+        return newOrder;
+      });
+
+      // 3. DB 초기화
+      supabase.from('room_participants')
+        .update({ effect_type: null, effect_at: null })
+        .eq('user_id', currentUserId).then();
+    }, 600);
+  };
       
 
   // 💉  3초간 얼려버리는 발동 함수
@@ -126,26 +157,39 @@ export default function MultiGameEngine({
     }
   }, [freezeCount, roomId, currentUserId]);
 
+
+
   const coinRef = useRef(0);
   
+
+
   // 멀티플레이도 '라운드 진입 시간'을 기준으로 기록
   const roundEntryTimeRef = useRef(0);
+
+
 
   // 💉 현재 라운드에서 '사용 예약'한 아이템 상태
   const [pendingAttack, setPendingAttack] = useState<string | null>(null);
   const [pendingHeal, setPendingHeal] = useState(false);
 
-  // 아이템 클릭 핸들러
+
+
+  // 💉 아이템 클릭 시 즉시 서버로 발사하는 로직
   const handleItemClick = (type: string) => {
+    // 아이템이 없으면 무시
     if (userItems[type as keyof typeof userItems] <= 0) return;
     
+    // 🚀 [핵심] 즉시 서버 전송 및 차감 (App.tsx의 onUseItem 호출)
+    console.log(`🚀 ${type} 아이템 즉시 발동!`);
+    onUseItem(type);
+
+    // 힐(Heal)인 경우 내 로컬에서 추가 연출이 필요하다면 여기에 작성
     if (type === 'heal') {
-      setPendingHeal(!pendingHeal);
-    } else {
-      // 공격 아이템은 하나만 선택 가능 (토글)
-      setPendingAttack(prev => prev === type ? null : type);
+      // 💉 예: setHp(prev => prev + 1); (필요시)
     }
   };
+
+
 
   // 게임 로직 관련
   const [aiSelect, setAiSelect] = useState<number[]>([]);
@@ -567,14 +611,14 @@ export default function MultiGameEngine({
                 ].map((item) => (
                   <button 
                     key={item.id}
-                    disabled={pendingAttack !== null && pendingAttack !== item.id} // 하나 선택 시 나머지 비활성화
                     onClick={() => handleItemClick(item.id)}
-                    className={`relative p-1 rounded-xl transition-all duration-200 
-                      ${pendingAttack === item.id ? 'bg-[#FF9900] ring-2 ring-[#FF9900] scale-110 shadow-[0_0_15px_rgba(255,153,0,0.5)]' : 'bg-zinc-800/50 opacity-50'}
-                      ${userItems[item.id as keyof typeof userItems] <= 0 ? 'grayscale opacity-20 pointer-events-none' : 'hover:opacity-100'}
-                    `}
+                    className={`relative p-1 rounded-xl transition-all duration-100 active:scale-125
+                      ${userItems[item.id as keyof typeof userItems] <= 0 
+                        ? 'grayscale opacity-20 pointer-events-none' 
+                        : 'bg-zinc-800/50 hover:bg-zinc-700 opacity-100'}`}
                   >
                     <img src={`/images/${item.img}`} className="w-8 h-8 object-contain" alt={item.id} />
+                    {/* 보유 수량 배지 */}
                     <div className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[8px] font-black min-w-[15px] h-[15px] rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
                       {userItems[item.id as keyof typeof userItems]}
                     </div>
@@ -645,24 +689,30 @@ export default function MultiGameEngine({
             ) : (
               /* 가위바위보 버튼 영역 (60% 너비 유지) */
               <div className="flex gap-3 w-[60%] mb-2">
-                {['rock', 'paper', 'scissor'].map((type) => (
-                  <button 
-                    key={type} 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      /* 💉 추가 안전장치: freezeCount가 떠있는 동안 클릭 방지 */
-                      if (freezeCount > 0) return;
-                      handleSelect(type === 'rock' ? 1 : type === 'paper' ? 2 : 0);
-                    }} 
-                    className={`flex-1 aspect-square rounded-3xl active:scale-90 transition-all bg-zinc-900 pointer-events-auto ${
-                      type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 
-                      type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 
-                      'shadow-[0_0_15px_rgba(236,72,153,0.5)]'
-                    }`}
-                  >
-                    <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
+                {buttonOrder.map((idx) => {
+                  // idx 기반 타입 매핑 (기존 handleSelect 로직과 호환)
+                  const types = ['scissor', 'rock', 'paper'];
+                  const type = types[idx];
+                  const value = idx === 1 ? 1 : idx === 2 ? 2 : 0; // rock:1, paper:2, scissor:0
+
+                  return (
+                    <button 
+                      key={type} 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (freezeCount > 0) return;
+                        handleSelect(value);
+                      }} 
+                      className={`flex-1 aspect-square rounded-3xl active:scale-90 transition-all bg-zinc-900 pointer-events-auto ${
+                        type === 'rock' ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 
+                        type === 'paper' ? 'shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 
+                        'shadow-[0_0_15px_rgba(236,72,153,0.5)]'
+                      }`}
+                    >
+                      <img src={`/images/${type}.png`} className="w-full h-full object-cover" />
+                    </button>
+                  );
+                })}
               </div>
             )
           )
@@ -678,20 +728,6 @@ export default function MultiGameEngine({
           }
         `}</style>
       </div>
-
-      {isFrozen && (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-blue-400/30 backdrop-blur-md pointer-events-auto animate-in fade-in duration-300">
-          <div className="relative">
-            {/* 🧊 얼음 아이콘 애니메이션 */}
-            <img src="/images/itemStop3sec.png" className="w-32 h-32 object-contain animate-pulse" />
-            <div className="absolute inset-0 bg-gradient-to-t from-blue-500/50 to-transparent rounded-full filter blur-xl animate-ping" />
-          </div>
-          <h2 className="mt-6 text-4xl font-black text-white italic drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] uppercase">
-            Frozen!
-          </h2>
-          <p className="text-blue-100 font-bold mt-2">3 Seconds...</p>
-        </div>
-      )}
 
       <MultiResultModal 
         isOpen={showResult} 
