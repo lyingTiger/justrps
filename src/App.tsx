@@ -405,8 +405,8 @@ export default function App() {
           isOpen: true,
           title: lang === 'ko' ? "일일 보상!" : "DAILY GIFT!",
           desc: lang === 'ko' 
-            ? "오늘의 접속 보상입니다!\n공격 아이템 3종 각 1개" 
-            : "Daily login reward!\nAttack Item Set (1 each)",
+            ? "접속 보상:\n공격 아이템 세트!" 
+            : "Daily reward!\nAttack Item Set!",
           onConfirm: async () => {
             // DB 아이템 지급
             await supabase.rpc('update_user_items', {
