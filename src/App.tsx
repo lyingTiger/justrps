@@ -532,8 +532,9 @@ export default function App() {
         // [B] 현재 뷰에 따른 커스텀 뒤로 가기 액션
         switch (view) {
           case 'lobby':
-            // 💉 [수정] 로비에서 뒤로 가기 시 새로고침 실행
+            // 💉 로비에서 뒤로 가기 시 새로고침 실행
             console.log("🔄 Lobby swipe detected: Refreshing page...");
+            handleLeaveAllRooms();
             window.location.reload();
             break;
 
@@ -544,13 +545,14 @@ export default function App() {
 
           case 'multiplay':
             // 멀티플레이 페이지 -> 셀렉트 모드
+            handleLeaveAllRooms();
             setView('modeSelect');
             break;
 
           case 'waitingRoom':
             // 웨이팅룸 -> 방 퇴장 후 멀티플레이 페이지
             playClickSound();
-            await leaveCurrentRoom();
+            handleLeaveAllRooms();
             setView('multiplay');
             break;
 
@@ -928,14 +930,10 @@ export default function App() {
   };
 
 
-
   // ------------------------------------------------------------------
-  // 💉 [세션 종료] 로그아웃 및 로컬 캐시 전체 삭제
+  // 💉 모든 방에서 나가기
   // ------------------------------------------------------------------
-  const handleLogout = async () => {
-
-    // if (currentRoomId) await leaveCurrentRoom();
-    // 💉 현재 유저 ID가 있다면 DB의 모든 참여 목록 삭제
+  const handleLeaveAllRooms = async () => {
     if (currentUserId) {
       try {
         await supabase
@@ -948,6 +946,30 @@ export default function App() {
         console.error("방 퇴장 처리 중 오류 발생:", e);
       }
     }
+  }
+
+
+
+  // ------------------------------------------------------------------
+  // 💉 [세션 종료] 로그아웃 및 로컬 캐시 전체 삭제
+  // ------------------------------------------------------------------
+  const handleLogout = async () => {
+
+    // if (currentRoomId) await leaveCurrentRoom();
+    // 💉 현재 유저 ID가 있다면 DB의 모든 참여 목록 삭제
+    // if (currentUserId) {
+    //   try {
+    //     await supabase
+    //       .from('room_participants')
+    //       .delete()
+    //       .eq('user_id', currentUserId);
+        
+    //     console.log("🧹 모든 방에서 퇴장 처리가 완료되었습니다.");
+    //   } catch (e) {
+    //     console.error("방 퇴장 처리 중 오류 발생:", e);
+    //   }
+    // }
+    handleLeaveAllRooms(); // 💉 방 퇴장 로직을 별도의 함수로 분리하여 재사용
 
 
     // 💉 [백업] 삭제 전 보존해야 할 설정값들을 수집합니다.
@@ -1352,13 +1374,13 @@ export default function App() {
               </button>
               {isSettingsMenuOpen && (
                 <div className="absolute left-0 mt-3 w-30 bg-zinc-900 border border-zinc-800 rounded-lg py-0 z-[100] shadow-2xl">
-                  <button onClick={() => { playClickSound(); setView('settings'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">{t('settings', 'language')}</button>
-                  <button onClick={() => { playClickSound(); setView('info'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white">{t('settings', 'game_info')}</button>
+                  <button onClick={() => { handleLeaveAllRooms(); playClickSound(); setView('settings'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase">{t('settings', 'language')}</button>
+                  <button onClick={() => { handleLeaveAllRooms();  playClickSound(); setView('info'); }} className="w-full text-left px-4 py-2 text-xs hover:bg-zinc-800 font-bold uppercase text-zinc-300 hover:text-white">{t('settings', 'game_info')}</button>
                 </div>
               )}
             </div>
 
-            <h2 className="ml-2 text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => { playClickSound(); if(currentRoomId) leaveCurrentRoom(); setView('lobby'); }}>
+            <h2 className="ml-2 text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => { handleLeaveAllRooms(); playClickSound(); if(currentRoomId) leaveCurrentRoom(); setView('lobby'); }}>
               <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
             </h2>
           </div>
@@ -1418,16 +1440,16 @@ export default function App() {
                {['rock', 'paper', 'scissor'].map(img => <div key={img} className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800  shadow-xl"><img src={`/images/${img}.png`} className="w-full h-full object-cover" /></div>)}
              </div>
              <div className="w-full flex flex-col gap-3">
-                 <button onClick={() => { playClickSound(); handleLobbyNavigation('tutorial'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
+                 <button onClick={() => { handleLeaveAllRooms(); playClickSound(); handleLobbyNavigation('tutorial'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
                    {t('lobby', 'btn_tutorial')}
                  </button>
-                 <button onClick={() => { playClickSound(); handleLobbyNavigation('ranking'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
+                 <button onClick={() => { handleLeaveAllRooms(); playClickSound(); handleLobbyNavigation('ranking'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
                    {t('lobby', 'btn_ranking')}
                  </button>
-                 <button onClick={() => { playClickSound(); handleLobbyNavigation('shop'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
+                 <button onClick={() => { handleLeaveAllRooms(); playClickSound(); handleLobbyNavigation('shop'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
                    {t('lobby', 'btn_inventory')}
                  </button>
-                 <button onClick={() => { playClickSound(); handleLobbyNavigation('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
+                 <button onClick={() => { handleLeaveAllRooms(); playClickSound(); handleLobbyNavigation('modeSelect'); }} className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95">
                    {t('lobby', 'btn_play')}
                  </button>
              </div>
@@ -1453,7 +1475,7 @@ export default function App() {
           <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4">
             <div className="w-full flex justify-end mb-0">
               <button 
-                onClick={() => { playClickSound(); setView('lobby'); }} // 💉 사운드 추가
+                onClick={() => { handleLeaveAllRooms(); playClickSound(); setView('lobby'); }} // 💉 사운드 추가
                 className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px] transition-all hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
               >
                 {t('modeSelect', 'btn_back')}
@@ -1472,19 +1494,19 @@ export default function App() {
             </div>
             <p className="w-full text-left text-base font-black text-[#ffcc33] uppercase ml-1 mt-4">{t('modeSelect', 'title_start_with')}</p>
             <button 
-              onClick={() => { playClickSound(); resetGameSession(); setView('battle'); }} 
+              onClick={() => { handleLeaveAllRooms(); playClickSound(); resetGameSession(); setView('battle'); }} 
               className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#3399cc] hover:text-black hover:border-[#3399cc] hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] active:bg-[#3399cc] active:text-black active:border-[#3399cc] active:scale-95"
             >
               {t('modeSelect', 'btn_single')}
             </button>
             <button 
-              onClick={() => { playClickSound(); setView('multiplay'); }} 
+              onClick={() => { handleLeaveAllRooms(); playClickSound(); setView('multiplay'); }} 
               className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#66cc33] hover:text-black hover:border-[#66cc33] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#66cc33] active:text-black active:border-[#66cc33] active:scale-95"
             >
               {t('modeSelect', 'btn_multi')}
             </button>
             <button 
-              onClick={() => { playClickSound(); handlePlayFromBest(); }} 
+              onClick={() => { handleLeaveAllRooms(); playClickSound(); handlePlayFromBest(); }} 
               className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800  hover:bg-[#ff3366] hover:text-black hover:border-[#ff3366] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#ff3366] active:text-black active:border-[#ff3366] active:scale-95"
             >
               {t('modeSelect', 'btn_play_from_best')}
