@@ -52,6 +52,35 @@ export default function MultiGameEngine({
   const [isLoading, setIsLoading] = useState(true);
   const [showResult, setShowResult] = useState(false);
 
+  // 1. 기존 useState 삭제 또는 주석 처리
+  // const [bufferedEffect, setBufferedEffect] = useState<string | null>(null);
+
+  // 2. 💉 최신 값을 실시간으로 담아둘 Ref 생성
+  const bufferedEffectRef = useRef<string | null>(null);
+
+  const [isColorActive, setIsColorActive] = useState(false);
+
+  // 칼라 공격 발동 함수
+  const triggerColorEffect = () => {
+    console.log("🎨 칼라 공격 발동: 문제 색상 제거!");
+    setFlashingItem('color'); // 중앙에 itemColor.png 번쩍임
+    setIsColorActive(true);   // 칼라 효과 활성화
+    
+    if (typeof playBeepSound === 'function') playBeepSound();
+
+    setTimeout(() => {
+      setFlashingItem(null);
+      // 🔥 [핵심 추가] DB의 공격 신호를 삭제하여 무한 루프 방지
+      // 이 작업을 안 해주면 라운드가 바뀔 때마다 리스너가 다시 칼라 공격을 감지합니다.
+      supabase.from('room_participants')
+        .update({ effect_type: null, effect_at: null })
+        .eq('user_id', currentUserId)
+        .then(({ error }) => {
+          if (!error) console.log("✅ 칼라 공격 신호 처리 완료 및 DB 초기화");
+        });
+    }, 600);
+  };
+
 
   // 이 코드는 isItemMatch나 userItems 값이 실제로 바뀔 때만 실행됩니다.
   useEffect(() => {
@@ -76,21 +105,16 @@ export default function MultiGameEngine({
 
     const channel = supabase.channel(`room_attacks_${roomId}`)
       .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'room_participants',
+        event: 'UPDATE', schema: 'public', table: 'room_participants',
         filter: `user_id=eq.${currentUserId}` 
       }, (payload) => {
-        console.log("🚨 [공격 감지]:", payload.new.effect_type);
         const { effect_type, effect_at } = payload.new;
-        if (!effect_at) return;
-
-        if (effect_type === 'stop') triggerStopEffect();
-        else if (effect_type === 'switch') triggerSwitchEffect();
-      })
-      .subscribe((status) => {
-        console.log(`📡 공격 수신 안테나 상태: ${status}`);
-      });
+        if (effect_at && effect_type) {
+          console.log("📥 [최신 공격 수신]:", effect_type);
+          // 💉 즉시 Ref에 저장하여 함수들이 바로 읽을 수 있게 합니다.
+          bufferedEffectRef.current = effect_type; 
+        }
+      }).subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [roomId, currentUserId]);
@@ -98,22 +122,25 @@ export default function MultiGameEngine({
 
 
   const triggerSwitchEffect = () => {
-    setFlashingItem('switch'); // 1. 스위치 아이콘 3회 깜빡임
+    console.log("🌪️ 위치 변경 공격 즉시 발동!");
+
+    setFlashingItem('switch'); // 스위치 아이콘 3회 깜빡임
+
+    // 버튼 순서 즉시 셔플
+    setButtonOrder(prev => {
+      const newOrder = [...prev];
+      for (let i = newOrder.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newOrder[i], newOrder[j]] = [newOrder[j], newOrder[i]];
+      }
+      return newOrder;
+    });
+
     if (typeof playBeepSound === 'function') playBeepSound();
 
     setTimeout(() => {
       setFlashingItem(null);
-      // 2. 버튼 순서 무작위 셔플 (Fisher-Yates)
-      setButtonOrder(prev => {
-        const newOrder = [...prev];
-        for (let i = newOrder.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [newOrder[i], newOrder[j]] = [newOrder[j], newOrder[i]];
-        }
-        return newOrder;
-      });
-
-      // 3. DB 초기화
+      // 효과 종료 후 DB 초기화 (공통 로직)
       supabase.from('room_participants')
         .update({ effect_type: null, effect_at: null })
         .eq('user_id', currentUserId).then();
@@ -121,41 +148,42 @@ export default function MultiGameEngine({
   };
       
 
-  // 💉  3초간 얼려버리는 발동 함수
+  // 💉 5초 멈춤 발동 함수
   const triggerStopEffect = () => {
-    console.log("❄️ triggerStopEffect 진입"); 
-    setFlashingItem('stop'); // 1. 아이콘 깜빡임 시작
+    console.log("❄️ 5초 멈춤 공격 즉시 발동!"); 
+
+    // 1. 모든 상태를 지연 없이 즉시 업데이트
+    setFlashingItem('stop');      // 중앙 아이콘 깜빡임 시작
+    setFreezeCount(5.00);        // 빨간색 소수점 카운트다운 즉시 시작 (버튼은 이때 사라짐)
+    
     if (typeof playIceSound === 'function') playIceSound();
 
-    // 0.6초(깜빡임 3회 시간) 뒤에 카운트다운 시작
+    // 2. 중앙 아이콘만 연출이 끝난 뒤에 슬쩍 치워줍니다.
     setTimeout(() => {
-      console.log("⏱️ 카운트다운 상태 진입 (freezeCount = 3)");
       setFlashingItem(null); 
-      setFreezeCount(3); 
-    }, 600);
+    }, 600); 
   };
 
-  // 💉 freezeCount 숫자를 1초마다 줄이는 전용 감시자
+  // 💉 소수점 타이머 감시자 (10ms 단위 업데이트)
   useEffect(() => {
     if (freezeCount > 0) {
       const timer = setInterval(() => {
         setFreezeCount((prev) => {
-          if (prev <= 1) {
+          const nextValue = prev - 0.01;
+          if (nextValue <= 0) {
             clearInterval(timer);
-            // 3초 종료 후 DB 초기화
+            // DB 초기화 로직 (기존과 동일)
             supabase.from('room_participants')
               .update({ effect_type: null, effect_at: null })
-              .eq('room_id', roomId)
-              .eq('user_id', currentUserId)
-              .then(() => console.log("✅ 공격 효과 종료 및 DB 초기화"));
+              .eq('user_id', currentUserId).then();
             return 0;
           }
-          return prev - 1;
+          return nextValue;
         });
-      }, 1000);
-      return () => clearInterval(timer); // 메모리 누수 방지
+      }, 10); // 0.01초마다 실행
+      return () => clearInterval(timer);
     }
-  }, [freezeCount, roomId, currentUserId]);
+  }, [freezeCount, currentUserId]);
 
 
 
@@ -182,6 +210,11 @@ export default function MultiGameEngine({
     // 🚀 [핵심] 즉시 서버 전송 및 차감 (App.tsx의 onUseItem 호출)
     console.log(`🚀 ${type} 아이템 즉시 발동!`);
     onUseItem(type);
+
+    // 💉 [추가] 시각적으로 어떤 버튼이 눌렸는지 잠시 불이 들어오게 하려면 
+    // pendingAttack을 활용하거나 애니메이션을 트리거합니다.
+    setPendingAttack(type); 
+    setTimeout(() => setPendingAttack(null), 500);
 
     // 힐(Heal)인 경우 내 로컬에서 추가 연출이 필요하다면 여기에 작성
     if (type === 'heal') {
@@ -274,7 +307,22 @@ export default function MultiGameEngine({
     if (data) setParticipants(data);
   };
 
-  const startNewRound = (newRound: number, seed: number, mode: string, isInitialLoad = false) => {
+
+
+  /*  startNewRound 함수 내부 */
+  const startNewRound = (newRound: number, seed: number, mode: string, isInitialLoad = false) => {      // 🎨 라운드 시작 시 칼라 효과 초기화 (이전 판 공격 복구)
+    // 칼라 효과 초기화
+    setIsColorActive(false);
+
+      // 다음 라운드가 시작될 때 뒤섞인 버튼을 다시 [가위, 바위, 보] 순으로 정렬합니다.
+      setButtonOrder([1, 2, 0]);
+
+      // 🔥 [핵심] Ref의 current 값을 확인하여 시차 없이 공격 발동!
+      if (bufferedEffectRef.current === 'color') {
+          console.log(`🎨 ${newRound}라운드 전환! 칼라 공격 즉시 발동.`);
+          triggerColorEffect();
+          bufferedEffectRef.current = null; // 사용 후 비우기
+      }
     myRoundRef.current = newRound;
     setCurrentRound(newRound);
     
@@ -427,7 +475,7 @@ export default function MultiGameEngine({
           });
 
           // 🔥 [추가] 혼자 플레이했다면(참가자 1명), 싱글 랭킹에도 도전!
-          // if (participants.length === 1) 
+          if (participants.length === 1) 
           {
                console.log("혼자 플레이했으므로 싱글 랭킹 갱신 시도...");
              
@@ -452,6 +500,8 @@ export default function MultiGameEngine({
                  }, { onConflict: 'user_id, mode' });
                  console.log("🎉 멀티 연습게임으로 싱글 랭킹 갱신 완료!");
              }
+          } else {
+              console.log(`🎮 멀티플레이 종료 (참가자: ${participants.length}명). 공격/수비 전적을 정산합니다.`);
           }
 
       } catch (err) { console.error("기록 저장 실패:", err); }
@@ -493,6 +543,35 @@ export default function MultiGameEngine({
   };
 
   if (isLoading) return <div className="text-white text-center mt-20 animate-pulse">Loading Battle...</div>;
+
+
+
+  /* 💉 'OK, I got it' 버튼 클릭 핸들러 */
+  const handleStartSolvePhase = (e: React.MouseEvent) => {
+    e.stopPropagation(); 
+    playClickSound(); 
+    
+    // 1. 즉시 암기 페이즈 종료 (가위바위보 버튼들이 렌더링될 준비를 함)
+    setIsMemoryPhase(false); 
+
+    // 2. 🔥 [핵심 수술] 'OK'를 누른 순간, 대기 중인 공격(Stop, Switch)이 있다면 즉시 발동!
+    const pendingEffect = bufferedEffectRef.current;
+    
+    if (pendingEffect) {
+      console.log(`🔥 OK 클릭 시점 공격 기습 발동: ${pendingEffect}`);
+      
+      if (pendingEffect === 'stop') {
+        triggerStopEffect(); // 5초 레드 타이머 작동
+      } else if (pendingEffect === 'switch') {
+        triggerSwitchEffect(); // 버튼 위치 즉시 셔플
+      }
+      
+      // 💉 발동했으므로 버퍼 비우기 (중복 발동 방지)
+      bufferedEffectRef.current = null; 
+    }
+  };
+
+
 
   return (
     <div className="w-full max-w-[360px] flex flex-col h-[100dvh] justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto">
@@ -542,7 +621,7 @@ export default function MultiGameEngine({
 
 
 
-      {/* 3. 💉 [수정] 문제 영역 확장 */}
+      {/* 3. 💉 문제 영역 확장 */}
     <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center justify-center min-h-0">
        {(isEliminated || isCleared) ? (
           <div className="text-center animate-in zoom-in py-10">
@@ -585,8 +664,28 @@ export default function MultiGameEngine({
                             {isCurrent && mode === 'EXPERT MODE' && (
                               <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{targetConditions[i]}</span>
                             )}
-                            <div className={`w-14 h-14 rounded-2xl  transition-all duration-300 bg-zinc-900 ${showDetails ? (hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 'shadow-[0_0_12px_rgba(34,197,94,0.7)]') : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
-                                {isMemoryPhase ? <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center">{isSolved && <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-40" />}</div>}
+                            <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900
+                               ${showDetails ? (
+                                hand === 0 ? 'shadow-none' : //[0_0_12px_rgba(236,72,153,0.7)]
+                                hand === 1 ? 'shadow-none' : //[0_0_12px_rgba(34,197,94,0.7)]
+                                'shadow-none') : //[0_0_12px_rgba(34,197,94,0.7)]
+                                isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'
+                                }`}>
+
+                                {isMemoryPhase ? (
+                                  /* 🎨 [핵심 수술] 암기 단계 + 칼라공격 활성 시 _g 파일 호출 */
+                                  <img 
+                                    src={`/images/${['scissor', 'rock', 'paper'][hand]}${isColorActive ? '_g' : ''}.png`} 
+                                    className="w-full h-full object-cover" 
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    {isSolved && (
+                                      /* ✅ 정답을 맞춘 뒤 나오는 아이콘은 항상 원래 색상(isColorActive 무시) */
+                                      <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-40" />
+                                    )}
+                                  </div>
+                                )}
                             </div>
                         </div>
                        );
@@ -656,32 +755,34 @@ export default function MultiGameEngine({
         {flashingItem && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none">
             <img 
-              src={flashingItem === 'stop' ? "/images/itemStop3sec.png" : `/images/item${flashingItem}.png`}
+              src={
+                flashingItem === 'stop' ? "/images/itemStop3sec.png" : 
+                flashingItem === 'switch' ? "/images/itemSwitchBtn.png" : 
+                flashingItem === 'color' ? "/images/itemColor.png" : ""
+              }
               alt="attack effect"
               className="w-1/2 aspect-square object-contain animate-[flash_0.2s_ease-in-out_3]"
-              /* 💉 이미지가 안 뜰 경우를 대비해 콘솔 로그 확인용 */
-              onError={() => console.error("❌ 아이콘 이미지 로드 실패:", flashingItem)}
+              // 🔍 이미지 로드 실패 시 로그 확인용
+              onError={(e) => console.error("❌ 이미지 로드 실패:", flashingItem)}
             />
           </div>
         )}
+
+
 
         {(!isEliminated && !isCleared) ? (
           /* 💉 2. 멈춤 공격 카운트다운 상태일 때 (최우선 순위) */
           freezeCount > 0 ? (
             <div className="flex items-center justify-center h-24">
-              <span className="text-8xl font-black text-blue-500 italic animate-pulse drop-shadow-[0_0_15px_rgba(59,130,246,0.8)]">
-                {freezeCount}
+              <span className="text-7xl font-black text-red-600 italic drop-shadow-[0_0_20px_rgba(220,38,38,0.5)] font-mono">
+                {freezeCount.toFixed(2)}
               </span>
             </div>
           ) : (
             /* 💉 3. 정상 상태 (기존 로직 보존) */
             isMemoryPhase ? (
               <button 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  playClickSound(); 
-                  setIsMemoryPhase(false); 
-                }} 
+                onClick={handleStartSolvePhase} 
                 className="w-full h-14 rounded-md font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic hover:scale-105 transition-transform animate-pulse cursor-pointer pointer-events-auto"
               >
                 OK, I got it

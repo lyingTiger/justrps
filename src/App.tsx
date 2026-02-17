@@ -790,7 +790,7 @@ export default function App() {
     const playBeepSound = () => playSound(beepBufferRef.current);
     const playIceSound = () => {
     try {
-      const audio = new Audio('/sounds/ice.mp3');
+      const audio = new Audio('/sounds/beepbeep.mp3');
       audio.volume = 0.5; // 너무 클 수 있으니 조절
       audio.play().catch(e => console.log("사운드 재생 차단됨:", e));
     } catch (e) {
@@ -1454,11 +1454,19 @@ export default function App() {
 
             // 💉 아이템 사용 시 실제 차감 로직
             onUseItem={async (itemType) => {
-              console.log("🛠️ onUseItem 진입:", { itemType, currentUserId, currentRoomId, hasParticipants: !!participants });
-              
-              // 💉 [수정] 중괄호 {}를 추가하여 조건을 만족할 때만 return하게 합니다.
-              if (!currentUserId || !currentRoomId || !participants || participants.length === 0) {
-                console.warn("⚠️ 필수 데이터 미준비로 중단됨");
+              // 🔍 [디버깅 로그 추가] 현재 인식하고 있는 참가자 명단 확인
+              console.log("🛠️ 아이템 발사 시도. 현재 인식된 참가자 수:", participants?.length);
+              console.table(participants?.map(p => ({ ID: p.user_id, Round: p.current_round })));
+
+              if (!currentUserId || !currentRoomId || !participants || participants.length < 2) {
+                // 💉 참가자가 2명 미만이면 공격 로직을 타지 않도록 되어 있습니다.
+                console.warn("⚠️ 공격 중단: 상대방이 명단에 없거나 혼자 있습니다.");
+                
+                // 만약 힐(Heal) 아이템이라면 혼자여도 작동해야 하므로 분기 처리
+                if (itemType === 'heal') {
+                  console.log("🩹 힐 아이템은 혼자여도 사용 가능합니다.");
+                  // ... 힐 로직 실행
+                }
                 return; 
               }
 
