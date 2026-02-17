@@ -85,8 +85,8 @@ export default function ShopPage({
     } else {
         // 💉 아이템 4종 보상 (각 5개씩)
         await onPurchaseItem(adType, 5);
-        const itemNames = { stop: '3 sec STOP', switch: 'SWITCH buttons', color: 'Kill COLORS', heal: 'HEAL' };
-        setRewardPopup({ isOpen: true, title: `${itemNames[adType]} x5`, desc: "ITEMS ADDED TO INVENTORY.", icon: `/images/item${adType.charAt(0).toUpperCase() + adType.slice(1)}${adType === 'stop' ? '3sec' : adType === 'switch' ? 'Btn' : ''}.png` });
+        const itemNames = { stop: 'STOP 5 sec', switch: 'SWITCH Btns', color: 'Kill COLORS', heal: 'HEAL now' };
+        setRewardPopup({ isOpen: true, title: `"${itemNames[adType]}" x5`, desc: "ITEMS ADDED TO INVENTORY.", icon: `/images/item${adType.charAt(0).toUpperCase() + adType.slice(1)}${adType === 'stop' ? '3sec' : adType === 'switch' ? 'Btn' : ''}.png` });
     }
   };
 
@@ -156,12 +156,10 @@ export default function ShopPage({
         {adCooldown > 0 && (
           <div className="absolute inset-0 z-10 bg-black/70 backdrop-blur-sm rounded-[12px] flex flex-col items-center justify-center border border-zinc-800 animate-in fade-in duration-300">
             
-              {/* 💉 [수정] 기존 이모티콘(⏳) div를 삭제하고 이미지 태그로 교체합니다. */}
               <img 
                 src="/images/icon_houseglass.png" 
                 alt="cooldown" 
                 className="w-12 h-12 object-contain mb-2" 
-                // opacity-80을 주어 배경에 은은하게 어우러지도록 했습니다.
               />
               
               <span className="text-3xl font-black text-red-500 font-mono italic drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]">
@@ -187,13 +185,11 @@ export default function ShopPage({
       {/* 💉 6. 영구 광고 제거 (최하단 고정) */}
       <div className="w-full p-5 bg-gradient-to-b from-zinc-800 to-zinc-900 border-1 border-zinc-500 rounded-[12px] flex flex-col items-center shadow-[0_0_20px_rgba(255,153,0,0.2)] relative overflow-hidden">
         
-        {/* 💉 [수정] h3 태그를 flex 컨테이너로 바꾸고 아이콘 이미지 추가 */}
         <h3 className="flex items-center justify-center gap-2 text-lg font-black text-white italic uppercase mb-4">
           <img 
             src="/images/icon_noAds.png" 
             alt="no ads" 
             className="w-6 h-6 object-contain" 
-            // w-6 h-6로 아이콘 크기를 적절히 맞췄습니다. 필요시 조절하세요.
           />
           <span>Forever No Ads</span>
         </h3>

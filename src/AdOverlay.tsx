@@ -50,16 +50,16 @@ export default function AdOverlay({ isOpen, onClose, onReward }: AdOverlayProps)
         )}
       </div>
 
-      <div className="text-center space-y-4">
+      <div className="text-center space-y-4 flex flex-col items-center">
         <h2 className="text-4xl font-black text-[#FF9900] italic uppercase animate-pulse">
           ADVERTISEMENT
         </h2>
         <p className="text-white text-sm">This is a mock ad component.</p>
         
         {/* 광고 진행 바 */}
-        <div className="w-[200px] h-2 bg-zinc-800 rounded-full overflow-hidden mt-4">
+        <div className="w-[200px] h-2 bg-zinc-800 rounded-full overflow-hidden mt-4 mx-auto">
           <div 
-            className="h-full bg-[#FF9900] transition-all duration-1000 ease-linear"
+            className="h-full bg-[#FF9900]  transition-all duration-1000 ease-linear"
             style={{ width: `${((5 - timeLeft) / 5) * 100}%` }}
           />
         </div>
