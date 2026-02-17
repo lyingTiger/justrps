@@ -85,6 +85,47 @@ export default function MultiGameEngine({
   };
 
 
+
+  // 💉 게임 도중 이탈 시 방장 승계 및 데이터 정리 로직
+  const handleExitGame = async () => {
+    if (!currentUserId || !roomId) return;
+
+    const isCreator = roomData?.creator_id === currentUserId;
+
+    if (isCreator) {
+      // 1. 방장일 경우 다음 순번 유저 찾기
+      const { data: others } = await supabase
+        .from('room_participants')
+        .select('user_id')
+        .eq('room_id', roomId)
+        .neq('user_id', currentUserId)
+        .order('joined_at', { ascending: true })
+        .limit(1);
+
+      if (others && others.length > 0) {
+        // 다음 사람에게 방장 넘기기
+        await supabase.from('rooms').update({ creator_id: others[0].user_id }).eq('id', roomId);
+      } else {
+        // 아무도 없으면 방 삭제
+        await supabase.from('rooms').delete().eq('id', roomId);
+        return;
+      }
+    }
+    // 💉 delete 대신 update를 사용하여 결과창에 'FAIL'로 남게 합니다.
+    // .then()을 사용하여 브라우저가 닫히기 전 최대한 빠르게 요청을 보냅니다.
+    supabase.from('room_participants')
+      .update({ 
+        is_dead: true, 
+        play_time: 9999.99 
+      })
+      .eq('room_id', roomId)
+      .eq('user_id', currentUserId)
+      .then();
+  };
+
+
+
+
   // 이 코드는 isItemMatch나 userItems 값이 실제로 바뀔 때만 실행됩니다.
   useEffect(() => {
     console.log("✅ [아이템 모드 설정 확인]:", isItemMatch);
@@ -279,19 +320,46 @@ export default function MultiGameEngine({
     };
     init();
 
-    const channel = supabase.channel(`multi_game_${roomId}`)
+    const channel = supabase.channel(`multi_game_${roomId}`, {
+      config: { presence: { key: currentUserId || undefined } }
+    })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, 
         (payload) => { setRoomData(payload.new); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` }, 
         () => fetchParticipants())
-      .subscribe();
+      
+      // 💉 [추가] 유령 유저(이탈자) 발생 시 방장이 대신 처리
+      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+        // 방장만 이 처리를 수행함
+        if (roomData?.creator_id !== currentUserId) return;
+
+        leftPresences.forEach(async (p: any) => {
+          if (!p.user_id) return;
+          // 나간 유저를 '탈락' 처리하여 게임 결과 판정을 진행시킴
+          await supabase.from('room_participants')
+            .update({ is_dead: true, play_time: 999.99 })
+            .eq('room_id', roomId)
+            .eq('user_id', p.user_id);
+        });
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED' && currentUserId) {
+          // 💉 [추가] 내 접속 상태 추적 시작
+          await channel.track({ user_id: currentUserId });
+        }
+      });
+
+    // 💉 [추가] 브라우저 종료 시 이탈 로직 연결
+    const handleBeforeUnload = () => { handleExitGame(); };
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => { 
       if (timerRef.current) clearInterval(timerRef.current);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       supabase.removeChannel(channel); 
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId]);
+  }, [roomId, currentUserId, roomData?.creator_id]);
 
   // --- 2. 게임 종료 감지 ---
   useEffect(() => {
@@ -735,7 +803,7 @@ export default function MultiGameEngine({
                                     <div className="w-full h-full flex items-center justify-center">
                                       {isSolved && (
                                         /* ✅ 정답을 맞춘 뒤 나오는 아이콘은 항상 원래 색상(isColorActive 무시) */
-                                        <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-40" />
+                                        <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-100" />
                                       )}
                                     </div>
                                   )}

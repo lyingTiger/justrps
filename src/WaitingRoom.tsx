@@ -138,7 +138,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
            setRoomInfo(newRoom);
            if (userIdRef.current) isCreatorRef.current = (newRoom.creator_id === userIdRef.current);
            
-           // 🔥 [핵심 수정] DB 이벤트가 와도 'Ready' 체크 필수!
+           // 🔥 DB 이벤트가 와도 'Ready' 체크 필수!
            if (newRoom.status === 'playing' && userIdRef.current) {
                const { data: me } = await supabase
                    .from('room_participants')
@@ -164,17 +164,38 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
             playBeep();
           }
         })
-        // (E) 유저 이탈
+        // (E) 유저 이탈 (유령 유저 해결 핵심 영역)
         .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-            // 💉 [수술] DB에서 삭제하는 로직을 완전히 들어냅니다. 
-            // 유저가 나갔다는 사실은 'postgres_changes'나 폴링이 알아서 처리하게 둡니다.
-            console.log("👋 누군가 연결이 끊겼습니다:", leftPresences);
+            // 💉 [수술] 방장만 이탈자의 사후 처리를 수행합니다.
+            if (!isCreatorRef.current) return; 
+
+            console.log("👋 연결 끊김 감지, 사후 처리 시작:", leftPresences);
+            
+            leftPresences.forEach(async (p: any) => {
+                const leftUserId = p.user_id;
+                if (!leftUserId) return;
+
+                // 🚀 비정상 종료 유저를 'is_dead' 처리하여 게임 엔진이 계속 진행되게 합니다.
+                // play_time을 크게 주어 결과창 정렬 시 꼴찌로 처리되게 유도합니다.
+                await supabase.from('room_participants')
+                    .update({ 
+                        is_dead: true, 
+                        play_time: 999.99 
+                    })
+                    .eq('room_id', roomId)
+                    .eq('user_id', leftUserId);
+                
+                console.log(`✅ 유령 유저(${leftUserId}) 탈락 처리 완료`);
+            });
         })
 
         .subscribe((status) => {
            if (status === 'SUBSCRIBED') {
               channelRef.current = channel;
-              if (userIdRef.current) channel.track({ user_id: userIdRef.current });
+              // 💉 [추가] presence에 내 유저 ID를 태깅합니다.
+              if (userIdRef.current) {
+                channel.track({ user_id: userIdRef.current });
+              }
            }
         });
 
