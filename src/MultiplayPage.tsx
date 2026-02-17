@@ -176,10 +176,21 @@ export default function MultiplayPage({
             autoComplete="one-time-code" 
             placeholder={t('search_placeholder')} 
             value={newRoomName}
-            onChange={(e) => { setNewRoomName(e.target.value); setSearchName(e.target.value); }}
-            className="flex-1 h-12 bg-black border border-zinc-800 rounded-2xl px-4 text-xs text-white outline-none focus:border-[#FF9900] font-bold" 
+            onChange={(e) => { 
+                  let val = e.target.value;
+                  
+                  // 💉 [핵심 수술] 8자 초과 시: 앞의 9글자 + 방금 입력한 마지막 1글자로 조합
+                  if (val.length > 8) {
+                    val = val.substring(0, 7) + val.charAt(val.length - 1);
+                  }
+                  
+                  setNewRoomName(val); 
+                  setSearchName(val); 
+                }}
+                className="flex-1 h-12 bg-black border border-zinc-800 rounded-2xl px-4 text-xs text-white outline-none focus:border-[#FF9900] font-bold" 
           />
-          <button onClick={() => { playClickSound(); handleCreateRoom(); }} className="px-6 bg-zinc-800 text-white font-black uppercase rounded-2xl text-xs active:scale-95 transition-all hover:bg-[#ff9933] hover:text-black">
+          <button onClick={() => { playClickSound(); handleCreateRoom(); }} 
+            className="px-6 bg-zinc-800 text-white font-black uppercase rounded-2xl text-xs active:scale-95 transition-all hover:bg-[#ff9933] hover:text-black">
             {t('btn_create')}
           </button>
         </div>
@@ -243,20 +254,22 @@ export default function MultiplayPage({
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
                     <span className="ml-2 font-black text-sm italic text-white ">{room.name}</span>
-                    {room.password && <span className="text-[10px] opacity-40">🔒</span>}
+                    {room.password && <span className="text-[10px] opacity-40"></span>}
                   </div>
                   <span className="ml-2 text-sm text-zinc-500 font-black uppercase tracking-tighter ">{room.mode}</span>
                 </div>
                 
                 <div className="flex flex-col items-end gap-1">
                   <div className="flex items-center gap-1 mr-2">
-                    {/* 💉 수정 포인트 1: '아이템전' 라벨 추가 (아이템전일 때만 표시) */}
+
+                    {/* 1: '아이템전' 라벨 추가 (아이템전일 때만 표시) */}
                     {room.is_item_mode && (
                       <span className="text-[8px] font-black text-[#FF9900] border border-[#FF9900]/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
                         {t('item_game')}
                       </span>
                     )}
-                    
+
+                    {/* 2. 플레이 상태 라벨 */}
                     {room.status === 'playing' ? (
                       <span className="text-[8px] font-black text-red-500 border border-red-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider animate-pulse">
                         {t('status_playing')}
@@ -266,6 +279,15 @@ export default function MultiplayPage({
                         {t('status_waiting')}
                       </span>
                     )}
+
+                    {/* 💉 비밀방 노란색 라벨 (가장 우측) */}
+                    {room.password && (
+                      <span className="text-[8px] font-black text-[#FFCC00] border border-[#FFCC00]/50 px-1.5 py-0.5 rounded uppercase tracking-wider bg-[#FFCC00]/5">
+                        {t('title_private_room') || "비밀방"}
+                      </span>
+                    )}
+
+
                   </div>
                   <span className="mr-2 text-white font-mono font-black text-sm italic">{room.current_players}/{room.max_players}</span>
                 </div>
