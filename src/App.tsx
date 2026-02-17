@@ -51,6 +51,7 @@ export default function App() {
   const lastFetchedId = useRef<string | null>(null);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [showAdLoading, setShowAdLoading] = useState(false);
+  const hasCheckedDailyRef = useRef(false); // 💉 일일 보상 체크 여부
 
 
   // 💉 방 만들기 아이템전 설정 저장용 상태
@@ -362,7 +363,19 @@ export default function App() {
         const MAX_DB_LEN = 15;
         const googleName = rawName.length > MAX_DB_LEN ? rawName.substring(0, MAX_DB_LEN) : rawName;
 
-        const { data: newProfile, error: insertError } = await supabase.from('profiles').insert({ id: userId, display_name: googleName, coins: 0 }).select().single();
+        // 💉 프로필 생성 시 아이템 4종을 각각 3개씩 기본값으로 입력합니다.
+        const { data: newProfile, error: insertError } = await supabase.from('profiles').insert({ 
+          id: userId, 
+          display_name: googleName, 
+          coins: 300,
+          item_stop: 3,   // 💉 초기 지급: 3개
+          item_switch: 3, // 💉 초기 지급: 3개
+          item_color: 3,  // 💉 초기 지급: 3개
+          item_heal: 3,   // 💉 초기 지급: 3개
+          last_login_date: new Date().toISOString().split('T')[0] // 💉 생성일은 일일 보상 중복 방지
+        }).select().single();
+
+
         if (!insertError) {
             profile = newProfile;
             setMsgPopup({
@@ -377,6 +390,42 @@ export default function App() {
         setUserCoins(0);
         return;
       }
+
+      // ✅ [정상 위치] 프로필을 성공적으로 가져온 후 여기서 보상을 체크합니다.
+      // ------------------------------------------------------------------
+      // 💉 [일일 보상 체크 로직 시작]
+      // ------------------------------------------------------------------
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const lastLogin = profile.last_login_date;
+
+      if (!hasCheckedDailyRef.current && lastLogin !== today) {
+        hasCheckedDailyRef.current = true; // 중복 팝업 방지
+
+        setMsgPopup({
+          isOpen: true,
+          title: lang === 'ko' ? "일일 보상!" : "DAILY GIFT!",
+          desc: lang === 'ko' 
+            ? "오늘의 접속 보상입니다!\n공격 아이템 3종 각 1개" 
+            : "Daily login reward!\nAttack Item Set (1 each)",
+          onConfirm: async () => {
+            // DB 아이템 지급
+            await supabase.rpc('update_user_items', {
+              target_user_id: userId,
+              stop_inc: 1,
+              switch_inc: 1,
+              color_inc: 1,
+              heal_inc: 0
+            });
+
+            // 로그인 날짜 갱신
+            await supabase.from('profiles').update({ last_login_date: today }).eq('id', userId);
+            // 데이터 새로고침
+            await fetchUserData(userId);
+            setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }));
+          }
+        });
+      }
+      
 
       
       const newName = profile.display_name || 'Player';

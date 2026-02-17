@@ -73,6 +73,8 @@ export const translations = {
       msg_best_record_info: "start from best record",
       msg_session_expired: "Please login again.",
       msg_signin_to_start: "PLEASE SIGN IN TO START!",
+      daily_reward_title: "DAILY GIFT!",
+      daily_reward_desc: "Daily login reward!\nAttack Item Set (1 each)",
     }, 
 
     // --- 6. 게임 엔진 (game) : 💉 코드 로직에 맞춰 대문자 키로 수정 ---
@@ -149,6 +151,8 @@ export const translations = {
     msg_no_public_rooms: "No public rooms \navailable.",
     msg_wrong_pass: "Incorrect password."
     },
+
+    
   },
 
   ko: {
@@ -222,6 +226,8 @@ export const translations = {
       msg_best_record_info: "최고 기록에서 시작합니다",
       msg_session_expired: "다시 로그인해 주세요.",
       msg_signin_to_start: "시작하려면 로그인해 주세요!",
+      daily_reward_title: "일일 보상!",
+      daily_reward_desc: "오늘의 첫 접속 보상입니다!\n공격 아이템 3종 세트 (각 1개)",
     },
 
     // --- 6. 게임 엔진 (game)  ---
