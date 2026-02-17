@@ -225,7 +225,9 @@ export default function MultiplayPage({
         <h3 className="w-full text-center text-sm font-black text-[#ffcc33] uppercase tracking-[0.2em] mb-0">
           {t('title_active_rooms')}
         </h3>
-        <div className="w-full h-[220px] overflow-y-auto space-y- pr-1 custom-scrollbar">
+        
+        {/* 💉 방 목록 -간격 유지를 위해 space-y-0.5(2px) 적용 */}
+        <div className="w-full h-[220px] overflow-y-auto space-y-[5px] pr-1 custom-scrollbar">
           {filteredRooms.length === 0 ? (
             <div className="w-full py-10 text-center border border-dashed border-zinc-800 rounded-[24px] opacity-20">
               <p className="text-[10px] font-black uppercase tracking-widest">{t('no_active_rooms')}</p>
@@ -237,21 +239,29 @@ export default function MultiplayPage({
                   <div className="flex items-center gap-2">
                     <span className="ml-2 font-black text-sm italic text-white ">{room.name}</span>
                     {room.password && <span className="text-[10px] opacity-40">🔒</span>}
-                    {room.is_item_mode && <span className="text-[10px] text-[#FF9900] font-black">🎁</span>}
                   </div>
                   <span className="ml-2 text-sm text-zinc-500 font-black uppercase tracking-tighter ">{room.mode}</span>
                 </div>
                 
                 <div className="flex flex-col items-end gap-1">
-                  {room.status === 'playing' ? (
-                    <span className="mr-2 text-[8px] font-black text-red-500 border border-red-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider animate-pulse">
-                      {t('status_playing')}
-                    </span>
-                  ) : (
-                    <span className="mr-2 text-[8px] font-black text-green-500 border border-green-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                      {t('status_waiting')}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1 mr-2">
+                    {/* 💉 수정 포인트 1: '아이템전' 라벨 추가 (아이템전일 때만 표시) */}
+                    {room.is_item_mode && (
+                      <span className="text-[8px] font-black text-[#FF9900] border border-[#FF9900]/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        {t('item_game')}
+                      </span>
+                    )}
+                    
+                    {room.status === 'playing' ? (
+                      <span className="text-[8px] font-black text-red-500 border border-red-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider animate-pulse">
+                        {t('status_playing')}
+                      </span>
+                    ) : (
+                      <span className="text-[8px] font-black text-green-500 border border-green-500/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        {t('status_waiting')}
+                      </span>
+                    )}
+                  </div>
                   <span className="mr-2 text-white font-mono font-black text-sm italic">{room.current_players}/{room.max_players}</span>
                 </div>
               </div>

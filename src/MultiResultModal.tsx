@@ -32,9 +32,14 @@ export default function MultiResultModal({
 
       if (!participants) return;
 
+      // 💉 판정 로직 개선: 라운드 내림차순 -> 시간 오름차순
       const sorted = participants.sort((a, b) => {
-        if (b.current_round !== a.current_round) return b.current_round - a.current_round;
-        return a.play_time - b.play_time;
+        // 1순위: 도달한 라운드가 높은 사람이 상위권
+        if (b.current_round !== a.current_round) {
+          return (b.current_round || 0) - (a.current_round || 0);
+        }
+        // 2순위: 라운드가 같다면 플레이 타임이 짧은 사람이 상위권
+        return (a.play_time || 0) - (b.play_time || 0);
       });
 
       const totalPlayers = sorted.length;
@@ -51,11 +56,6 @@ export default function MultiResultModal({
 
       setResults(processedResults);
       setLoading(false);
-
-      // -------------------------------------------------------
-      // 💉 [삭제] 이 부분의 자동 코인 지급 로직(increment_coin)을 제거했습니다.
-      // 이제 아래 버튼 클릭 시 onSaveRewards()를 통해 일괄 저장됩니다.
-      // -------------------------------------------------------
     };
 
     fetchResults();

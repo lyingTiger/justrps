@@ -92,9 +92,11 @@ export default function ResultModal({
         </div>
 
         {/* 4. 아이템 영역: 기존 위치 유지하되 내부 여백 조절 */}
-        {hasItems && (
-          <div className="w-full mb-3  p-5">
+        {hasItems ? (
+          /* 💉 [수정] 아이템이 있을 때: 내부 여백(p-5 -> p-2)과 하단 마진(mb-3 -> mb-0)을 줄임 */
+          <div className="w-full mt-4 mb-0 p-2"> 
             <div className="flex justify-center gap-4">
+              {/* (아이템 아이콘 렌더링 부분: 기존 코드 그대로 유지) */}
               {sessionItems.stop > 0 && (
                 <div className="relative">
                   <img src="/images/itemStop3sec.png" className="w-10 h-10 object-contain" alt="stop" />
@@ -129,10 +131,13 @@ export default function ResultModal({
               )}
             </div>
           </div>
+        ): (
+          /* 💉 [추가] 아이템이 없을 때: 버튼 그룹이 너무 올라붙지 않게 빈 공간 확보 */
+          <div className="h-6"></div> 
         )}
 
         {/* 5. 최하단: 이어하기 & 버튼 그룹 (기존 유지) */}
-        <div className="w-full flex flex-col items-center">
+        <div className={`w-full flex flex-col items-center ${hasItems ? 'mt-8' : 'mt-8'}`}>
             
             {/* 이어하기 섹션 */}
             {continueCount > 0 ? (
