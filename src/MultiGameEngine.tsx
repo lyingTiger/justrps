@@ -52,6 +52,9 @@ export default function MultiGameEngine({
   const [isLoading, setIsLoading] = useState(true);
   const [showResult, setShowResult] = useState(false);
 
+  const [hasAttackedThisRound, setHasAttackedThisRound] = useState(false);
+  const [launchedAttackId, setLaunchedAttackId] = useState<string | null>(null);
+
   // 1. 기존 useState 삭제 또는 주석 처리
   // const [bufferedEffect, setBufferedEffect] = useState<string | null>(null);
 
@@ -206,8 +209,15 @@ export default function MultiGameEngine({
   const handleItemClick = (type: string) => {
     // 아이템이 없으면 무시
     if (userItems[type as keyof typeof userItems] <= 0) return;
+
+    // 🚀 공격 아이템(힐 제외)을 썼다면 이번 라운드 공격 완료 처리
+    if (type !== 'heal') {
+      if (hasAttackedThisRound) return; // 이미 공격했다면 중단
+      setHasAttackedThisRound(true);
+      setLaunchedAttackId(type); // 🔥 내가 쏜 아이템 ID 기록
+    }
     
-    // 🚀 [핵심] 즉시 서버 전송 및 차감 (App.tsx의 onUseItem 호출)
+    // 🚀 [핵심] 즉시 서버 전송 및 차감 
     console.log(`🚀 ${type} 아이템 즉시 발동!`);
     onUseItem(type);
 
@@ -317,7 +327,13 @@ export default function MultiGameEngine({
       // 다음 라운드가 시작될 때 뒤섞인 버튼을 다시 [가위, 바위, 보] 순으로 정렬합니다.
       setButtonOrder([1, 2, 0]);
 
-      // 🔥 [핵심] Ref의 current 값을 확인하여 시차 없이 공격 발동!
+      // 🔥 다음 라운드가 되었으므로 공격 권한 복구!
+      setHasAttackedThisRound(false);
+
+      // 🔥 새 라운드 시 기록 초기화
+      setLaunchedAttackId(null); 
+
+      // 🔥 Ref의 current 값을 확인하여 시차 없이 공격 발동!
       if (bufferedEffectRef.current === 'color') {
           console.log(`🎨 ${newRound}라운드 전환! 칼라 공격 즉시 발동.`);
           triggerColorEffect();
@@ -573,179 +589,202 @@ export default function MultiGameEngine({
 
 
 
+  // 💉아이템 활성/비활성 판정 로직
+  // 1. 공격 아이템: 내가 이번 라운드에 아직 공격하지 않았을 때만 활성
+  const canAttack = !hasAttackedThisRound; 
+  // 2. 힐 아이템: 현재 실시간으로 공격 효과(Stop/Color)가 발동 중일 때만 활성
+  const isUnderAttack = freezeCount > 0 || isColorActive;
+  const canHeal = isUnderAttack && userItems.heal > 0;
+
+
+
   return (
     <div className="w-full max-w-[360px] flex flex-col h-[100dvh] justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto">
     
-    {/* 1. 헤더 영역 */}
-    <div className="w-full flex justify-between items-start flex-none mb-4 px-4">
-      {/* [좌측] 로고 및 획득 코인 표시 */}
-      <div className="flex flex-col items-start">
-        <h2 className="text-3xl font-bold tracking-tighter uppercase italic leading-none">
-          <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
-        </h2>
+      {/* 1. 헤더 영역 */}
+      <div className="w-full flex justify-between items-start flex-none mb-4 px-4">
+        {/* [좌측] 로고 및 획득 코인 표시 */}
+        <div className="flex flex-col items-start">
+          <h2 className="text-3xl font-bold tracking-tighter uppercase italic leading-none">
+            <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
+          </h2>
+          
+          {/* 💉 획득 코인이 0보다 클 때만 표시하거나, 항상 표시하여 긴장감 유도 */}
+          <div className="flex items-center gap-1.5 mt-2 ml-1 ">
+            <img src="/images/coin.png" alt="earned coin" className="w-4 h-4 object-contain" />
+            <span className="text-white font-black text-sm font-mono">
+              +{sessionCoins}
+            </span>
+          </div>
+        </div>
         
-        {/* 💉 획득 코인이 0보다 클 때만 표시하거나, 항상 표시하여 긴장감 유도 */}
-        <div className="flex items-center gap-1.5 mt-2 ml-1 ">
-          <img src="/images/coin.png" alt="earned coin" className="w-4 h-4 object-contain" />
-          <span className="text-white font-black text-sm font-mono">
-            +{sessionCoins}
-          </span>
+        {/* [우측] 정보 영역 */}
+        <div className="text-right flex flex-col items-end pt-0">
+          <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">Round {currentRound}</h2>
+          <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-1 leading-none">{playTime.toFixed(2)} sec</p>
+          
+          {roomData?.first_cleared_at && !isCleared && !isEliminated && (
+            <div className="text-red-500 text-[10px] font-black uppercase animate-pulse border border-red-500/30 px-2 py-1 rounded w-fit mt-2">Hurry Up!</div>
+          )}
         </div>
       </div>
-      
-      {/* [우측] 정보 영역 */}
-      <div className="text-right flex flex-col items-end pt-0">
-        <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">Round {currentRound}</h2>
-        <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-1 leading-none">{playTime.toFixed(2)} sec</p>
-        
-        {roomData?.first_cleared_at && !isCleared && !isEliminated && (
-          <div className="text-red-500 text-[10px] font-black uppercase animate-pulse border border-red-500/30 px-2 py-1 rounded w-fit mt-2">Hurry Up!</div>
-        )}
-      </div>
-    </div>
 
-    {/* 2. 플레이어 현황판 - 멀티 전용 (고정 높이) */}
-    <div className="w-full bg-zinc-900/50 rounded-3xl p-3 mb-4 flex-none space-y-2 mx-4 w-[calc(100%-32px)]">
-      <div className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Other Players</div>
-      {participants.filter(p => p.user_id !== currentUserId).map(p => (
-        <div key={p.user_id} className="flex justify-between items-center opacity-80">
-          <span className={`text-[10px] font-black uppercase flex items-center gap-1 ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : 'text-zinc-500'}`}>
-             {p.is_dead && "💀"} {p.profiles?.display_name}
-          </span>
-          <span className={`text-xs font-mono mr-5 font-bold ${p.is_dead ? 'text-red-900' : 'text-white'}`}>
-            {p.is_dead ? "FAIL" : `Round ${p.current_round || 1}`}
-          </span>
-        </div>
-      ))}
-    </div>
+      {/* 2. 플레이어 현황판 - 멀티 전용 (고정 높이) */}
+      <div className="w-full bg-zinc-900/50 rounded-3xl p-3 mb-4 flex-none space-y-2 mx-4 w-[calc(100%-32px)]">
+        <div className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Other Players</div>
+        {participants.filter(p => p.user_id !== currentUserId).map(p => (
+          <div key={p.user_id} className="flex justify-between items-center opacity-80">
+            <span className={`text-[10px] font-black uppercase flex items-center gap-1 ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : 'text-zinc-500'}`}>
+              {p.is_dead && "💀"} {p.profiles?.display_name}
+            </span>
+            <span className={`text-xs font-mono mr-5 font-bold ${p.is_dead ? 'text-red-900' : 'text-white'}`}>
+              {p.is_dead ? "FAIL" : `Round ${p.current_round || 1}`}
+            </span>
+          </div>
+        ))}
+      </div>
 
 
 
       {/* 3. 💉 문제 영역 확장 */}
-    <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center justify-center min-h-0">
-       {(isEliminated || isCleared) ? (
-          <div className="text-center animate-in zoom-in py-10">
-              {isEliminated && <div className="text-6xl mb-4">💀</div>}
-              <h3 className={`text-3xl font-black uppercase italic ${isEliminated ? 'text-zinc-600' : 'text-green-500'}`}>
-                  {isEliminated ? "Game over" : "Next Round!"}
-              </h3>
-              {isEliminated && (
-                  <p className="text-zinc-500 text-xs font-bold uppercase mt-2 animate-pulse">
-                      Waiting for others to finish...
-                  </p>
-              )}
-          </div>
-       ) : (
-           <div className="w-full flex flex-col items-center">
-               {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
-                  <div className="text-center mb-10 select-none flex-none">
-                      <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
-                          <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
-                      </div>
-                      <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
-                          <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
-                      </div>
-                  </div>
-               ) : (
-                  <div className="text-center mb-10 flex-none">
-                      <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">{aiSelect.length} {mode.split(' ')[0]}</p>
-                      <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">{questionTurn} {mode.split(' ')[0]}</p>
-                  </div>
-               )}
-
-               <div className="flex flex-wrap justify-center gap-3 mb-4 w-full">
-                  {aiSelect.map((hand, i) => {
-                       const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
-                       const isCurrent = (i === questionTurn && !isMemoryPhase);
-                       const showDetails = isMemoryPhase || isSolved;
-                       
-                       return (
-                        <div key={i} className="relative flex flex-col items-center">
-                            {isCurrent && mode === 'EXPERT MODE' && (
-                              <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{targetConditions[i]}</span>
-                            )}
-                            <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900
-                               ${showDetails ? (
-                                hand === 0 ? 'shadow-none' : //[0_0_12px_rgba(236,72,153,0.7)]
-                                hand === 1 ? 'shadow-none' : //[0_0_12px_rgba(34,197,94,0.7)]
-                                'shadow-none') : //[0_0_12px_rgba(34,197,94,0.7)]
-                                isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'
-                                }`}>
-
-                                {isMemoryPhase ? (
-                                  /* 🎨 [핵심 수술] 암기 단계 + 칼라공격 활성 시 _g 파일 호출 */
-                                  <img 
-                                    src={`/images/${['scissor', 'rock', 'paper'][hand]}${isColorActive ? '_g' : ''}.png`} 
-                                    className="w-full h-full object-cover" 
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    {isSolved && (
-                                      /* ✅ 정답을 맞춘 뒤 나오는 아이콘은 항상 원래 색상(isColorActive 무시) */
-                                      <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-40" />
-                                    )}
-                                  </div>
-                                )}
-                            </div>
+      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center justify-center min-h-0">
+        {(isEliminated || isCleared) ? (
+            <div className="text-center animate-in zoom-in py-10">
+                {isEliminated && <div className="text-6xl mb-4">💀</div>}
+                <h3 className={`text-3xl font-black uppercase italic ${isEliminated ? 'text-zinc-600' : 'text-green-500'}`}>
+                    {isEliminated ? "Game over" : "Next Round!"}
+                </h3>
+                {isEliminated && (
+                    <p className="text-zinc-500 text-xs font-bold uppercase mt-2 animate-pulse">
+                        Waiting for others to finish...
+                    </p>
+                )}
+            </div>
+        ) : (
+            <div className="w-full flex flex-col items-center">
+                {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
+                    <div className="text-center mb-10 select-none flex-none">
+                        <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
+                            <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
                         </div>
-                       );
-                    })}
-               </div>
-           </div>
-       )}
-    </div>
+                        <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
+                            <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-center mb-10 flex-none">
+                        <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">{aiSelect.length} {mode.split(' ')[0]}</p>
+                        <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">{questionTurn} {mode.split(' ')[0]}</p>
+                    </div>
+                )}
+
+                <div className="flex flex-wrap justify-center gap-3 mb-4 w-full">
+                    {aiSelect.map((hand, i) => {
+                        const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
+                        const isCurrent = (i === questionTurn && !isMemoryPhase);
+                        const showDetails = isMemoryPhase || isSolved;
+                        
+                        return (
+                          <div key={i} className="relative flex flex-col items-center">
+                              {isCurrent && mode === 'EXPERT MODE' && (
+                                <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{targetConditions[i]}</span>
+                              )}
+                              <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900
+                                ${showDetails ? (
+                                  hand === 0 ? 'shadow-none' : //[0_0_12px_rgba(236,72,153,0.7)]
+                                  hand === 1 ? 'shadow-none' : //[0_0_12px_rgba(34,197,94,0.7)]
+                                  'shadow-none') : //[0_0_12px_rgba(34,197,94,0.7)]
+                                  isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'
+                                  }`}>
+
+                                  {isMemoryPhase ? (
+                                    /* 🎨 [핵심 수술] 암기 단계 + 칼라공격 활성 시 _g 파일 호출 */
+                                    <img 
+                                      src={`/images/${['scissor', 'rock', 'paper'][hand]}${isColorActive ? '_g' : ''}.png`} 
+                                      className="w-full h-full object-cover" 
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      {isSolved && (
+                                        /* ✅ 정답을 맞춘 뒤 나오는 아이콘은 항상 원래 색상(isColorActive 무시) */
+                                        <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-40" />
+                                      )}
+                                    </div>
+                                  )}
+                              </div>
+                          </div>
+                        );
+                      })}
+                </div>
+            </div>
+        )}
+      </div>
 
 
-       {/* 💉 아이템전일 때만 나타나는 아이템 버튼 영역 */}
-        {isItemMatch && !isCleared && !isEliminated && (
-          <div className="w-full px-4 mb-4 animate-in slide-in-from-bottom-2 duration-300">
-            <div className="flex items-center justify-between bg-black/60 backdrop-blur-md p-3 rounded-[24px] border border-white/10 shadow-2xl">
-              
-              {/* 1. 공격 아이템 그룹 (3종) */}
-              <div className="flex gap-3">
-                {[
-                  { id: 'stop', img: 'itemStop3sec.png' },
-                  { id: 'switch', img: 'itemSwitchBtn.png' },
-                  { id: 'color', img: 'itemColor.png' }
-                ].map((item) => (
+      {/* 💉 아이템전일 때만 나타나는 아이템 버튼 영역 */}
+      {isItemMatch && !isCleared && !isEliminated && (
+        <div className="w-full px-4 mb-4 animate-in slide-in-from-bottom-2 duration-300">
+          <div className="flex items-center justify-between bg-black/60 backdrop-blur-md p-3 rounded-[24px] border border-white/10 shadow-2xl">
+            
+            {/* 1. 공격 아이템 그룹 (3종) */}
+            <div className="flex gap-3">
+              {[
+                { id: 'stop', img: 'itemStop3sec.png' },
+                { id: 'switch', img: 'itemSwitchBtn.png' },
+                { id: 'color', img: 'itemColor.png' }
+              ].map((item) => {
+                const isLaunched = launchedAttackId === item.id; // 🔥 내가 이번에 쏜 아이템인가?
+                const isNoStock = userItems[item.id as keyof typeof userItems] <= 0;
+                const isOtherAttackActive = hasAttackedThisRound && !isLaunched; // 다른 공격이 이미 진행 중인가?
+                
+                // 💉 클릭 불가 조건: 개수 0 OR (이미 공격했는데 내가 쏜 게 아님)
+                const isBtnDisabled = isNoStock || (hasAttackedThisRound && !isLaunched);
+
+                return (
                   <button 
                     key={item.id}
-                    onClick={() => handleItemClick(item.id)}
-                    className={`relative p-1 rounded-xl transition-all duration-100 active:scale-125
-                      ${userItems[item.id as keyof typeof userItems] <= 0 
-                        ? 'grayscale opacity-20 pointer-events-none' 
-                        : 'bg-zinc-800/50 hover:bg-zinc-700 opacity-100'}`}
+                    onClick={() => !hasAttackedThisRound && !isNoStock && handleItemClick(item.id)}
+                    disabled={isBtnDisabled}
+                    className={`relative p-1 rounded-xl transition-all duration-100 
+                      ${isLaunched 
+                        ? 'opacity-50 scale-95 shadow-inner' // ✅ 내가 쏜 것: 컬러 유지 + 50% 투명도 + 눌림 효과
+                        : (isNoStock || isOtherAttackActive)
+                          ? 'grayscale opacity-50 cursor-not-allowed' // ❌ 못 쓰는 것: 회색 + 50% 투명도
+                          : 'bg-zinc-800/50 opacity-100 hover:scale-125 active:rotate-12' // ✨ 사용 가능
+                      }`}
                   >
-                    <img src={`/images/${item.img}`} className="w-8 h-8 object-contain" alt={item.id} />
-                    {/* 보유 수량 배지 */}
+                    <img src={`/images/${item.img}`} className="w-12 h-12 object-contain" alt={item.id} />
                     <div className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[8px] font-black min-w-[15px] h-[15px] rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
                       {userItems[item.id as keyof typeof userItems]}
                     </div>
                   </button>
-                ))}
-              </div>
-
-              {/* 구분선 */}
-              <div className="w-[1px] h-6 bg-zinc-700 mx-1"></div>
-
-              {/* 2. 치유 아이템 (1종) */}
-              <button 
-                onClick={() => handleItemClick('heal')}
-                className={`relative p-1 rounded-xl transition-all duration-200 
-                  ${pendingHeal ? 'bg-green-500 ring-2 ring-green-500 scale-110 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'bg-zinc-800/50 opacity-50'}
-                  ${userItems.heal <= 0 ? 'grayscale opacity-20 pointer-events-none' : 'hover:opacity-100'}
-                `}
-              >
-                <img src="/images/itemHeal.png" className="w-8 h-8 object-contain" alt="heal" />
-                <div className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[8px] font-black min-w-[15px] h-[15px] rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
-                  {userItems.heal}
-                </div>
-              </button>
+                );
+              })}
             </div>
+
+            <div className="w-[1px] h-6 bg-zinc-700 mx-1"></div>
+
+            {/* 2. 치유 아이템 (1종) */}
+            <button 
+              onClick={() => canHeal && handleItemClick('heal')}
+              disabled={!canHeal}
+              className={`relative p-1 rounded-xl transition-all duration-200 
+                ${!canHeal
+                  ? 'grayscale opacity-50 cursor-not-allowed' // 💉 요청하신 50% 투명도 통일
+                  : 'bg-green-500/20 opacity-100 hover:scale-125 active:rotate-12 ring-1 ring-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)]'}
+                ${pendingHeal ? 'bg-green-500 ring-4 ring-green-400 scale-110' : ''}
+              `}
+            >
+              <img src="/images/itemHeal.png" className="w-12 h-12 object-contain" alt="heal" />
+              <div className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[8px] font-black min-w-[15px] h-[15px] rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
+                {userItems.heal}
+              </div>
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-
+      
 
       {/*  💉 하단 버튼영역 */}
       
