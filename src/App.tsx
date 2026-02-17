@@ -551,9 +551,9 @@ export default function App() {
 
           case 'waitingRoom':
             // 웨이팅룸 -> 방 퇴장 후 멀티플레이 페이지
-            playClickSound();
             handleLeaveAllRooms();
-            setView('multiplay');
+            // setView('multiplay');
+            setView('modeSelect');
             break;
 
           case 'multiBattle':
