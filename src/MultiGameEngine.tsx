@@ -211,10 +211,35 @@ export default function MultiGameEngine({
     if (userItems[type as keyof typeof userItems] <= 0) return;
 
     // 🚀 공격 아이템(힐 제외)을 썼다면 이번 라운드 공격 완료 처리
-    if (type !== 'heal') {
-      if (hasAttackedThisRound) return; // 이미 공격했다면 중단
+    if (type === 'heal') {
+      // 1. 멈춤 공격 해제: 카운트다운을 즉시 0으로 리셋
+      setFreezeCount(0);
+      
+      // 2. 색상 공격 해제: 이미지 경로의 _g 접미사 제거를 위해 false로 설정
+      setIsColorActive(false);
+      
+      // 3. 버튼 위치 복구: 뒤섞인 순서를 [바위(1), 보(2), 가위(0)] 정위치로 리셋
+      setButtonOrder([1, 2, 0]);
+
+      // 4. DB 상태 초기화: 자신에게 걸려있는 공격 신호를 제거하여 리스너 중복 작동 방지
+      supabase.from('room_participants')
+        .update({ effect_type: null, effect_at: null })
+        .eq('user_id', currentUserId)
+        .then();
+
+      // 5. 힐 아이템 전용 시각적 피드백 활성화
+      setPendingHeal(true);
+      setTimeout(() => setPendingHeal(false), 500);
+
+      console.log("힐 아이템 사용: 모든 공격 효과 제거 및 버튼 위치 복구 완료");
+    } else {
+      // 공격 아이템 사용 로직 (기존 중복 공격 방지 유지)
+      if (hasAttackedThisRound) return;
       setHasAttackedThisRound(true);
-      setLaunchedAttackId(type); // 🔥 내가 쏜 아이템 ID 기록
+      setLaunchedAttackId(type);
+      
+      setPendingAttack(type);
+      setTimeout(() => setPendingAttack(null), 500);
     }
     
     // 🚀 [핵심] 즉시 서버 전송 및 차감 
@@ -593,7 +618,10 @@ export default function MultiGameEngine({
   // 1. 공격 아이템: 내가 이번 라운드에 아직 공격하지 않았을 때만 활성
   const canAttack = !hasAttackedThisRound; 
   // 2. 힐 아이템: 현재 실시간으로 공격 효과(Stop/Color)가 발동 중일 때만 활성
-  const isUnderAttack = freezeCount > 0 || isColorActive;
+  const isUnderAttack = 
+    freezeCount > 0 || 
+    isColorActive || 
+    JSON.stringify(buttonOrder) !== JSON.stringify([1, 2, 0]);
   const canHeal = isUnderAttack && userItems.heal > 0;
 
 
@@ -784,7 +812,7 @@ export default function MultiGameEngine({
         </div>
       )}
 
-      
+
 
       {/*  💉 하단 버튼영역 */}
       
