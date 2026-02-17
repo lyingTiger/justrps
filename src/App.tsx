@@ -403,10 +403,10 @@ export default function App() {
 
         setMsgPopup({
           isOpen: true,
-          title: lang === 'ko' ? "일일 보상!" : "DAILY GIFT!",
+          title: lang === 'ko' ? "일일 접속 보상" : "DAILY GIFT",
           desc: lang === 'ko' 
-            ? "접속 보상:\n공격 아이템 세트!" 
-            : "Daily reward!\nAttack Item Set!",
+            ? "공격 아이템 세트" 
+            : "Attack Item Set",
           onConfirm: async () => {
             // DB 아이템 지급
             await supabase.rpc('update_user_items', {
