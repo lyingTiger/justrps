@@ -75,23 +75,23 @@ export default function ShopPage({
         const bonus = 1000; // 💉 보상량 수정: 1000개
         await supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: bonus });
         onUpdateCoins(userCoins + bonus);
-        setRewardPopup({ isOpen: true, title: `+${bonus} COINS!`, desc: "ADDED TO YOUR WALLET.", icon: "/images/coin.png" });
+        setRewardPopup({ isOpen: true, title: `+${bonus.toLocaleString()} COINS!`, desc: "ADDED TO YOUR WALLET.", icon: "/images/coin.png" });
     } else if (adType === 'remove_ads') {
         const duration = 50 * 60 * 60 * 1000; // 💉 보상량 수정: 50시간
         const newAdFreeUntil = new Date(Date.now() + duration).toISOString();
         await supabase.from('profiles').update({ ad_free_until: newAdFreeUntil }).eq('id', currentUserId);
         setAdFreeTimeLeft(50 * 60 * 60); 
-        setRewardPopup({ isOpen: true, title: "50H AD-FREE!", desc: "PURE GAMEPLAY SECURED.", icon: "🚫" });
+        setRewardPopup({ isOpen: true, title: "50 Hours AD-FREE!", desc: "ENJOY PURE GAME.", icon: "/images/icon_noAd.png" });
     } else {
         // 💉 아이템 4종 보상 (각 5개씩)
         await onPurchaseItem(adType, 5);
-        const itemNames = { stop: 'STOP', switch: 'SWITCH', color: 'COLOR', heal: 'HEAL' };
-        setRewardPopup({ isOpen: true, title: `+5 ${itemNames[adType]}!`, desc: "ITEMS ADDED TO INVENTORY.", icon: `/images/item${adType.charAt(0).toUpperCase() + adType.slice(1)}${adType === 'stop' ? '3sec' : adType === 'switch' ? 'Btn' : ''}.png` });
+        const itemNames = { stop: '3 sec STOP', switch: 'SWITCH buttons', color: 'Kill COLORS', heal: 'HEAL' };
+        setRewardPopup({ isOpen: true, title: `${itemNames[adType]} x5`, desc: "ITEMS ADDED TO INVENTORY.", icon: `/images/item${adType.charAt(0).toUpperCase() + adType.slice(1)}${adType === 'stop' ? '3sec' : adType === 'switch' ? 'Btn' : ''}.png` });
     }
   };
 
   return (
-    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4 pb-10">
+    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-2 px-4 pb-10">
       <AdOverlay isOpen={isAdOpen} onClose={() => setIsAdOpen(false)} onReward={handleAdReward} />
 
       <div className="w-full flex justify-end mb-2">
@@ -100,10 +100,12 @@ export default function ShopPage({
 
       {/* 💉 1. 보유 중인 아이템 텍스트 추가 */}
       <div className="w-full mb-1 ml-1 text-left">
-        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">Items in Possession</span>
+        <span className="text-[10px] font-black text-[#ffcc33] uppercase tracking-widest italic">
+          Items in Inventory
+        </span>
       </div>
 
-      <div className="w-full grid grid-cols-4 gap-2 mb-6 p-3 rounded-[12px] border-2 border-[#ffcc33] bg-zinc-900/50">
+      <div className="w-full grid grid-cols-4 gap-2 mb-6 p-3 rounded-[12px]  bg-zinc-900/50">
         {[
           { id: 'stop', img: 'itemStop3sec.png', count: userItems.stop },
           { id: 'switch', img: 'itemSwitchBtn.png', count: userItems.switch },
@@ -111,53 +113,97 @@ export default function ShopPage({
           { id: 'heal', img: 'itemHeal.png', count: userItems.heal }
         ].map((item) => (
           <div key={item.id} className="relative flex flex-col items-center">
-            <img src={`/images/${item.img}`} alt={item.id} className="w-12 h-12 object-contain" />
+            <img src={`/images/${item.img}`} alt={item.id} className="w-14 h-14 object-contain" />
             <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black min-w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-zinc-900 px-1 shadow-lg">{item.count}</div>
           </div>
         ))}
       </div>
 
       {/* 💉 2 & 4 & 5. 광고 시청 보상 목록 (3열 그리드 / 아이템 스타일) */}
-      <div className="w-full grid grid-cols-3 gap-2 mb-8">
-        {[
-          { id: 'stop', img: 'itemStop3sec.png', label: '5개', sub: 'STOP' },
-          { id: 'switch', img: 'itemSwitchBtn.png', label: '5개', sub: 'SWITCH' },
-          { id: 'color', img: 'itemColor.png', label: '5개', sub: 'COLOR' },
-          { id: 'heal', img: 'itemHeal.png', label: '5개', sub: 'HEAL' },
-          { id: 'remove_ads', icon: '🚫', label: '50H', sub: 'AD-FREE' },
-          { id: 'coins', img: 'coin.png', label: '1,000', sub: 'COINS' }
-        ].map((item: any) => (
-          <button 
-            key={item.id}
-            disabled={adCooldown > 0}
-            onClick={() => startAd(item.id)}
-            className={`flex flex-col items-center py-4 border rounded-[12px] transition-all active:scale-95 shadow-lg
-              ${adCooldown > 0 ? 'bg-zinc-900/50 border-zinc-800 opacity-50 grayscale' : 'bg-zinc-800 border-zinc-700 hover:border-[#FF9900]'}`}
-          >
-            <span className="text-[10px] font-black text-[#FF9900] uppercase leading-none mb-2">{item.label}</span>
-            {item.img ? (
-                <img src={`/images/${item.img}`} className="w-8 h-8 object-contain mb-2" alt={item.id} />
-            ) : (
-                <div className="text-2xl mb-2">{item.icon}</div>
-            )}
-            <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-tighter">
-                {adCooldown > 0 ? "Wait..." : "Watch Ad"}
-            </span>
-          </button>
-        ))}
+      <div className="w-full mb-1 ml-1 text-left">
+        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest italic">
+          Get More by Watching Ads
+        </span>
       </div>
 
-      <div className="w-full border-t border-zinc-800/50 my-4" />
+      {/* 버튼 그리드 영역 */}
+      <div className="relative w-full mb-8">
+
+        {/* 6개 버튼 그리드 */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { id: 'stop', img: 'itemStop3sec.png', label: '+5개' },
+            { id: 'switch', img: 'itemSwitchBtn.png', label: '+5개' },
+            { id: 'color', img: 'itemColor.png', label: '+5개' },
+            { id: 'heal', img: 'itemHeal.png', label: '+5개' },
+            { id: 'remove_ads', img: 'icon_noAd.png', label: 'No Ad 50H' },
+            { id: 'coins', img: 'coins.png', label: '+1,000' }
+          ].map((item: any) => (
+            <button 
+              key={item.id}
+              disabled={adCooldown > 0}
+              onClick={() => startAd(item.id)}
+              className={`flex flex-col items-center py-5 border rounded-[12px] transition-all active:scale-95 shadow-lg
+                ${adCooldown > 0 ? 'bg-zinc-900/50 border-zinc-800' : 'bg-zinc-800 border-zinc-700 hover:border-[#FF9900]'}`}
+            >
+              <span className="text-[12px] font-black text-[#FF9900] uppercase leading-none mb-3">{item.label}</span>
+              <img src={`/images/${item.img}`} className="w-12 h-12 object-contain" alt={item.id} />
+            </button>
+          ))}
+        </div>
+
+        {/* 💉 [핵심 추가] 쿨타임 발생 시 그리드 위에 겹쳐지는 오버레이 */}
+        {adCooldown > 0 && (
+          <div className="absolute inset-0 z-10 bg-black/70 backdrop-blur-sm rounded-[12px] flex flex-col items-center justify-center border border-zinc-800 animate-in fade-in duration-300">
+            
+              {/* 💉 [수정] 기존 이모티콘(⏳) div를 삭제하고 이미지 태그로 교체합니다. */}
+              <img 
+                src="/images/icon_houseglass.png" 
+                alt="cooldown" 
+                className="w-12 h-12 object-contain mb-2" 
+                // opacity-80을 주어 배경에 은은하게 어우러지도록 했습니다.
+              />
+              
+              <span className="text-3xl font-black text-red-500 font-mono italic drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]">
+                {Math.floor(adCooldown / 60)}:{(adCooldown % 60).toString().padStart(2, '0')}
+              </span>
+              <span className="text-[12px] font-bold text-red-500 uppercase tracking-widest mt-2">
+                Next Ad Available
+              </span>
+            </div>
+          )}
+        </div>
+
+      <div className="w-full mb-1 ml-1 text-left">
+        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest italic">
+          Get by Purchase
+        </span>
+      </div>
+
+      <div className="w-full border-t border-zinc-800/50 my-0" />
+
+
 
       {/* 💉 6. 영구 광고 제거 (최하단 고정) */}
-      <div className="w-full p-5 bg-gradient-to-b from-zinc-800 to-zinc-900 border-2 border-[#FF9900] rounded-[32px] flex flex-col items-center shadow-[0_0_20px_rgba(255,153,0,0.2)] relative overflow-hidden">
-        <div className="absolute top-2 right-4 bg-[#FF9900] text-black text-[8px] font-black px-2 py-0.5 rounded-full">BEST</div>
-        <div className="text-3xl mb-2">👑</div>
-        <h3 className="text-lg font-black text-white italic uppercase mb-4">Forever No Ads</h3>
-        <button className="w-full h-12 bg-white text-black rounded-2xl font-black text-sm uppercase hover:bg-zinc-200 transition-all active:scale-95">
+      <div className="w-full p-5 bg-gradient-to-b from-zinc-800 to-zinc-900 border-1 border-zinc-500 rounded-[12px] flex flex-col items-center shadow-[0_0_20px_rgba(255,153,0,0.2)] relative overflow-hidden">
+        
+        {/* 💉 [수정] h3 태그를 flex 컨테이너로 바꾸고 아이콘 이미지 추가 */}
+        <h3 className="flex items-center justify-center gap-2 text-lg font-black text-white italic uppercase mb-4">
+          <img 
+            src="/images/icon_noAds.png" 
+            alt="no ads" 
+            className="w-6 h-6 object-contain" 
+            // w-6 h-6로 아이콘 크기를 적절히 맞췄습니다. 필요시 조절하세요.
+          />
+          <span>Forever No Ads</span>
+        </h3>
+
+        <button className="w-full h-12 bg-zinc-700 border border-zinc-500 text-white rounded-2xl font-black text-sm uppercase hover:bg-[#FF9900] hover:text-black transition-all active:scale-95">
           $4.99
         </button>
       </div>
+
+
 
       {/* 보상 팝업 UI (기존 로직 유지) */}
       {rewardPopup.isOpen && (
