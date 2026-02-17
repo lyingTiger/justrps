@@ -331,13 +331,13 @@ export default function MultiGameEngine({
       // 💉 [추가] 유령 유저(이탈자) 발생 시 방장이 대신 처리
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
         // 방장만 이 처리를 수행함
-        if (roomData?.creator_id !== currentUserId) return;
+        // if (roomData?.creator_id !== currentUserId) return;
 
         leftPresences.forEach(async (p: any) => {
           if (!p.user_id) return;
           // 나간 유저를 '탈락' 처리하여 게임 결과 판정을 진행시킴
           await supabase.from('room_participants')
-            .update({ is_dead: true, play_time: 999.99 })
+            .update({ is_dead: true, play_time: 9999.99 })
             .eq('room_id', roomId)
             .eq('user_id', p.user_id);
         });
@@ -632,6 +632,8 @@ export default function MultiGameEngine({
 
   const handleBackToRoom = async () => {
     if (!currentUserId || !roomId) return;
+
+    // 1. 자신의 상태 초기화
     await supabase.from('room_participants')
       .update({ 
         current_round: 1, 
@@ -644,10 +646,14 @@ export default function MultiGameEngine({
       .eq('room_id', roomId)
       .eq('user_id', currentUserId);
 
+    // 2. 💉 [추가] 방장이 방으로 돌아갈 때 유령 유저(이탈자) 정리
     if (roomData?.creator_id === currentUserId) {
-        console.log("🧹 Host resetting room status...");
+        console.log("🧹 Host cleanup: Removing disconnected players...");
+        
+        // ✅ 방 상태만 'waiting'으로 변경
         await supabase.from('rooms').update({ status: 'waiting', first_cleared_at: null }).eq('id', roomId);
     }
+
     onGameOver(1, 0); 
   };
 

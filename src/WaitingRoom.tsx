@@ -73,6 +73,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
         
       if (me && me.is_ready) {
         console.log("⏰ Polling: Room is playing & I am Ready -> Joining!");
+        isExiting.current = true;
         onStartGame();
       }
     }
@@ -149,6 +150,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
                
                if (me && me.is_ready) {
                    console.log("🎮 DB Event: Game Started & I am Ready -> Go!");
+                   isExiting.current = true;
                    onStartGame();
                }
            }
@@ -156,6 +158,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
         // (C) 강제 시작 방송 (이건 방장이 눌러야만 오므로 신뢰 가능)
         .on('broadcast', { event: 'force_start_game' }, () => {
             console.log("⚡ Game Start via Broadcast!");
+            isExiting.current = true;
             onStartGame();
         })
         // (D) 경고음
@@ -169,23 +172,26 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
             // 💉 [수술] 방장만 이탈자의 사후 처리를 수행합니다.
             if (!isCreatorRef.current) return; 
 
-            console.log("👋 연결 끊김 감지, 사후 처리 시작:", leftPresences);
+            // 💉 [수정] roomInfo 대신 isExiting Ref를 사용하세요!
+            // 방장이 게임 시작 버튼을 눌렀다면(isExiting=true), 참가자들이 나가는 건 게임하러 가는 겁니다.
+            if (isExiting.current) {
+                console.log("🎮 게임 시작 중 이탈 감지 -> 삭제하지 않음 (Pass)");
+                return;
+            }
+
+            console.log("👋 대기실 연결 끊김 감지:", leftPresences);
             
             leftPresences.forEach(async (p: any) => {
                 const leftUserId = p.user_id;
                 if (!leftUserId) return;
 
-                // 🚀 비정상 종료 유저를 'is_dead' 처리하여 게임 엔진이 계속 진행되게 합니다.
-                // play_time을 크게 주어 결과창 정렬 시 꼴찌로 처리되게 유도합니다.
+                // 💉 [수정] 대기실에서는 연결 끊긴 유저를 명단에서 '삭제'합니다.
                 await supabase.from('room_participants')
-                    .update({ 
-                        is_dead: true, 
-                        play_time: 999.99 
-                    })
+                    .delete() 
                     .eq('room_id', roomId)
                     .eq('user_id', leftUserId);
                 
-                console.log(`✅ 유령 유저(${leftUserId}) 탈락 처리 완료`);
+                console.log(`✅ 대기실 이탈 유저(${leftUserId}) 삭제 완료`);
             });
         })
 
@@ -222,21 +228,25 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
   // --- 강퇴 감지 ---
   useEffect(() => {
-  // 💉 내 ID가 없거나 참가자 명단이 아직 로딩 전(0명)이면 판단을 유보합니다.
   if (!currentUserId || participants.length === 0) return;
+
+  // 💉 [추가] 방 상태가 이미 게임 중(playing)이라면 강퇴 로직을 건너뜁니다.
+  // (화면 전환 중 데이터 비동기화로 인한 오판 방지)
+  if (roomInfo?.status === 'playing') return;
 
     const isMeInList = participants.some(p => p.user_id === currentUserId);
     
     if (isMeInList) {
       hasJoinedRef.current = true; 
     } else {
-      // 💉 'hasJoinedRef'가 확실히 true인 상태(한번이라도 명단에 있었음)에서만 킥으로 간주
+      // 💉 isExiting.current가 true면(게임 진입 중이면) 모달을 띄우지 않습니다.
       if (hasJoinedRef.current && !isExiting.current) {
         console.log("🚨 강퇴당함이 감지되었습니다.");
         setShowKickedModal(true); 
       }
     }
-  }, [participants, currentUserId]);
+  // 💉 [수정] roomInfo?.status를 의존성 배열에 추가
+  }, [participants, currentUserId, roomInfo?.status]);
 
 
   // --- Handlers ---
@@ -308,7 +318,10 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
     // 2. DB 업데이트
     const { error } = await supabase.from('rooms').update({ status: 'playing', seed: randomSeed }).eq('id', roomId);
     if (error) console.error(error);
-    else onStartGame();
+    else {
+        isExiting.current = true; 
+        onStartGame();
+    }
   };
 
 
@@ -363,7 +376,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
       <div className="w-full mt-auto">
         {isCreator ? (
-          <button onClick={handleStart} disabled={participants.length < 1} className={`w-full h-14 text-white font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 transition-all ${participants.length < 2 ? 'bg-zinc-900 hover:bg-[#FF9900] hover:text-black' : !isAllReady ? 'bg-green-600 opacity-80' : 'bg-[#22c55e] animate-pulse hover:bg-green-400'}`}>
+          <button onClick={handleStart} disabled={participants.length < 1} className={`w-full h-14 text-white font-black uppercase rounded-2xl border border-zinc-600 text-lg shadow-xl active:scale-95 transition-all ${participants.length < 2 ? 'bg-zinc-800 hover:bg-[#FF9900] hover:text-black' : !isAllReady ? 'bg-green-600 opacity-80' : 'bg-[#22c55e] animate-pulse hover:bg-green-400'}`}>
             {participants.length < 2 ? 'Practice Start' : isAllReady ? 'Start Game' : 'Wait to Ready'}
           </button>
         ) : (
@@ -371,7 +384,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
             onClick={handleToggleReady} 
             // 🔥 [수정] 방이 playing 상태면 버튼 비활성화 (레디 못 박게 막음)
             disabled={!myInfo?.is_ready && roomInfo?.status === 'playing'}
-            className={`w-full h-16 font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 transition-all 
+            className={`w-full h-14 font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 transition-all 
                 ${myInfo?.is_ready 
                     ? 'bg-[#22c55e] text-black hover:bg-green-400' 
                     : (roomInfo?.status === 'playing') 

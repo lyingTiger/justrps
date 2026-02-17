@@ -155,7 +155,11 @@ export default function MultiplayPage({
   // 💉 [렌더링] UI 레이아웃
   // ------------------------------------------------------------------
   return (
-    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4">
+    // 💉 [수정 1] Main Wrapper: h-[calc(100dvh-100px)] 추가
+    // 전체 화면 높이에서 상단 여백과 하단 푸터(약 60~80px) 공간을 뺀 높이를 강제합니다.
+    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4 h-[calc(100dvh-100px)]">
+
+      
       <div className="w-full flex justify-end mb-0">
         <button 
           onClick={() => { playClickSound(); onBack(); }} 
@@ -227,7 +231,8 @@ export default function MultiplayPage({
         </h3>
         
         {/* 💉 방 목록 -간격 유지를 위해 space-y-0.5(2px) 적용 */}
-        <div className="w-full h-[220px] overflow-y-auto space-y-[5px] pr-1 custom-scrollbar">
+        {/* 고정 높이를 없애고 부모의 남은 공간만큼 늘어나서 스크롤되게 합니다. */}
+        <div className="w-full flex-1 overflow-y-auto space-y-[5px] pr-1 custom-scrollbar">
           {filteredRooms.length === 0 ? (
             <div className="w-full py-10 text-center border border-dashed border-zinc-800 rounded-[24px] opacity-20">
               <p className="text-[10px] font-black uppercase tracking-widest">{t('no_active_rooms')}</p>
