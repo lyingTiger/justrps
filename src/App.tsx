@@ -61,8 +61,10 @@ export default function App() {
   const [userItems, setUserItems] = useState<UserItems>({ stop: 0, switch: 0, color: 0, heal: 0 });
   const [sessionItems, setSessionItems] = useState<UserItems>({ stop: 0, switch: 0, color: 0, heal: 0 });
 
+  const lastActivityTimeRef = useRef(Date.now()); // 💉 마지막 활동 시각 타임스탬프
 
-  // 1. 비밀번호 변경 핸들러
+
+  // 비밀번호 변경 핸들러
   const handleChangePassword = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user?.email) return;
@@ -79,7 +81,9 @@ export default function App() {
     }
   };
 
-  // 2. 회원 탈퇴 핸들러
+
+
+  // 회원 탈퇴 핸들러
   const handleDeleteAccount = () => {
     setMsgPopup({
       isOpen: true,
@@ -224,6 +228,8 @@ export default function App() {
   const [sessionCoins, setSessionCoins] = useState(0); 
   const CONTINUE_COST = 50;
 
+
+
   // 세션 보상 저장 함수 (아이템 포함)
   const saveSessionRewards = async () => {
     // 코인이나 아이템 중 하나라도 획득한 게 있을 때만 실행
@@ -288,6 +294,7 @@ export default function App() {
   };
 
 
+
   // ------------------------------------------------------------------
   // 💉 [방 관리] DB 방 퇴장 처리 헬퍼 함수 (자동 로그아웃/로고 클릭용)
   // ------------------------------------------------------------------
@@ -300,6 +307,7 @@ export default function App() {
       console.error("자동 퇴장 처리 중 오류:", e);
     }
   };
+
 
 
   // ------------------------------------------------------------------
@@ -329,6 +337,7 @@ export default function App() {
       console.log("Share action cancelled");
     }
   };
+
 
 
   // 💉 아이템 모드 설정 변경 시 Supabase(profiles)에 자동 저장하는 로직
@@ -585,28 +594,49 @@ export default function App() {
     let timer: NodeJS.Timeout;
     const LIMIT = 10 * 60 * 1000; // 10분
 
+    // 💉 [핵심 함수] 실제 시차를 계산하여 로그아웃 여부 판정
+    const checkTimeout = () => {
+      const now = Date.now();
+      const gap = now - lastActivityTimeRef.current;
+
+      if (gap >= LIMIT) {
+        console.log(`💤 [보안] ${Math.round(gap / 1000)}초간 활동이 없어 로그아웃됩니다.`);
+        handleLogout();
+        return true;
+      }
+      return false;
+    };
+
     const resetTimer = () => {
+      // 💉 사용자가 움직이면 현재 시각을 타임스탬프에 박아넣습니다.
+      lastActivityTimeRef.current = Date.now(); 
+
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        console.log("💤 장시간 미활동으로 로그아웃됩니다.");
-        handleLogout();
+        checkTimeout(); // 10분 뒤에 시차 체크 실행
       }, LIMIT);
     };
 
-    // 💉 모바일 유저를 위한 touchstart 및 좀 더 포괄적인 감시를 위해 document에 등록
+    // 💉 [복귀 감지] 백그라운드(모바일 홈 화면 등)에서 돌아온 순간 실행
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("📱 앱 복귀 감지: 시차를 확인합니다.");
+        checkTimeout(); // 돌아온 즉시 "나 없는 동안 10분 지났나?" 확인
+      }
+    };
+
     const events = ['mousemove', 'click', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(event => document.addEventListener(event, resetTimer));
     
-    events.forEach(event => {
-      document.addEventListener(event, resetTimer);
-    });
+    // 💉 브라우저 탭 활성화 상태 변경 이벤트 리스너 추가
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     resetTimer(); // 초기 실행
 
     return () => {
       if (timer) clearTimeout(timer);
-      events.forEach(event => {
-        document.removeEventListener(event, resetTimer);
-      });
+      events.forEach(event => document.removeEventListener(event, resetTimer));
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isLoggedIn]);
 
@@ -903,7 +933,23 @@ export default function App() {
   // 💉 [세션 종료] 로그아웃 및 로컬 캐시 전체 삭제
   // ------------------------------------------------------------------
   const handleLogout = async () => {
-    if (currentRoomId) await leaveCurrentRoom();
+
+    // if (currentRoomId) await leaveCurrentRoom();
+    // 💉 현재 유저 ID가 있다면 DB의 모든 참여 목록 삭제
+    if (currentUserId) {
+      try {
+        await supabase
+          .from('room_participants')
+          .delete()
+          .eq('user_id', currentUserId);
+        
+        console.log("🧹 모든 방에서 퇴장 처리가 완료되었습니다.");
+      } catch (e) {
+        console.error("방 퇴장 처리 중 오류 발생:", e);
+      }
+    }
+
+
     // 💉 [백업] 삭제 전 보존해야 할 설정값들을 수집합니다.
     const savedLang = localStorage.getItem('app_lang');
     const savedVol = volume.toString();
@@ -1337,11 +1383,13 @@ export default function App() {
       </header>
       )}
 
+
+
       {/* 💉 메인 메인 콘텐츠 렌더링 영역 */}
-     {/* 💉 [수정] 메인 영역: min-h-[100dvh]를 주어 푸터를 아래로 밀어냄 */}
-      <main className={`flex-1 flex flex-col items-center justify-start p-0 min-h-[100dvh] ${
+     
+      <main className={`flex-1 flex flex-col items-center justify-start p-0 min-h-0 h-full ${
         (view === 'battle' || view === 'multiBattle') ? 'overflow-hidden' : ''
-        }`}>
+      }`}>
 
         {view === 'settings' && (
           <SettingsPage 

@@ -155,12 +155,11 @@ export default function MultiplayPage({
   // 💉 [렌더링] UI 레이아웃
   // ------------------------------------------------------------------
   return (
-    // 💉 [수정 1] Main Wrapper: h-[calc(100dvh-100px)] 추가
-    // 전체 화면 높이에서 상단 여백과 하단 푸터(약 60~80px) 공간을 뺀 높이를 강제합니다.
-    <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4 h-[calc(100dvh-100px)]">
+    // 💉 [수정] 고정 계산식(calc) 대신 h-full과 min-h-0를 사용합니다.
+  <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4 h-[calc(100dvh-100px)] min-h-0 pb-10">
 
       
-      <div className="w-full flex justify-end mb-0">
+      <div className="w-full flex justify-end mb-0 flex-none">
         <button 
           onClick={() => { playClickSound(); onBack(); }} 
           className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px] transition-all hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
@@ -236,14 +235,14 @@ export default function MultiplayPage({
         </button>
       </div>
 
-      <div className="w-full flex flex-col gap-2">
-        <h3 className="w-full text-center text-sm font-black text-[#ffcc33] uppercase tracking-[0.2em] mb-0">
+      <div className="w-full flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
+        <h3 className="w-full text-center text-sm font-black text-[#ffcc33] uppercase tracking-[0.2em] mb-0 flex-none">
           {t('title_active_rooms')}
         </h3>
         
         {/* 💉 방 목록 -간격 유지를 위해 space-y-0.5(2px) 적용 */}
         {/* 고정 높이를 없애고 부모의 남은 공간만큼 늘어나서 스크롤되게 합니다. */}
-        <div className="w-full flex-1 overflow-y-auto space-y-[5px] pr-1 custom-scrollbar">
+        <div className="w-full flex-1 min-h-0 overflow-y-auto space-y-[5px] pr-1 custom-scrollbar">
           {filteredRooms.length === 0 ? (
             <div className="w-full py-10 text-center border border-dashed border-zinc-800 rounded-[24px] opacity-20">
               <p className="text-[10px] font-black uppercase tracking-widest">{t('no_active_rooms')}</p>
