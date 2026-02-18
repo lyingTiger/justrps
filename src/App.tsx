@@ -42,7 +42,7 @@ export default function App() {
   // ------------------------------------------------------------------
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentRoomMode, setCurrentRoomMode] = useState<string>('normal');
+  const [currentRoomMode, setCurrentRoomMode] = useState<string>('DRAW MODE');
   const [userNickname, setUserNickname] = useState(localStorage.getItem('cached_nickname') || 'Loading...');
   const [userCoins, setUserCoins] = useState(parseInt(localStorage.getItem('cached_coins') || '0'));
   const [showResultModal, setShowResultModal] = useState(false);
@@ -451,8 +451,18 @@ export default function App() {
 
       // 💉 DB에서 마지막으로 선택했던 모드 설정을 가져와 상태에 주입합니다.
       if (typeof setSelectedOption === 'function') {
-        setSelectedOption(profile.last_selected_option || 'DRAW MODE');
+        const savedMode = profile.last_selected_option;
+        const validModes = ['WIN MODE', 'DRAW MODE', 'LOSE MODE', 'SHUFFLE MODE', 'EXPERT MODE'];
+        
+        // 저장된 값이 없거나, 유효한 리스트에 없는 값(예: 'normal')이면 'DRAW MODE' 선택
+        if (!savedMode || !validModes.includes(savedMode)) {
+          setSelectedOption('DRAW MODE');
+        } else {
+          setSelectedOption(savedMode);
+        }
       }
+
+
       if (typeof setIsItemMode === 'function') {
         setIsItemMode(profile.last_is_item_mode ?? false);
       }
