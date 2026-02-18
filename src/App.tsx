@@ -1568,19 +1568,19 @@ export default function App() {
             <p className="w-full text-left text-base font-black text-[#ffcc33] uppercase ml-1 mt-4">{t('modeSelect', 'title_start_with')}</p>
             <button 
               onClick={() => { handleLeaveAllRooms(); playClickSound(); resetGameSession(); setView('battle'); }} 
-              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#3399cc] hover:text-black hover:border-[#3399cc] hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] active:bg-[#3399cc] active:text-black active:border-[#3399cc] active:scale-95"
+              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-[#3399cc]/30 text-white border border-zinc-800 hover:bg-[#3399cc] hover:text-black hover:border-[#3399cc] hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] active:bg-[#3399cc] active:text-black active:border-[#3399cc] active:scale-95"
             >
               {t('modeSelect', 'btn_single')}
             </button>
             <button 
               onClick={() => { handleLeaveAllRooms(); playClickSound(); setView('multiplay'); }} 
-              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#66cc33] hover:text-black hover:border-[#66cc33] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#66cc33] active:text-black active:border-[#66cc33] active:scale-95"
+              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-[#66cc33]/30 text-white border border-zinc-800 hover:bg-[#66cc33] hover:text-black hover:border-[#66cc33] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#66cc33] active:text-black active:border-[#66cc33] active:scale-95"
             >
               {t('modeSelect', 'btn_multi')}
             </button>
             <button 
               onClick={() => { handleLeaveAllRooms(); playClickSound(); handlePlayFromBest(); }} 
-              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800  hover:bg-[#ff3366] hover:text-black hover:border-[#ff3366] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#ff3366] active:text-black active:border-[#ff3366] active:scale-95"
+              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-[#ff3366]/30 text-white border border-zinc-800  hover:bg-[#ff3366] hover:text-black hover:border-[#ff3366] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#ff3366] active:text-black active:border-[#ff3366] active:scale-95"
             >
               {t('modeSelect', 'btn_play_from_best')}
             </button>
@@ -1588,7 +1588,7 @@ export default function App() {
             {/* 💉 [신규 추가] 저장된 기록에서 이어하기 버튼 */}
             <button 
               onClick={() => { handleLeaveAllRooms(); playClickSound(); handleLoadGame(); }} 
-              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#ff3366] hover:text-black hover:border-[#ff3366] hover:shadow-[0_0_15px_rgba(255,51,102,0.4)] active:bg-[#ff3366] active:text-black active:scale-95"
+              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-[#ff9933]/30 text-white border border-zinc-800 hover:bg-[#ff9933] hover:text-black hover:border-[#ff9933] hover:shadow-[0_0_15px_rgba(255,51,102,0.4)] active:bg-[#ff9933] active:text-black active:scale-95"
             >
               {/* 번역 파일에 btn_play_from_save 키가 없다면 아래 텍스트가 나옵니다. */}
               {t('modeSelect', 'btn_play_from_save')}
@@ -1855,8 +1855,8 @@ export default function App() {
               <button className="hover:text-white transition-colors">Privacy</button>
               <button className="hover:text-white transition-colors">Contact</button>
             </div>
-            <p className="text-zinc-800 text-[8px] font-mono tracking-tighter opacity-50">
-              Powered by Treasure Factory
+            <p className="text-zinc-800 text-[8px] font-mono tracking-tighter opacity-70">
+              Powered by 2H soft
             </p>
           </div>
         </footer>

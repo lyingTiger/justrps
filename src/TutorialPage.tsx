@@ -27,14 +27,14 @@ export default function TutorialPage({ onBack }: TutorialPageProps) {
         {/* --- 01 단계: 기억하기 --- */}
         <div className="flex flex-col items-center text-center space-y-3 animate-in slide-in-from-top duration-700">
           <h4 className={`${titleStyle} text-white`}>
-            <span className="text-[#FF9900] mr-2">01</span>AI가 제시하는 손의 순서를 기억하세요.
+            <span className="text-[#FF9900] mr-2">01</span>AI가 제시하는 손의 "순서"를 기억하세요.
           </h4>
           <p className={descStyle}>라운드마다 한 문제씩 늘어납니다.</p>
           <div className="flex gap-2 mt-1">
             {['rock', 'paper', 'scissor'].map(hand => (
-              <div key={hand} className="w-11 h-11 bg-zinc-900 border border-zinc-800 rounded-2xl p-2">
+              <div key={hand} className="w-12 h-12  p-2">
                 {/* [UPDATE] opacity-30 -> opacity-90 으로 변경하여 밝게 표시 */}
-                <img src={`/images/${hand}.png`} className="w-full h-full object-contain opacity-90" />
+                <img src={`/images/${hand}.png`} className="w-full h-full object-contain opacity-100" />
               </div>
             ))}
           </div>
@@ -45,9 +45,9 @@ export default function TutorialPage({ onBack }: TutorialPageProps) {
         {/* --- 02 단계: I GOT IT 클릭 --- */}
         <div className="flex flex-col items-center text-center space-y-4 animate-in zoom-in duration-500 delay-300">
           <h4 className={`${titleStyle} text-white`}>
-            <span className="text-[#FF9900] mr-2">02</span>"ok, 기억완료!" 클릭
+            <span className="text-[#FF9900] mr-2">02</span>"순서"를 외우고 버튼 클릭
           </h4>
-          <p className={descStyle}>순서를 외우고 버튼을 클릭하세요.</p>
+          <p className={descStyle}>제시된 문제의 순서를 외우고 버튼을 클릭하세요.</p>
           <div className="px-8 py-2.5 bg-zinc-900 rounded-full border border-[#ffcc33]/50 text-[#ffcc33] text-xs font-black uppercase italic animate-pulse shadow-[0_0_20px_rgba(255,153,0,0.15)]">
             "ok, 기억완료!"
           </div>
@@ -59,15 +59,15 @@ export default function TutorialPage({ onBack }: TutorialPageProps) {
         {/* --- 03 단계: 대응하기 --- */}
         <div className="flex flex-col items-center text-center space-y-3 animate-in slide-in-from-bottom duration-700 delay-500 pb-2">
           <h4 className={`${titleStyle} text-white`}>
-            <span className="text-[#FF9900] mr-2">03</span>기억한 순서대로 조건에 맞춰 클릭
+            <span className="text-[#FF9900] mr-2">03</span>기억한 "순서"대로 조건에 맞게 "순서"대로 클릭
           </h4>
           <div className="space-y-0.5">
-            <p className={descStyle}>선택한 모드와 조건을 확인하세요.</p>
+            <p className={descStyle}>모드와 조건을 확인하며 플레이하세요.</p>
             <p className="text-[#FF9900] text-xs font-black uppercase italic">(예: 승리모드, 3승)</p>
           </div>
           <div className="flex gap-2 mt-1">
             {['paper', 'scissor', 'rock'].map(hand => (
-              <div key={hand} className="w-11 h-11 bg-zinc-900 border border-[#FF9900] rounded-2xl p-2 shadow-[0_0_15px_rgba(255,153,0,0.2)]">
+              <div key={hand} className="w-12 h-12 bg-zinc-900 border border-[#FF9900] rounded-2xl p-2 shadow-[0_0_15px_rgba(255,153,0,0.2)]">
                 <img src={`/images/${hand}.png`} className="w-full h-full object-contain" />
               </div>
             ))}
