@@ -95,7 +95,7 @@ export default function ShopPage({
       <AdOverlay isOpen={isAdOpen} onClose={() => setIsAdOpen(false)} onReward={handleAdReward} />
 
       <div className="w-full flex justify-end mb-2">
-        <button onClick={onBack} className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px]">Back</button>
+        <button onClick={onBack} className="px-4 py-1 bg-zinc-800 hover:bg-[#ff9900] text-white hover:text-black text-[10px] font-black uppercase border border-zinc-600 rounded-[10px]">Back</button>
       </div>
 
       {/* 💉 1. 보유 중인 아이템 텍스트 추가 */}
@@ -122,7 +122,7 @@ export default function ShopPage({
       {/* 💉 2 & 4 & 5. 광고 시청 보상 목록 (3열 그리드 / 아이템 스타일) */}
       <div className="w-full mb-1 ml-1 text-left">
         <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest italic">
-          Get More by Watching Ads
+          Get More ITEMS by Watching Ads
         </span>
       </div>
 
@@ -172,18 +172,18 @@ export default function ShopPage({
           )}
         </div>
 
-      <div className="w-full mb-1 ml-1 text-left">
+      {/* <div className="w-full mb-1 ml-1 text-left">
         <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest italic">
           Get by Purchase
         </span>
       </div>
 
-      <div className="w-full border-t border-zinc-800/50 my-0" />
+      <div className="w-full border-t border-zinc-800/50 my-0" /> */}
 
 
 
       {/* 💉 6. 영구 광고 제거 (최하단 고정) */}
-      <div className="w-full p-5 bg-gradient-to-b from-zinc-800 to-zinc-900 border-1 border-zinc-500 rounded-[12px] flex flex-col items-center shadow-[0_0_20px_rgba(255,153,0,0.2)] relative overflow-hidden">
+      {/* <div className="w-full p-5 bg-gradient-to-b from-zinc-800 to-zinc-900 border-1 border-zinc-500 rounded-[12px] flex flex-col items-center shadow-[0_0_20px_rgba(255,153,0,0.2)] relative overflow-hidden">
         
         <h3 className="flex items-center justify-center gap-2 text-lg font-black text-white italic uppercase mb-4">
           <img 
@@ -197,7 +197,7 @@ export default function ShopPage({
         <button className="w-full h-12 bg-zinc-700 border border-zinc-500 text-white rounded-2xl font-black text-sm uppercase hover:bg-[#FF9900] hover:text-black transition-all active:scale-95">
           $4.99
         </button>
-      </div>
+      </div> */}
 
 
 

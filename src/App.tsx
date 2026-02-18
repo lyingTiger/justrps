@@ -53,7 +53,6 @@ export default function App() {
   const [showAdLoading, setShowAdLoading] = useState(false);
   const hasCheckedDailyRef = useRef(false); // 💉 일일 보상 체크 여부
 
-
   // 💉 방 만들기 아이템전 설정 저장용 상태
   const [isItemMode, setIsItemMode] = useState<boolean>(false);
   
@@ -147,7 +146,10 @@ export default function App() {
   // ------------------------------------------------------------------
   // 💉 [게임 엔진 제어] 뷰 전환, 라운드, 통계 데이터 관리
   // ------------------------------------------------------------------
-  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle' | 'info'>('lobby');  
+  //const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle' | 'info'>('lobby');  
+  const [view, setView] = useState<'lobby' | 'modeSelect' | 'battle' | 'settings' | 'ranking' | 'shop' | 'multiplay' | 'waitingRoom' | 'tutorial' | 'multiBattle' | 'info' | 'terms' | 'privacy'>('lobby');
+
+  
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); 
   // 💉 [신규 추가] 현재 방에 참여 중인 유저들의 목록을 저장합니다.
   const [participants, setParticipants] = useState<any[]>([]);
@@ -319,7 +321,7 @@ export default function App() {
   const handleShare = async () => {
     const shareData = {
       title: 'just RPS',
-      text: lang === 'ko' ? '기억해, 가위 바위 보!\n천재들의 놀이터! \n\n자신의 한계를 극복하고, \n친구들과 대결해 보세요!' : 'Remember, RPS!\nGenius playground!\n\nOvercome your limits,\nand battle your friends!',
+      text: lang === 'ko' ? '기억해, 보 보 가위 바위 보...\n가위바위보 기억력 게임! \n\n자신의 한계를 극복하고, \n친구들과 대결해 보세요!' : 'Remember, RPS!\nGenius playground!\n\nOvercome your limits,\nand battle your friends!',
       url: window.location.origin,
     };
 
@@ -1497,10 +1499,12 @@ export default function App() {
           />
         )}
 
-        {view === 'info' && <InfoPage onBack={() => { playClickSound(); setView('lobby'); }} todayCount={visitorStats.today} totalCount={visitorStats.total} />}
+
         
+
+
         {view === 'lobby' && (
-          <div className="w-full max-w-[360px] flex flex-col items-center mt-4 space-y-3 px-4">
+          <div className="w-full max-w-[360px] flex flex-col items-center mt-4 space-y-3 px-4 pb-10">
               <div className="w-full flex justify-end mb-0">
                 <button 
                   onClick={() => { playClickSound(); handleShare(); }} // 💉 사운드 추가
@@ -1843,6 +1847,37 @@ export default function App() {
             }}
           />
         }
+
+
+        {view === 'info' && <InfoPage onBack={() => { playClickSound(); setView('lobby'); }} todayCount={visitorStats.today} totalCount={visitorStats.total} />}
+        
+
+        {/* 이용약관 및 개인정보처리방침 공용 렌더링 (코드 중복 방지를 위해 하나의 구조로 처리 가능) */}
+        {(view === 'terms' || view === 'privacy') && (
+          <div className="w-full max-w-[340px] flex flex-col items-center mt-6 px-4 animate-in fade-in slide-in-from-bottom-5 duration-300">
+            <div className="w-full flex justify-between items-center mb-6">
+              <h2 className="text-xl font-black text-[#FF9900] italic uppercase tracking-tighter">
+                {t('legal', view === 'terms' ? 'terms_title' : 'privacy_title')}
+              </h2>
+              <button 
+                onClick={() => { playClickSound(); setView('lobby'); }}
+                className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px] hover:bg-zinc-800 transition-all"
+              >
+                {t('modeSelect', 'btn_back')}
+              </button>
+            </div>
+
+            <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-[24px] p-5 h-[50vh] overflow-y-auto custom-scrollbar">
+              <p className="text-zinc-400 text-[11px] leading-relaxed whitespace-pre-line font-medium">
+                {t('legal', view === 'terms' ? 'terms_content' : 'privacy_content')}
+              </p>
+            </div>
+            
+            <p className="mt-4 text-zinc-600 text-[9px] font-bold uppercase tracking-widest italic">
+              Last Updated: 2026.02.18
+            </p>
+          </div>
+        )}
               
       </main>
 
@@ -1850,17 +1885,24 @@ export default function App() {
 
       {/* 💉 [신규] 웹 전용 푸터: 게임 중에는 숨기고, 평소에는 스크롤해야 보임 */}
       {!(view === 'battle' || view === 'multiBattle') && (
-        <footer className="w-full py-10 bg-black border-t border-zinc-900 flex flex-col items-center justify-center gap-3 flex-none">
+        <footer className="w-full py-10 bg-black border-t border-zinc-800 flex flex-col items-center justify-center gap-3 flex-none">
           <div className="max-w-[360px] w-full text-center px-6">
             <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
               © 2026 just RPS. All Rights Reserved.
             </p>
-            <div className="flex justify-center gap-6 text-zinc-500 text-[6px] font-bold uppercase tracking-widest mb-6">
-              <button className="hover:text-white transition-colors">Terms</button>
-              <button className="hover:text-white transition-colors">Privacy</button>
-              <button className="hover:text-white transition-colors">Contact</button>
+            {/* 💉 버튼에 setView 연결 */}
+            <div className="flex justify-center gap-6 text-zinc-500 font-bold uppercase tracking-widest mb-4">
+              <button onClick={() => { playClickSound(); setView('terms'); }} className="text-[12px] hover:text-white transition-colors">
+                {t('footer', 'terms') || 'Terms'}
+              </button>
+              <button onClick={() => { playClickSound(); setView('privacy'); }} className="text-[12px] hover:text-white transition-colors">
+                {t('footer', 'privacy') || 'Privacy'}
+              </button>
+              <button onClick={() => { playClickSound(); setView('info'); }} className="text-[12px] hover:text-white transition-colors">
+                {t('footer', 'contact') || 'Contact'}
+              </button>
             </div>
-            <p className="text-zinc-500 text-[10px] font-mono tracking-tighter opacity-100">
+            <p className="text-zinc-500 text-[12px] font-mono tracking-tighter opacity-100">
               Powered by 2H soft
             </p>
           </div>

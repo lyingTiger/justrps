@@ -165,6 +165,20 @@ export const translations = {
     msg_wrong_pass: "Incorrect password."
     },
 
+    footer: {
+    terms: "Terms",
+    privacy: "Privacy",
+    contact: "Contact"
+    },
+
+    legal: {
+      terms_title: "Terms of Service",
+      privacy_title: "Privacy Policy",
+      terms_content: `[Article 1: Purpose]\nThese terms govern the use of the 'justRPS' service provided by 2H soft (the 'Company') and the rights and responsibilities of the Company and its members.\n\n[Article 2: Definitions]\n'Service' refers to the web game and related functions provided by the Company.\n\n[Article 3: Formation of Contract]\nA service use agreement is formed when a member creates an account within the service and agrees to these terms.\n\n[Article 4: Service Use and Restrictions]\n1. The Company, in principle, provides the service 24/7 but may suspend it for equipment maintenance or in case of failure.\n2. Users must not play the game using unfair methods such as macros, hacking, or bug abuse. If detected, accounts may be permanently suspended.\n\n[Article 5: Limitation of Liability]\n1. The Company is not liable for service interruptions caused by natural disasters or force majeure.\n2. The Company is not responsible for the loss of data (coins, items) caused by the user's negligence.`,
+    
+      privacy_content: `This Privacy Policy explains how the Company collects, uses, and protects users' personal information.\n\n[1. Collected Information]\nThe Company collects email addresses, nicknames, and game play records for account creation and management (via Supabase).\n\n[2. Collection Method]\nMembers can easily provide information through Google or Kakao social login.\n\n[3. Cookies and Advertising Services (Important)]\n1. This service uses Google AdSense to serve advertisements.\n2. Google uses cookies to serve ads based on a user's prior visits to this or other websites.\n3. Users may opt out of personalized advertising by visiting Google Ads Settings (www.google.com/settings/ads).\n\n[4. Data Retention and Destruction]\nPersonal information is destroyed immediately once a user requests account deletion or the purpose of collection is fulfilled.\n\n[5. Third-Party Disclosure]\nThe Company does not sell or provide users' personal information to third parties without consent, except where there is a legal obligation.`
+    }
+
     
   },
 
@@ -330,5 +344,19 @@ export const translations = {
     msg_no_public_rooms: "입장 가능한 \n방이 없습니다.",
     msg_wrong_pass: "비밀번호가 \n틀렸습니다."
     },
+
+    footer: {
+    terms: "이용약관",
+    privacy: "개인정보처리방침",
+    contact: "문의하기"
+    },
+
+    legal: {
+      terms_title: "이용약관",
+      privacy_title: "개인정보처리방침",
+      terms_content: `[제1조 목적]\n본 약관은 2H soft(이하 '회사')가 제공하는 'justRPS' 서비스의 이용과 관련하여 회사와 회원간의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.\n\n[제2조 용어의 정의]\n'서비스'란 회사가 제공하는 웹 게임 및 관련 기능을 의미합니다.\n\n[제3조 이용계약의 성립]\n이용계약은 회원이 서비스 내에서 계정을 생성하고 약관에 동의함으로써 성립됩니다.\n\n[제4조 서비스의 이용 및 제한]\n1. 회사는 24시간 서비스를 제공하는 것을 원칙으로 하나, 설비 점검 및 고장 시 중단될 수 있습니다.\n2. 사용자는 매크로, 해킹, 버그 악용 등 부정한 방법으로 게임을 플레이해서는 안 되며, 적발 시 계정이 영구 정지될 수 있습니다.\n\n[제5조 책임의 제한]\n1. 회사는 천재지변 또는 불가항력으로 인한 서비스 중단에 대해 책임을 지지 않습니다.\n2. 회사는 사용자의 과실로 인한 데이터(코인, 아이템) 손실에 대해 책임을 지지 않습니다.`,
+    
+      privacy_content: `본 개인정보처리방침은 회사가 사용자의 개인정보를 어떻게 수집, 사용 및 보호하는지 설명합니다.\n\n[1. 수집하는 정보]\n회사는 계정 생성 및 관리(Supabase 이용)를 위해 이메일 주소, 닉네임, 게임 플레이 기록을 수집합니다.\n\n[2. 정보의 수집 방법]\n회원은 Google 또는 Kakao 소셜 로그인을 통해 간편하게 정보를 제공할 수 있습니다.\n\n[3. 쿠키 및 광고 서비스 (중요)]\n1. 본 서비스는 광고 게재를 위해 Google AdSense를 사용합니다.\n2. Google은 쿠키를 사용하여 사용자의 웹사이트 방문 기록을 바탕으로 맞춤형 광고를 제공합니다.\n3. 사용자는 Google 광고 설정(www.google.com/settings/ads)을 통해 맞춤형 광고를 거부할 수 있습니다.\n\n[4. 정보의 보유 및 파기]\n사용자가 회원 탈퇴를 요청하거나 목적이 달성된 경우, 회사는 해당 정보를 즉시 파기합니다.\n\n[5. 제3자 제공]\n회사는 법적 의무가 있는 경우를 제외하고 사용자의 동의 없이 개인정보를 제3자에게 판매하거나 제공하지 않습니다.`
+    }
   }
 };
