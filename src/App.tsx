@@ -321,7 +321,7 @@ export default function App() {
   const handleShare = async () => {
     const shareData = {
       title: 'just RPS',
-      text: lang === 'ko' ? '기억해, 보 보 가위 바위 보...\n가위바위보 기억력 게임! \n\n자신의 한계를 극복하고, \n친구들과 대결해 보세요!' : 'Remember, RPS!\nGenius playground!\n\nOvercome your limits,\nand battle your friends!',
+      text: lang === 'ko' ? '기억해, 보 보 가위 바위 보...\n기억력 & 순발력 대결! \n\n자신의 한계를 극복하고, \n친구들과 대결해 보세요!' : 'Remember, RPS!\nGenius playground!\n\nOvercome your limits,\nand battle your friends!',
       url: window.location.origin,
     };
 
@@ -451,7 +451,7 @@ export default function App() {
 
       // 💉 DB에서 마지막으로 선택했던 모드 설정을 가져와 상태에 주입합니다.
       if (typeof setSelectedOption === 'function') {
-        setSelectedOption(profile.last_selected_option || 'normal');
+        setSelectedOption(profile.last_selected_option || 'DRAW MODE');
       }
       if (typeof setIsItemMode === 'function') {
         setIsItemMode(profile.last_is_item_mode ?? false);
