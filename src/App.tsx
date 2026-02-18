@@ -1484,7 +1484,7 @@ export default function App() {
 
       {/* 💉 메인 메인 콘텐츠 렌더링 영역 */}
      
-      <main className={`flex-1 flex flex-col items-center justify-start p-0 min-h-0 h-full ${
+      <main className={`flex-1 flex flex-col items-center justify-start p-0 min-h-0 h-full pb-10 ${
         (view === 'battle' || view === 'multiBattle') ? 'overflow-hidden' : ''
       }`}>
 
