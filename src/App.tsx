@@ -63,6 +63,9 @@ export default function App() {
 
   const lastActivityTimeRef = useRef(Date.now()); // 💉 마지막 활동 시각 타임스탬프
 
+  // 💉 [상태 추가] 이어하기 횟수 관리용
+  const [loadCount, setLoadCount] = useState(0);
+
 
   // 비밀번호 변경 핸들러
   const handleChangePassword = async () => {
@@ -441,6 +444,7 @@ export default function App() {
       const newCoins = profile.coins || 0;
       setUserNickname(newName);
       setUserCoins(newCoins);
+      setLoadCount(profile.load_count || 0);
       setAdFreeUntil(profile.ad_free_until);
 
       // 💉 DB에서 마지막으로 선택했던 모드 설정을 가져와 상태에 주입합니다.
@@ -552,14 +556,17 @@ export default function App() {
           case 'waitingRoom':
             // 웨이팅룸 -> 방 퇴장 후 멀티플레이 페이지
             handleLeaveAllRooms();
-            // setView('multiplay');
-            setView('modeSelect');
+            setView('multiplay');
             break;
 
           case 'multiBattle':
             // 멀티 게임 중/결과창 -> 방(waitingRoom)으로 복귀
-            if (currentUserId) fetchUserData(currentUserId);
-            setView('waitingRoom'); 
+            // if (currentUserId) fetchUserData(currentUserId);
+            // setView('waitingRoom'); 
+           
+            setView('multiplay');
+            handleLeaveAllRooms();
+
             break;
 
           case 'battle':
@@ -657,55 +664,56 @@ export default function App() {
   }, [msgPopup.isOpen]);
 
 
-    // 💉 [교체 1] 방문자 통계 관리: 중복 방지 로직 포함
-    useEffect(() => {
-      const handleStats = async () => {
-        // 1. 로비 진입 시 + 로그인된 경우에만 방문자 수 증가 시도
-        // (DB의 increment_visitor 함수가 오늘 방문 여부를 체크해 중복을 막습니다)
-        if (view === 'lobby' && isLoggedIn) {
-          await supabase.rpc('increment_visitor');
+  // 💉 방문자 통계 관리: 중복 방지 로직 포함
+  useEffect(() => {
+    const handleStats = async () => {
+      // 1. 로비 진입 시 + 로그인된 경우에만 방문자 수 증가 시도
+      // (DB의 increment_visitor 함수가 오늘 방문 여부를 체크해 중복을 막습니다)
+      if (view === 'lobby' && isLoggedIn) {
+        await supabase.rpc('increment_visitor');
+      }
+
+      // 2. [수정] 데이터 조구(Fetch)는 뷰 조건 없이, 혹은 세팅 뷰까지 포함하여 실행
+      // 💉 이제 어떤 뷰에서든 최신 통계를 가져와 상태를 유지합니다.
+      const { data } = await supabase
+        .from('site_stats')
+        .select('today_count, total_count')
+        .eq('id', 'global')
+        .maybeSingle();
+        
+      if (data) {
+        setVisitorStats({ today: data.today_count, total: data.total_count });
+      }
+    };
+
+    handleStats();
+  }, [view, isLoggedIn]); // 💉 isLoggedIn을 추가하여 로그인 직후 카운트가 반영되게 함
+
+
+  // 💉 [교체 2] 인증 및 초기 설정 (방문자 로직 분리됨)
+  useEffect(() => {
+    document.title = "just RPS";
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        lastFetchedId.current = null; 
+        resetUserState();
+      } 
+      else if (session?.user) {
+        const userId = session.user.id;
+        if (currentUserId !== userId) {
+            setCurrentUserId(userId);
+            setIsLoggedIn(true);
+            playStartSound();
         }
+        if (lastFetchedId.current === userId) return;
+        lastFetchedId.current = userId;
+        fetchUserData(userId); 
+      }
+    });
 
-        // 2. 로비나 정보 페이지일 때 최신 통계 데이터를 가져옴
-        if (view === 'lobby' || view === 'info') {
-          const { data } = await supabase
-            .from('site_stats')
-            .select('today_count, total_count')
-            .eq('id', 'global')
-            .maybeSingle();
-            
-          if (data) setVisitorStats({ today: data.today_count, total: data.total_count });
-        }
-      };
-
-      handleStats();
-    }, [view, isLoggedIn]); // 💉 isLoggedIn을 추가하여 로그인 직후 카운트가 반영되게 함
-
-
-    // 💉 [교체 2] 인증 및 초기 설정 (방문자 로직 분리됨)
-    useEffect(() => {
-      document.title = "just RPS";
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
-          lastFetchedId.current = null; 
-          resetUserState();
-        } 
-        else if (session?.user) {
-          const userId = session.user.id;
-          if (currentUserId !== userId) {
-              setCurrentUserId(userId);
-              setIsLoggedIn(true);
-              playStartSound();
-          }
-          if (lastFetchedId.current === userId) return;
-          lastFetchedId.current = userId;
-          fetchUserData(userId); 
-        }
-      });
-
-      return () => { subscription.unsubscribe(); };
-    }, [currentUserId]);
+    return () => { subscription.unsubscribe(); };
+  }, [currentUserId]);
 
 
 
@@ -1140,6 +1148,71 @@ export default function App() {
   };
 
 
+  // ------------------------------------------------------------------
+  // 💉 [플레이 로직] 저장된 기록에서 이어하기 (비용 점증 로직 포함)
+  // ------------------------------------------------------------------
+  const handleLoadGame = async () => {
+    if (!currentUserId) return;
+    
+    // 1. 저장된 데이터 확인
+    const { data: save } = await supabase
+      .from('game_saves')
+      .select('*')
+      .eq('user_id', currentUserId)
+      .maybeSingle();
+
+    if (!save) {
+      setMsgPopup({ 
+        isOpen: true, 
+        title: "NOTICE", 
+        desc: lang === 'ko' ? "저장된 기록이 없습니다." : "NO SAVED DATA" 
+      });
+      return;
+    }
+
+    // 2. 비용 계산 (0, 100, 200...)
+    const cost = loadCount * 100;
+
+    if (userCoins < cost) {
+      setMsgPopup({ 
+        isOpen: true, 
+        title: "NOT ENOUGH COINS", 
+        desc: lang === 'ko' ? `${cost} 코인이 필요합니다.` : `Need ${cost} Coins` 
+      });
+      return;
+    }
+
+    // 3. 확인 팝업
+    setMsgPopup({
+      isOpen: true,
+      title: t('popup', 'msg_save_load_title'), // 💉 [수정] 전용 타이틀로 변경
+      desc: cost === 0 
+        ? t('popup', 'msg_save_load_free') 
+        : t('popup', 'msg_save_load_cost').replace('{{cost}}', cost.toString()),
+      onConfirm: async () => {
+        // 코인 차감 및 카운트 증가
+        if (cost > 0) {
+          await supabase.rpc('add_coins_batch', { row_id: currentUserId, amount: -cost });
+          setUserCoins(prev => prev - cost);
+        }
+        
+        // DB 카운트 업데이트
+        await supabase.from('profiles').update({ load_count: loadCount + 1 }).eq('id', currentUserId);
+        
+        // 게임 세팅 및 시작
+        setSelectedOption(save.mode);
+        setRound(save.round);
+        resetGameSession(save.entry_time);
+        setView('battle');
+        
+        // 로컬 데이터 갱신
+        fetchUserData(currentUserId);
+        setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }));
+      }
+    });
+  };
+
+
 
   // ------------------------------------------------------------------
   // 💉 [광고 로직] 보상형 광고 시청 완료 후 이어하기 처리 핸들러
@@ -1511,6 +1584,15 @@ export default function App() {
             >
               {t('modeSelect', 'btn_play_from_best')}
             </button>
+
+            {/* 💉 [신규 추가] 저장된 기록에서 이어하기 버튼 */}
+            <button 
+              onClick={() => { handleLeaveAllRooms(); playClickSound(); handleLoadGame(); }} 
+              className="w-full h-14 rounded-md font-bold text-lg uppercase tracking-widest transition-all bg-zinc-900 text-white border border-zinc-800 hover:bg-[#ff3366] hover:text-black hover:border-[#ff3366] hover:shadow-[0_0_15px_rgba(255,51,102,0.4)] active:bg-[#ff3366] active:text-black active:scale-95"
+            >
+              {/* 번역 파일에 btn_play_from_save 키가 없다면 아래 텍스트가 나옵니다. */}
+              {t('modeSelect', 'btn_play_from_save')}
+            </button>
           </div>
         )}
 
@@ -1845,17 +1927,40 @@ export default function App() {
           <div className="w-full max-w-[280px] bg-zinc-900 border-2 border-[#FF9900] rounded-[40px] p-8 flex flex-col items-center text-center shadow-[0_0_50px_rgba(255,153,0,0.2)] animate-in zoom-in-95 duration-200">
             
             {/* 4. 제목(Title): 크고 굵은 이탤릭체로 강조 */}
-            <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-3">{msgPopup.title}</h3>
+            <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-3">
+              {msgPopup.title}
+            </h3>
             
             {/* 5. 부가 정보: '이어하기'나 '광고' 관련 팝업일 때만 보조 텍스트 출력 */}
             {(msgPopup.title === t('popup', 'msg_continue_title') || msgPopup.title === t('popup', 'msg_ad_start_title')) && (
-              <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-6">{t('popup', 'msg_best_record_info')}</p>
+              <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-6">
+                {t('popup', 'msg_best_record_info')}
+              </p>
+            )}
+
+            {/* 💉 [신규] 세이브 로드 팝업일 때만 출력되는 보조 문구 */}
+            {msgPopup.title === t('popup', 'msg_save_load_title') && (
+              <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-6 whitespace-pre-line">
+                {t('popup', 'load_game_info')}
+              </p>
             )}
             
-            {/* 6. 메인 설명(Description): 줄바꿈(\n)을 지원하며, 이어하기 시 코인 아이콘을 함께 표시 */}
+            {/* 6. 메인 설명(Description) 및 아이콘 */}
             <div className="flex items-center justify-center gap-3 mb-10">
-              {msgPopup.title === t('popup', 'msg_continue_title') && <img src="/images/coin.png" alt="coin" className="w-6 h-6 object-contain" />}
-              <p className="text-2xl text-zinc-300 font-black italic uppercase tracking-tighter whitespace-pre-line">{msgPopup.desc}</p>
+              {/* 조건 1: 최고기록 이어하기 아이콘 */}
+              {msgPopup.title === t('popup', 'msg_continue_title') && (
+                <img src="/images/coin.png" alt="coin" className="w-6 h-6 object-contain" />
+              )}
+              
+              {/* 조건 2: 세이브 로드인데 유료(무료가 아님)일 때만 아이콘 노출 */}
+              {msgPopup.title === t('popup', 'msg_save_load_title') && 
+              !msgPopup.desc.includes(t('popup', 'msg_save_load_free')) && (
+                <img src="/images/coin.png" alt="coin" className="w-6 h-6 object-contain" />
+              )}
+
+              <p className="text-2xl text-zinc-300 font-black italic uppercase tracking-tighter whitespace-pre-line">
+                {msgPopup.desc}
+              </p>
             </div>
 
             {/* 7. 하단 버튼 영역: 확인/취소 버튼 배치 */}
@@ -1866,7 +1971,7 @@ export default function App() {
                 <button 
                   onClick={() => { if(canClickPopup) { playClickSound(); msgPopup.onConfirm?.(); } }} 
                   disabled={!canClickPopup} // 광클 방지 상태일 때 비활성화
-                  className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-600 
+                  className={`flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-600 
                     ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
                 >
                   {t('settings', 'confirm')}
@@ -1877,7 +1982,7 @@ export default function App() {
               <button 
                 onClick={() => { if(canClickPopup) { playClickSound(); setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null })); } }} 
                 disabled={!canClickPopup} 
-                className={`flex-1 h-10 rounded-2xl font-bold text-lg uppercase tracking-widest transition-all border border-zinc-600
+                className={`flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all border border-zinc-600
                   ${msgPopup.onConfirm ? "bg-zinc-800 text-white" : "w-full bg-[#FF9900] text-black"} 
                   ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
               >

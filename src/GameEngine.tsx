@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from './supabaseClient';
 
 interface GameProps {
   round: number;
@@ -28,6 +29,10 @@ export default function GameEngine({
   // 2. [State 초기값 수정]
   const [playTime, setPlayTime] = useState(initialTime);      // 💉 0 대신 initialTime
   const [entryTime, setEntryTime] = useState(initialTime);
+
+  // 💉 [상태 추가] 저장 모달 및 기존 데이터 보관용
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [existingSave, setExistingSave] = useState<any>(null);
 
   const [aiSelect, setAiSelect] = useState<number[]>([]); 
   const [targetConditions, setTargetConditions] = useState<string[]>([]); 
@@ -72,20 +77,85 @@ export default function GameEngine({
 
   // 🚨 [신규 추가] 모달 상태에 따라 타이머를 멈추거나 다시 시작하는 로직
   useEffect(() => {
-    if (isModalOpen) {
-      // 결과창이 뜨면 타이머를 멈춤
+    // 💉 결과창(isModalOpen)이나 세이브창(isSaveModalOpen) 중 하나라도 열리면 멈춤
+    const shouldStop = isModalOpen || isSaveModalOpen;
+
+    if (shouldStop) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
     } else {
-      // 결과창이 닫히면(이어하기 성공 시) 타이머가 없을 경우 다시 시작
+      // 💉 모든 창이 닫혀 있을 때만 타이머가 '하나'만 돌아가도록 보장
       if (!timerRef.current) {
-        timerRef.current = setInterval(() => setPlayTime(prev => prev + 0.01), 10);
+        timerRef.current = setInterval(() => {
+          setPlayTime(prev => prev + 0.01);
+        }, 10);
       }
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isModalOpen, round]);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+    // 💉 의존성 배열에 isSaveModalOpen을 반드시 추가!
+  }, [isModalOpen, isSaveModalOpen, round]);
+
+
+
+  // 💉 [함수 추가] 저장 버튼 클릭 시 기존 데이터를 불러오고 모달을 엽니다.
+  const handleSaveClick = async () => {
+    playClickSound();
+    
+    // 타이머 일시정지 (선택 사항: 안내창 띄울 때 흐르지 않게 함)
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 기존 저장 데이터 가져오기 (테이블명은 'game_saves'로 가정)
+      const { data } = await supabase
+        .from('game_saves')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      setExistingSave(data);
+      setIsSaveModalOpen(true);
+    } catch (e) {
+      console.error("Save fetch error:", e);
+    }
+  };
+
+  // 💉 [함수 추가] 최종 저장 실행 (덮어쓰기)
+  const executeSave = async () => {
+    playClickSound();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.from('game_saves').upsert({
+      user_id: user.id,
+      mode: mode,
+      round: round,
+      entry_time: entryTime,
+      updated_at: new Date().toISOString()
+    });
+
+    // 💉 새로운 저장이 발생했으므로 '이어하기 비용' 카운트를 0으로 리셋합니다.
+    // 이렇게 해야 다음번에 로비에서 불러올 때 다시 '무료'부터 시작합니다.
+    await supabase
+      .from('profiles')
+      .update({ load_count: 0 })
+      .eq('id', user.id);
+
+    setIsSaveModalOpen(false);
+    // 타이머 재개
+    // timerRef.current = setInterval(() => setPlayTime(prev => prev + 0.01), 10);
+  };
 
 
   const getCounts = (list: string[]) => {
@@ -184,9 +254,17 @@ export default function GameEngine({
         {/* [우측] 라운드 및 시간 (상단 정렬) */}
         <div className="text-right flex flex-col items-end pt-0">
           <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">{t('ROUND')} {round}</h2>
-          <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-1 leading-none">
+          <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-2 leading-none">
             {playTime.toFixed(2)} {t('SEC')}
           </p>
+
+          {/* 💉 저장 버튼 추가 */}
+          <button 
+            onClick={handleSaveClick}
+            className="mt-3 px-3 py-1 bg-zinc-800/50 border border-zinc-700 rounded-lg text-[10px] font-black text-[#FF9900] uppercase tracking-widest hover:bg-[#FF9900] hover:text-black transition-all active:scale-90"
+          >
+            {t('SAVE_GAME') || 'SAVE'}
+          </button>
         </div>
       </div>
 
@@ -296,6 +374,75 @@ export default function GameEngine({
         </div>
       )}
       </div>
+
+
+      {/* 💉 [신규] 전용 저장 안내창 (Overwrite Modal) */}
+      {isSaveModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-300">
+          <div className="w-full max-w-[320px] bg-zinc-900 border-2 border-[#FF9900] rounded-[40px] p-8 flex flex-col items-center shadow-[0_0_60px_rgba(255,153,0,0.3)]">
+            
+            <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-8">{t('SAVE_PROGRESS') || 'SAVE PROGRESS'}</h3>
+
+            <div className="w-full space-y-6 mb-10">
+              {/* 기존 데이터 */}
+              <div className="opacity-80">
+                <p className="text-[10px] font-black text-white uppercase tracking-widest mb-2">● {t('EXISTING_DATA') || 'EXISTING DATA'}</p>
+                <div className="bg-black/40 rounded-2xl p-4 border border-zinc-800">
+                  {existingSave ? (
+                    <div className="text-xs font-bold text-white space-y-1">
+                      <p className="flex justify-between"><span>MODE:</span> <span>{existingSave.mode}</span></p>
+                      <p className="flex justify-between"><span>ROUND:</span> <span>{existingSave.round}</span></p>
+                      <p className="flex justify-between"><span>TIME:</span> <span>{existingSave.entry_time.toFixed(2)}s</span></p>
+                    </div>
+                  ) : (
+                    <p className="text-center text-[10px] text-zinc-600 italic py-2">NO SAVED DATA</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 현재 데이터 (화살표 아이콘은 
+
+      [Image of arrow down]
+      태그 대신 텍스트로 대체 가능) */}
+              <div className="flex justify-center text-[#FF9900] text-xl">▼</div>
+
+              {/* 새 데이터 */}
+              <div>
+                <p className="text-[10px] font-black text-[#FF9900] uppercase tracking-widest mb-2">● {t('NEW_DATA') || 'NEW DATA'}</p>
+                <div className="bg-[#FF9900]/10 rounded-2xl p-4 border border-[#FF9900]/30">
+                  <div className="text-xs font-black text-white space-y-1">
+                    <p className="flex justify-between"><span>MODE:</span> <span>{mode}</span></p>
+                    <p className="flex justify-between"><span>ROUND:</span> <span>{round}</span></p>
+                    <p className="flex justify-between"><span>TIME:</span> <span>{entryTime.toFixed(2)}s</span></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[12px] text-[#ffcc33] font-bold mb-6 text-center whitespace-pre-line">
+              {t('SAVE_DISCLAIMER')}
+            </p>
+
+            <div className="flex gap-3 w-full">
+              <button 
+                onClick={() => {
+                  setIsSaveModalOpen(false);
+                  // timerRef.current = setInterval(() => setPlayTime(prev => prev + 0.01), 10);
+                }}
+                className="flex-1 h-12 rounded-2xl border border-zinc-600 bg-zinc-800 hover:bg-[#FF9900] text-white hover:text-black font-black text-xs uppercase active:scale-95 transition-all"
+              >
+                {t('CANCEL') || 'CANCEL'}
+              </button>
+              <button 
+                onClick={executeSave}
+                className="flex-1 h-12 rounded-2xl border border-zinc-600 bg-zinc-800 hover:bg-[#FF9900] text-white hover:text-black font-black text-xs uppercase active:scale-95 transition-all"
+              >
+                {t('OVERWRITE') || 'OVERWRITE'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

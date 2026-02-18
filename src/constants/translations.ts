@@ -44,6 +44,7 @@ export const translations = {
       btn_single: "Single Play",
       btn_multi: "Multi Play",
       btn_play_from_best: "Play from Best",
+      btn_play_from_save: "Load Game",
     },
 
     // --- 4. 설정 페이지 (settings) ---
@@ -65,7 +66,7 @@ export const translations = {
       msg_welcome_title: "WELCOME!",
       msg_welcome_desc: "ENJOY JUST RPS!",
       msg_nick_updated: "NICKNAME \nUPDATED!",
-      msg_continue_title: "CONTINUE?",
+      msg_continue_title: "Continue?",
       msg_ad_start_title: "WATCH AD",
       msg_watch_ad: "WATCH AD",
       msg_copy_title: "COPIED!",
@@ -75,6 +76,10 @@ export const translations = {
       msg_signin_to_start: "PLEASE SIGN IN TO START!",
       daily_reward_title: "DAILY GIFT!",
       daily_reward_desc: "Daily login reward!\nAttack Item Set (1 each)",
+      msg_save_load_title: "LOAD game?",
+      load_game_info: "Start from saved game",
+      msg_save_load_free: "Continue from your save for free?",
+      msg_save_load_cost: "-{{cost}} coins",
     }, 
 
     // --- 6. 게임 엔진 (game) : 💉 코드 로직에 맞춰 대문자 키로 수정 ---
@@ -86,6 +91,14 @@ export const translations = {
       DRAW: "DRAW",
       LOSE: "LOSE",
       OK_GOT_IT: "OK, I got it",
+      SAVE_GAME: "SAVE DATA",
+      SAVE_PROGRESS: "SAVE DATA",
+      EXISTING_DATA: "EXISTING DATA",
+      NEW_DATA: "NEW DATA",
+      SAVE_DISCLAIMER: "※ Only 1 save slot is available.\n(Existing data will be deleted.)",
+      OVERWRITE: "OVERWRITE",
+      CANCEL: "CANCEL",
+      MODE: "MODE",
     },
 
     // --- 7. 랭킹 페이지 (ranking) ---
@@ -197,6 +210,7 @@ export const translations = {
       btn_single: "싱글 플레이",
       btn_multi: "멀티 플레이",
       btn_play_from_best: "최고 기록에서 시작",
+      btn_play_from_save: "저장된 게임 불러오기",
     },
 
     // --- 4. 설정 페이지 (settings) ---
@@ -228,6 +242,10 @@ export const translations = {
       msg_signin_to_start: "시작하려면 로그인해 주세요!",
       daily_reward_title: "일일 보상!",
       daily_reward_desc: "오늘의 첫 접속 보상입니다!\n공격 아이템 3종 세트 (각 1개)",
+      msg_save_load_title: "게임 불러오기",
+      load_game_info: "저장된 게임을 불러옵니다.\n기록 재사용 시 비용이 증가합니다.",
+      msg_save_load_free: "첫 회 무료",
+      msg_save_load_cost: "-{{cost}} 코인",
     },
 
     // --- 6. 게임 엔진 (game)  ---
@@ -239,6 +257,14 @@ export const translations = {
       DRAW: " 무",
       LOSE: " 패",
       OK_GOT_IT: "ok! 기억 완료!",
+      SAVE_GAME: "게임 저장",
+      SAVE_PROGRESS: "현재 기록 저장",
+      EXISTING_DATA: "기존 저장 데이터",
+      NEW_DATA: "현재 플레이 데이터",
+      SAVE_DISCLAIMER: "※ 저장 데이터는 1개만 저장 가능합니다.\n(기존 데이터는 삭제됩니다.)",
+      OVERWRITE: "덮어쓰기",
+      CANCEL: "취소",
+      MODE: "모드",
     },
 
     // --- 7. 랭킹 페이지 (ranking) ---
