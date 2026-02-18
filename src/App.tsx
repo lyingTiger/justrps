@@ -1549,7 +1549,7 @@ export default function App() {
         )}
 
         {view === 'modeSelect' && (
-          <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4 pb-10">
+          <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-3 px-4 pb-15">
             <div className="w-full flex justify-end mb-0">
               <button 
                 onClick={() => { handleLeaveAllRooms(); playClickSound(); setView('lobby'); }} // 💉 사운드 추가

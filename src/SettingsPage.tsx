@@ -107,7 +107,7 @@ export default function SettingsPage({
               {/* 비밀번호 변경 버튼 */}
               <button 
                 onClick={() => { playClickSound(); onChangePassword(); }}
-                className="w-full h-12 rounded-2xl bg-zinc-900 border border-zinc-800 text-zinc-300 font-bold text-xs uppercase hover:bg-zinc-800 active:scale-95 transition-all"
+                className="w-full h-12 rounded-2xl bg-zinc-900 border border-zinc-800 text-zinc-300 font-bold text-xs uppercase hover:bg-[#FF9900] hover:text-black active:scale-95 transition-all"
               >
                 Change Password
               </button>
@@ -115,7 +115,7 @@ export default function SettingsPage({
               {/* 회원 탈퇴 버튼 (위험 강조 스타일) */}
               <button 
                 onClick={() => { playClickSound(); onDeleteAccount(); }}
-                className="w-full h-12 rounded-2xl bg-red-950/10 border border-red-900/30 text-red-500/70 font-bold text-xs uppercase hover:bg-red-900/20 hover:text-red-500 active:scale-95 transition-all"
+                className="w-full h-12 rounded-2xl bg-red-950/10 border border-red-900 text-red-500 font-bold text-xs uppercase hover:bg-red-500 hover:text-white active:scale-95 transition-all"
               >
                 Delete Account
               </button>
