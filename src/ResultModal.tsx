@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface ResultModalProps {
   isOpen: boolean;
@@ -24,9 +24,24 @@ interface ResultModalProps {
 export default function ResultModal({ 
   isOpen, mode, round, time, earnedCoins, sessionItems, userCoins, isNewRecord, 
   continueCount, continueCost, onContinue, onRetry, onLobby, onShop,
-  onWatchAd, t,playClickSound,
+  onWatchAd, t, playClickSound,
   onSaveRewards
 }: ResultModalProps) {
+
+  const [canClick, setCanClick] = useState(false);
+
+  // 💉 [타이머 로직] 창이 열릴 때마다 0.5초간 클릭 방지
+  useEffect(() => {
+    if (isOpen) {
+      setCanClick(false);
+      const timer = setTimeout(() => {
+        setCanClick(true);
+      }, 500); // 0.5초 뒤에 활성화 (더 길게 원하시면 1000으로 수정)
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+
   // 💉 획득한 아이템이 있는지 확인하는 헬퍼
   const hasItems = Object.values(sessionItems).some(count => count > 0);
 
@@ -146,21 +161,19 @@ export default function ResultModal({
 
                     <div className="relative bg-black/40 p-6 rounded-[32px] flex flex-col items-center">
                         <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-1">
-                            {/* 💉 번역 적용: Continue? */}
                             {t('continue_question')}
                         </h3>
                         <p className="text-sm text-zinc-500 font-bold uppercase mb-4">
-                            {/* 💉 번역 적용: Attempts Left: */}
                             {t('attempts_left')} <span className="text-[#FF9900]">{continueCount}</span>/3
                         </p>
 
                         <div className="grid grid-cols-2 gap-3 w-full">
                             <button 
-                                onClick={onContinue}
-                                disabled={userCoins < continueCost}
+                                onClick={() => { if(canClick) onContinue(); }}
+                                disabled={!canClick || userCoins < continueCost}
                                 className={`h-10 rounded-2xl flex items-center justify-center gap-2 transition-all border text-sm font-black uppercase
-                                ${userCoins >= continueCost 
-                                    ? 'bg-zinc-800 border-zinc-700 text-white  hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95' 
+                                ${canClick && userCoins >= continueCost 
+                                    ? 'bg-zinc-800 border-zinc-700 text-white hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:scale-95' 
                                     : 'bg-zinc-900 border-zinc-800 text-zinc-600 opacity-50 cursor-not-allowed'
                                 }`}
                             >
@@ -169,10 +182,13 @@ export default function ResultModal({
                             </button>
 
                             <button 
-                                onClick={onWatchAd}
-                                className="flex-1 h-10 rounded-2xl font-bold text-[12px] uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-700 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
+                                onClick={() => { if(canClick) onWatchAd(); }}
+                                disabled={!canClick}
+                                className={`flex-1 h-10 rounded-2xl font-bold text-[12px] uppercase tracking-widest transition-all border
+                                ${canClick 
+                                  ? 'bg-zinc-800 text-white border-zinc-700 hover:bg-[#FF9900] hover:text-black active:scale-95' 
+                                  : 'bg-zinc-900 text-zinc-600 border-zinc-800 opacity-50 cursor-not-allowed'}`}
                             >
-                                {/* 💉 번역 적용: WATCH AD */}
                                 {t('watch_ad')}
                             </button>
                         </div>
@@ -180,7 +196,6 @@ export default function ResultModal({
                 </div>
             ) : (
                 <div className="w-full h-12 flex items-center justify-center bg-zinc-800/50 rounded-2xl text-zinc-500 font-bold text-xs uppercase mb-6 border border-zinc-800">
-                    {/* 💉 번역 적용: No Continues Left */}
                     {t('no_continues')}
                 </div>
             )}
@@ -188,25 +203,33 @@ export default function ResultModal({
             <div className="w-full grid grid-cols-2 gap-3">
                 <button 
                     onClick={async () => {
+                      if (!canClick) return;
                       playClickSound();
-                      await onSaveRewards(); // 💉 App.tsx에서 전달받은 saveSessionRewards 실행
+                      await onSaveRewards();
                       onRetry(); 
                     }}
-                    className="flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-700 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
+                    disabled={!canClick}
+                    className={`flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all border
+                    ${canClick 
+                      ? 'bg-zinc-800 text-white border-zinc-700 hover:bg-[#FF9900] hover:text-black active:scale-95' 
+                      : 'bg-zinc-900 text-zinc-600 border-zinc-800 opacity-50 cursor-not-allowed'}`}
                 >
-                    {/* 💉 번역 적용: Retry */}
                     {t('retry')}
                 </button>
 
                 <button 
                     onClick={async () => {
+                      if (!canClick) return;
                       playClickSound();
-                      await onSaveRewards(); // 💉 로비로 갈 때도 저장
+                      await onSaveRewards();
                       onLobby(); 
                     }}
-                    className="flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-700 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
+                    disabled={!canClick}
+                    className={`flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all border
+                    ${canClick 
+                      ? 'bg-zinc-800 text-white border-zinc-700 hover:bg-[#FF9900] hover:text-black active:scale-95' 
+                      : 'bg-zinc-900 text-zinc-600 border-zinc-800 opacity-50 cursor-not-allowed'}`}
                 >
-                    {/* 💉 번역 적용: game lobby */}
                     {t('game_lobby')}
                 </button>
             </div>
