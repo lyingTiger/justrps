@@ -2,8 +2,6 @@ import React from 'react';
 
 interface InfoPageProps {
   onBack: () => void;
-  todayCount: number;
-  totalCount: number;
 }
 
 const AppInfoFooter = () => (
@@ -24,8 +22,6 @@ const AppInfoFooter = () => (
 
 export default function InfoPage({ 
   onBack, 
-  todayCount, 
-  totalCount  
 }: InfoPageProps) {
   return (
     <div className="w-full max-w-[340px] flex flex-col items-center mt-6 px-4 animate-in fade-in duration-300">
@@ -96,23 +92,6 @@ export default function InfoPage({
             <p>Designed for web browsers.</p>
           </div>
         </div>
-      </div>
-
-
-      <div className="w-full space-y-1 mt-6">
-
-        {/* 🔻 오늘 방문자 수 표시 영역 */}
-        <div className="flex justify-between items-center border-b border-zinc-800/50">
-          <span className="text-[10px] text-zinc-500 font-black uppercase">Today Visitors</span>
-          <span className="text-[10px] text-white font-black uppercase tracking-tighter">{todayCount.toLocaleString()}</span>
-        </div>
-
-        {/* 🔻 누적 방문자 표시 영역 */}
-        <div className="flex justify-between items-center border-b border-zinc-800/50">
-          <span className="text-[10px] text-zinc-500 font-black uppercase">Total Visitors</span>
-          <span className="text-[10px] text-white font-black uppercase tracking-tighter">{totalCount.toLocaleString()}</span>
-        </div>
-
       </div>
     </div>
   );

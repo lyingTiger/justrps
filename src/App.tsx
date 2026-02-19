@@ -371,69 +371,64 @@ export default function App() {
     if (!userId) return;
     try {
       let { data: profile, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+      
+      // 🎁 [A] 신규 가입자: 프로필 생성 및 '가입 선물' 지급
       if (!profile && !error) {
         const { data: { session } } = await supabase.auth.getSession();
         const rawName = session?.user?.user_metadata?.full_name || 'Player';
-        const MAX_DB_LEN = 15;
-        const googleName = rawName.length > MAX_DB_LEN ? rawName.substring(0, MAX_DB_LEN) : rawName;
+        const googleName = rawName.substring(0, 15);
 
-        // 💉 프로필 생성 시 아이템 4종을 각각 3개씩 기본값으로 입력합니다.
         const { data: newProfile, error: insertError } = await supabase.from('profiles').insert({ 
           id: userId, 
           display_name: googleName, 
-          coins: 300,
-          item_stop: 3,   // 💉 초기 지급: 3개
-          item_switch: 3, // 💉 초기 지급: 3개
-          item_color: 3,  // 💉 초기 지급: 3개
-          item_heal: 3,   // 💉 초기 지급: 3개
-          last_login_date: new Date().toISOString().split('T')[0] // 💉 생성일은 일일 보상 중복 방지
+          coins: 300,     // 💰 가입 선물: 300 코인
+          item_stop: 3,   // 🎁 가입 선물: 아이템 3개씩
+          item_switch: 3,
+          item_color: 3,
+          item_heal: 3,
+          // 💉 중요: 가입 날짜를 '과거'나 '공백'으로 넣어야 바로 아래 일일 보상 로직이 작동합니다.
+          last_login_date: '1900-01-01' 
         }).select().single();
 
-
-        if (!insertError) {
-            profile = newProfile;
-            setMsgPopup({
-              isOpen: true,
-              title: t('popup', 'msg_welcome_title'),
-              desc: `Hi, ${googleName}!\n${t('popup', 'msg_welcome_desc')}`
-            });
+        if (!insertError && newProfile) {
+          profile = newProfile;
+          
+          // ✨ 가입 축하 팝업 (가입 선물 내용 명시)
+          setMsgPopup({
+            isOpen: true,
+            title: lang === 'ko' ? "환영합니다!" : "WELCOME!",
+            desc: lang === 'ko' 
+              ? `가입 선물\n+300코인\n공격 아이템 3세트` 
+              : `Signup Gift\n+300 Coins\nattack item 3 sets`,
+          });
         }
       }
-      if (error || !profile) {
-        setUserNickname('Unknown');
-        setUserCoins(0);
-        return;
-      }
 
-      // ✅ [정상 위치] 프로필을 성공적으로 가져온 후 여기서 보상을 체크합니다.
-      // ------------------------------------------------------------------
-      // 💉 [일일 보상 체크 로직 시작]
-      // ------------------------------------------------------------------
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      if (error || !profile) return;
+
+      // 📅 [B] 일일 보상 체크 (기존 로직 유지하되 신규 가입자도 포함됨)
+      const today = new Date().toISOString().split('T')[0];
       const lastLogin = profile.last_login_date;
 
+      // 가입 날짜가 1900-01-01이므로, 신규 가입자도 무조건 이 조건문을 통과하게 됩니다.
       if (!hasCheckedDailyRef.current && lastLogin !== today) {
-        hasCheckedDailyRef.current = true; // 중복 팝업 방지
+        hasCheckedDailyRef.current = true;
 
         setMsgPopup({
           isOpen: true,
           title: lang === 'ko' ? "일일 접속 보상" : "DAILY GIFT",
-          desc: lang === 'ko' 
-            ? "공격 아이템 세트" 
-            : "Attack Item Set",
+          desc: lang === 'ko' ? "공격 아이템 1세트" : "Attack Item Set",
           onConfirm: async () => {
-            // DB 아이템 지급
+            // 일일 보상: 아이템 +1씩 추가
             await supabase.rpc('update_user_items', {
               target_user_id: userId,
-              stop_inc: 1,
-              switch_inc: 1,
-              color_inc: 1,
-              heal_inc: 0
+              stop_inc: 1, switch_inc: 1, color_inc: 1, heal_inc: 0
             });
 
-            // 로그인 날짜 갱신
+            // 오늘 날짜로 갱신하여 중복 수령 방지
             await supabase.from('profiles').update({ last_login_date: today }).eq('id', userId);
-            // 데이터 새로고침
+            
+            // 최종 데이터 새로고침
             await fetchUserData(userId);
             setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null }));
           }
@@ -679,14 +674,13 @@ export default function App() {
   // 💉 방문자 통계 관리: 중복 방지 로직 포함
   useEffect(() => {
     const handleStats = async () => {
-      // 1. 로비 진입 시 + 로그인된 경우에만 방문자 수 증가 시도
-      // (DB의 increment_visitor 함수가 오늘 방문 여부를 체크해 중복을 막습니다)
-      if (view === 'lobby' && isLoggedIn) {
-        await supabase.rpc('increment_visitor');
+      // 1. 로비 진입 시 유저 ID를 전달하여 중복 체크 로직 실행
+      if (view === 'lobby' && isLoggedIn && currentUserId) {
+        // 💉 target_user_id 인자를 추가하여 호출합니다.
+        await supabase.rpc('increment_visitor', { target_user_id: currentUserId });
       }
 
-      // 2. [수정] 데이터 조구(Fetch)는 뷰 조건 없이, 혹은 세팅 뷰까지 포함하여 실행
-      // 💉 이제 어떤 뷰에서든 최신 통계를 가져와 상태를 유지합니다.
+      // 2. 최신 통계 가져오기 (기존 코드 유지)
       const { data } = await supabase
         .from('site_stats')
         .select('today_count, total_count')
@@ -699,7 +693,7 @@ export default function App() {
     };
 
     handleStats();
-  }, [view, isLoggedIn]); // 💉 isLoggedIn을 추가하여 로그인 직후 카운트가 반영되게 함
+  }, [view, isLoggedIn, currentUserId]); // currentUserId가 생겼을 때도 실행되도록 의존성 추가
 
 
   // 💉 [교체 2] 인증 및 초기 설정 (방문자 로직 분리됨)
@@ -1465,9 +1459,18 @@ export default function App() {
               )}
             </div>
 
-            <h2 className="ml-2 text-2xl font-bold tracking-tighter cursor-pointer uppercase italic" onClick={() => { handleLeaveAllRooms(); playClickSound(); if(currentRoomId) leaveCurrentRoom(); setView('lobby'); }}>
+            {/* 로고 영역 */}
+            <h2 className="ml-2 text-2xl font-bold tracking-tighter cursor-pointer uppercase italic leading-none" 
+                onClick={() => { handleLeaveAllRooms(); playClickSound(); if(currentRoomId) leaveCurrentRoom(); setView('lobby'); }}>
               <span className="text-[#FF9900]">just</span> <span className="text-[#0099CC]">R</span><span className="text-[#66CC00]">P</span><span className="text-[#FF0066]">S</span>
             </h2>
+
+            {/* 💉 방문자 통계 영역: 구분선 제거 및 로고 바닥 라인에 맞춤 */}
+            <div className="ml-3 pb-0.5 select-none leading-none mt-2">
+              <span className="text-[10px] text-zinc-500 font-mono font-bold tracking-tighter">
+                {visitorStats.today.toLocaleString()} / {visitorStats.total.toLocaleString()}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-5">
@@ -1859,7 +1862,7 @@ export default function App() {
         }
 
 
-        {view === 'info' && <InfoPage onBack={() => { playClickSound(); setView('lobby'); }} todayCount={visitorStats.today} totalCount={visitorStats.total} />}
+        {view === 'info' && <InfoPage onBack={() => { playClickSound(); setView('lobby'); }} />}
         
 
         {/* 이용약관 및 개인정보처리방침 공용 렌더링 (코드 중복 방지를 위해 하나의 구조로 처리 가능) */}
@@ -2023,27 +2026,48 @@ export default function App() {
             {/* 7. 하단 버튼 영역: 확인/취소 버튼 배치 */}
             <div className="flex gap-3 w-full">
               
-              {/* [왼쪽 버튼]: msgPopup.onConfirm(확인 후 실행할 함수)이 있을 때만 나타남 */}
-              {msgPopup.onConfirm && (
+              {/* [왼쪽 버튼]: '확인' 버튼 - 취소 버튼이 필요 없는 팝업에서는 숨깁니다. */}
+              {msgPopup.onConfirm && 
+              msgPopup.title !== (lang === 'ko' ? "오늘의 출석 보상" : "DAILY GIFT") && (
                 <button 
                   onClick={() => { if(canClickPopup) { playClickSound(); msgPopup.onConfirm?.(); } }} 
-                  disabled={!canClickPopup} // 광클 방지 상태일 때 비활성화
+                  disabled={!canClickPopup}
                   className={`flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-600 
-                    ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
+                    ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900]" : "opacity-50"}`}
                 >
                   {t('settings', 'confirm')}
                 </button>
               )}
               
-              {/* [오른쪽 버튼]: 팝업을 닫거나 취소하는 기본 버튼. 확인 버튼 유무에 따라 스타일(색상, 너비)이 바뀜 */}
+              {/* [오른쪽 버튼]: 
+                  1. 일반 팝업: '확인' (onConfirm 없음)
+                  2. 일일 보상/가입 선물: '확인' (onConfirm 로직을 여기에 직접 연결)
+                  3. 선택 팝업: '취소' (onConfirm이 있고 일반 제목인 경우)
+              */}
               <button 
-                onClick={() => { if(canClickPopup) { playClickSound(); setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null })); } }} 
+                onClick={() => { 
+                  if(canClickPopup) { 
+                    playClickSound(); 
+                    // 💉 수술: 일일 보상 제목일 경우 닫기 버튼이 곧 '수령 확인' 버튼 역할을 수행하게 함
+                    if (msgPopup.title === (lang === 'ko' ? "오늘의 출석 보상" : "DAILY GIFT")) {
+                      msgPopup.onConfirm?.(); 
+                    } else {
+                      setMsgPopup(prev => ({ ...prev, isOpen: false, onConfirm: null })); 
+                    }
+                  } 
+                }} 
                 disabled={!canClickPopup} 
                 className={`flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all border border-zinc-600
-                  ${msgPopup.onConfirm ? "bg-zinc-800 text-white" : "w-full bg-[#FF9900] text-black"} 
-                  ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95" : "opacity-50 cursor-not-allowed"}`}
+                  ${(msgPopup.onConfirm && msgPopup.title !== (lang === 'ko' ? "오늘의 출석 보상" : "DAILY GIFT")) 
+                    ? "bg-zinc-800 text-white" // 일반 선택 팝업의 경우 '취소' 스타일
+                    : "w-full bg-[#FF9900] text-black" // 보상/가입 선물의 경우 '단독 확인' 스타일
+                  } 
+                  ${canClickPopup ? "hover:opacity-90 active:scale-95" : "opacity-50"}`}
               >
-                {msgPopup.onConfirm ? t('settings', 'cancel') : t('settings', 'confirm')}
+                {/* 제목에 따라 '취소' 대신 '확인' 출력 */}
+                {(msgPopup.onConfirm && msgPopup.title !== (lang === 'ko' ? "오늘의 출석 보상" : "DAILY GIFT")) 
+                  ? t('settings', 'cancel') 
+                  : t('settings', 'confirm')}
               </button>
             </div>
           </div>
