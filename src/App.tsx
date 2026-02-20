@@ -31,6 +31,7 @@ interface RemoteConfigs {
   popup_click_delay: number;
   result_continue_cost: number;
   load_save_cost_unit: number;
+  multi_limit_time_sec: number;
   // 상점용 추가
   shop_ad_cooldown_sec: number;
   shop_ad_reward_coins: number;
@@ -63,6 +64,7 @@ export default function App() {
     popup_click_delay: 500,
     result_continue_cost: 50,
     load_save_cost_unit: 100,
+    multi_limit_time_sec: 30,
     shop_ad_cooldown_sec: 180,
     shop_ad_reward_coins: 1000,
     shop_ad_reward_items: 5,

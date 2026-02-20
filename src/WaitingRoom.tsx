@@ -13,6 +13,8 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
   const [roomInfo, setRoomInfo] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+  const [isGracePeriod, setIsGracePeriod] = useState(true);
   
   // 강퇴 관련 UI State
   const [kickTargetId, setKickTargetId] = useState<string | null>(null); 
@@ -106,124 +108,101 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
   // --- Main Effect ---
   useEffect(() => {
     if (!roomId) return;
-    
-    const fetchUser = async () => {
+
+    // 1. 유예 시간(Grace Period) 가동: 방 입장/복귀 시 5초간 오프라인 판정 유예
+    setIsGracePeriod(true);
+    const graceTimer = setTimeout(() => setIsGracePeriod(false), 5000);
+
+    // 2. 비동기 초기화 함수 (순서 보장)
+    const initWaitingRoom = async () => {
+      // [핵심] 유저 정보를 먼저 기다려서 가져옵니다.
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-          setCurrentUserId(user.id);
-          userIdRef.current = user.id; 
-      }
-    };
-    fetchUser();
+      if (!user) return;
 
-    fetchRoomStatus();
-    fetchParticipants();
+      setCurrentUserId(user.id);
+      userIdRef.current = user.id;
 
-    const channel = supabase.channel(`room_${roomId}`, {
-        config: { broadcast: { self: true }, presence: { key: userIdRef.current || undefined } },
-    });
+      // 초기 상태 업데이트
+      fetchRoomStatus();
+      fetchParticipants();
 
-    channel
-        // (A) 참가자 변경
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants' }, (payload) => {
-           const newRecord = payload.new as any;
-           const oldRecord = payload.old as any;
-           if ((newRecord?.room_id || oldRecord?.room_id) !== roomId) return;
-           fetchParticipants();
+      // [핵심] 유저 ID가 확보된 상태에서 채널을 생성합니다.
+      const channel = supabase.channel(`room_${roomId}`, {
+        config: { 
+          broadcast: { self: true }, 
+          presence: { key: user.id } // 확실하게 유저 ID 주입
+        },
+      });
+
+      channel
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` }, () => {
+          fetchParticipants();
         })
-        // (B) 방 정보 변경 (DB 이벤트)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms' }, async (payload) => {
-           const newRoom = payload.new as any;
-           if (newRoom.id !== roomId) return;
-
-           setRoomInfo(newRoom);
-           if (userIdRef.current) isCreatorRef.current = (newRoom.creator_id === userIdRef.current);
-           
-           // 🔥 DB 이벤트가 와도 'Ready' 체크 필수!
-           if (newRoom.status === 'playing' && userIdRef.current) {
-               const { data: me } = await supabase
-                   .from('room_participants')
-                   .select('is_ready')
-                   .eq('room_id', roomId)
-                   .eq('user_id', userIdRef.current)
-                   .single();
-               
-               if (me && me.is_ready) {
-                   console.log("🎮 DB Event: Game Started & I am Ready -> Go!");
-                   isExiting.current = true;
-                   onStartGame();
-               }
-           }
-        })
-        // (C) 강제 시작 방송 (이건 방장이 눌러야만 오므로 신뢰 가능)
-        .on('broadcast', { event: 'force_start_game' }, () => {
-            console.log("⚡ Game Start via Broadcast!");
-            isExiting.current = true;
-            onStartGame();
-        })
-        // (D) 경고음
-        .on('broadcast', { event: 'alert_unready' }, (payload) => {
-          if (payload.payload?.targetIds?.includes(userIdRef.current)) {
-            playBeep();
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, async (payload) => {
+          const newRoom = payload.new as any;
+          setRoomInfo(newRoom);
+          if (userIdRef.current) isCreatorRef.current = (newRoom.creator_id === userIdRef.current);
+          
+          if (newRoom.status === 'playing' && userIdRef.current) {
+            const { data: me } = await supabase.from('room_participants').select('is_ready').eq('room_id', roomId).eq('user_id', userIdRef.current).single();
+            if (me && me.is_ready) {
+              isExiting.current = true;
+              onStartGame();
+            }
           }
         })
-        // (E) 유저 이탈 (유령 유저 해결 핵심 영역)
-        .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-            // 💉 [수술] 방장만 이탈자의 사후 처리를 수행합니다.
-            if (!isCreatorRef.current) return; 
-
-            // 💉 [수정] roomInfo 대신 isExiting Ref를 사용하세요!
-            // 방장이 게임 시작 버튼을 눌렀다면(isExiting=true), 참가자들이 나가는 건 게임하러 가는 겁니다.
-            if (isExiting.current) {
-                console.log("🎮 게임 시작 중 이탈 감지 -> 삭제하지 않음 (Pass)");
-                return;
-            }
-
-            console.log("👋 대기실 연결 끊김 감지:", leftPresences);
-            
-            leftPresences.forEach(async (p: any) => {
-                const leftUserId = p.user_id;
-                if (!leftUserId) return;
-
-                // 💉 [수정] 대기실에서는 연결 끊긴 유저를 명단에서 '삭제'합니다.
-                await supabase.from('room_participants')
-                    .delete() 
-                    .eq('room_id', roomId)
-                    .eq('user_id', leftUserId);
-                
-                console.log(`✅ 대기실 이탈 유저(${leftUserId}) 삭제 완료`);
-            });
+        .on('broadcast', { event: 'force_start_game' }, () => {
+          isExiting.current = true;
+          onStartGame();
         })
-
-        .subscribe((status) => {
-           if (status === 'SUBSCRIBED') {
-              channelRef.current = channel;
-              // 💉 [추가] presence에 내 유저 ID를 태깅합니다.
-              if (userIdRef.current) {
-                channel.track({ user_id: userIdRef.current });
-              }
-           }
+        .on('broadcast', { event: 'alert_unready' }, (payload) => {
+          if (payload.payload?.targetIds?.includes(userIdRef.current)) playBeep();
+        })
+        .on('presence', { event: 'sync' }, () => {
+          const newState = channel.presenceState();
+          const connectedIds = new Set<string>();
+          Object.values(newState).forEach((presences: any) => {
+            presences.forEach((p: any) => { if (p.user_id) connectedIds.add(p.user_id); });
+          });
+          setOnlineUserIds(connectedIds);
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            // 유저 ID가 확실히 있으므로 track이 정상 작동합니다.
+            await channel.track({ user_id: user.id, joined_at: new Date().toISOString() });
+          }
         });
 
-    // 3초 폴링 (방 상태 & 명단)
+      channelRef.current = channel;
+    };
+
+    initWaitingRoom();
+
     const refreshInterval = setInterval(() => {
-        fetchParticipants();
-        fetchRoomStatus(); 
+      fetchParticipants();
+      fetchRoomStatus(); 
     }, 3000);
 
-    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
-        e.preventDefault(); 
-        await leaveRoomWithSuccession();
-    };
+    const handleBeforeUnload = async () => { await leaveRoomWithSuccession(); };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
+      clearTimeout(graceTimer); // 유예 타이머 클린업
       clearInterval(refreshInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, onLeave, onStartGame]);
+  }, [roomId]); // roomId가 바뀔 때마다 재실행
+
+
+  // 💉 방에 입장(또는 복귀)한 후 5초간은 오프라인 판정을 유예합니다.
+  useEffect(() => {
+    setIsGracePeriod(true);
+    const timer = setTimeout(() => {
+      setIsGracePeriod(false);
+    }, 5000); // 5초 후부터 오프라인 체크 시작
+    return () => clearTimeout(timer);
+  }, [roomId]); // 방에 들어올 때마다 타이머 작동
 
 
   // --- 강퇴 감지 ---
@@ -310,17 +289,21 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
     const randomSeed = Math.floor(Math.random() * 10000); 
 
-    // 1. 방송 송출
-    if (channelRef.current) {
-        await channelRef.current.send({ type: 'broadcast', event: 'force_start_game', payload: {} });
-    }
+    // 1. DB 업데이트: status는 playing으로, 선두 기록은 null로 확실히 초기화!
+    const { error } = await supabase.from('rooms')
+      .update({ 
+        status: 'playing', 
+        seed: randomSeed,
+        first_cleared_at: null // ✨ 게임 시작 시 무조건 비우고 시작
+      })
+      .eq('id', roomId);
 
-    // 2. DB 업데이트
-    const { error } = await supabase.from('rooms').update({ status: 'playing', seed: randomSeed }).eq('id', roomId);
-    if (error) console.error(error);
-    else {
-        isExiting.current = true; 
-        onStartGame();
+    if (!error) {
+      if (channelRef.current) {
+          await channelRef.current.send({ type: 'broadcast', event: 'force_start_game', payload: {} });
+      }
+      isExiting.current = true; 
+      onStartGame();
     }
   };
 
@@ -351,24 +334,81 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
       <div className="w-full space-y-2 mb-8">
         {participants.map((p) => {
-           const isHost = p.user_id === roomInfo?.creator_id;
-           const isMe = p.user_id === currentUserId;
-           return (
-             <div key={p.user_id} className={`w-full p-3 rounded-2xl border flex justify-between items-center transition-all ${isMe ? 'bg-zinc-800 border-zinc-700' : 'bg-zinc-900 border-zinc-800'}`}>
-               <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-black italic ${isHost ? 'text-[#FF9900]' : 'text-white'}`}>{p.profiles?.display_name || "Unknown"}</span>
-                    {isHost && <span className="text-[8px] bg-[#FF9900] text-black font-bold px-1 rounded">HOST</span>}
-                  </div>
-                  {isHost && roomInfo?.status === 'playing' && <span className="text-[10px] text-green-500 font-bold uppercase animate-pulse">▶ Playing Round {p.current_round || 1}</span>}
-               </div>
-               <div className="flex items-center gap-2">
-                 {!isHost ? (p.is_ready ? <span className="text-green-500 font-black text-xs uppercase">READY</span> : <span className="text-zinc-600 font-black text-xs uppercase">WAITING</span>) : null}
-                 {isCreator && !isMe && <button onClick={() => openKickModal(p.user_id)} className="w-5 h-5 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded shadow-md active:scale-90 transition-all ml-2"><span className="text-[10px] font-bold leading-none pb-[1px]">✕</span></button>}
-               </div>
-             </div>
-           );
-        })}
+  const isHost = p.user_id === roomInfo?.creator_id;
+  const isMe = p.user_id === currentUserId;
+  const isOnline = onlineUserIds.has(p.user_id); // 대기실 채널 접속 여부
+
+  // 1. ✨ [Lobby] 최우선 순위: 실시간 신호가 있다면 무조건 로비에 있는 것입니다.
+  const isInLobby = isOnline;
+
+  // 2. ✨ [In Battle] 
+  // 신호가 없는데, 아직 죽지(is_dead) 않았고 최종 클리어(is_cleared)도 안 했다면 '무조건' 배틀 중입니다.
+  // (방의 status가 'waiting'으로 바뀌었어도 유저 데이터가 그대로면 아직 게임판을 안 떠난 것입니다.)
+  const isStillInBattle = !isInLobby && !p.is_dead && !p.is_cleared && p.current_round >= 1;
+
+  // 3. ✨ [Result Screen]
+  // 신호가 없는데, 죽었거나 클리어했다면 결과창을 보고 있는 것입니다.
+  const isInResultScreen = !isInLobby && (p.is_dead || p.is_cleared);
+
+  // 4. ✨ [Offline] 진짜 튕김
+  // 위 세 상황이 모두 아니고, 신호가 5초 이상 없을 때만 오프라인으로 판정합니다.
+  const showAsOffline = !isMe && !isInLobby && !isStillInBattle && !isInResultScreen && !isGracePeriod;
+
+  return (
+    <div key={p.user_id} className={`w-full p-3 rounded-2xl border flex justify-between items-center transition-all duration-300
+      ${isMe ? 'bg-zinc-800 border-zinc-700' : 'bg-zinc-900 border-zinc-800'}
+      ${showAsOffline ? 'border-red-500/40 bg-red-500/5' : ''} 
+    `}>
+      <div className="flex flex-col">
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-black italic ${isHost ? 'text-[#FF9900]' : 'text-white'}`}>
+            {p.profiles?.display_name || "Unknown"}
+          </span>
+          {isHost && <span className="text-[8px] bg-[#FF9900] text-black font-bold px-1 rounded shadow-sm">HOST</span>}
+          
+          {/* ✨ 상태 라벨 (우선순위에 따른 렌더링) */}
+          {isInLobby ? (
+            <span className="text-[8px] bg-green-900/50 text-green-500 font-black px-1 rounded">LOBBY</span>
+          ) : isStillInBattle ? (
+            <span className="text-[8px] bg-blue-600 text-white font-black px-1 rounded animate-pulse shadow-[0_0_8px_rgba(37,99,235,0.4)]">IN BATTLE</span>
+          ) : isInResultScreen ? (
+            <span className="text-[8px] bg-purple-600 text-white font-black px-1 rounded animate-pulse">RESULT SCREEN</span>
+          ) : showAsOffline ? (
+            <span className="text-[8px] bg-red-600 text-white font-black px-1 rounded shadow-sm">OFFLINE</span>
+          ) : (
+            <span className="text-[8px] bg-zinc-700 text-zinc-400 font-black px-1 rounded animate-pulse">SYNCING...</span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {isInLobby ? (
+          // 로비에 있을 때만 READY/WAITING 표시
+          <span className={`${p.is_ready ? 'text-green-500' : 'text-zinc-600'} font-black text-xs uppercase`}>
+            {isHost ? 'Host' : p.is_ready ? 'READY' : 'WAITING'}
+          </span>
+        ) : isStillInBattle ? (
+          <span className="text-blue-400 font-black text-[10px] uppercase italic">
+            Round {p.current_round}
+          </span>
+        ) : isInResultScreen ? (
+          <span className="text-purple-400 font-black text-[10px] uppercase italic">Reviewing...</span>
+        ) : (
+          <span className="text-red-500 font-black text-[10px] uppercase italic tracking-widest">
+            {showAsOffline ? 'Disconnected' : 'Connecting...'}
+          </span>
+        )}
+        
+        {/* 강퇴 버튼: 나 이외의 모든 유저는 방장이 정리 가능 */}
+        {isCreator && !isMe && (
+          <button onClick={() => openKickModal(p.user_id)} className="ml-2 w-5 h-5 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-500 text-[10px] hover:bg-red-600 hover:text-white transition-colors">✕</button>
+        )}
+      </div>
+    </div>
+  );
+})}
+
+
         {Array.from({ length: Math.max(0, (roomInfo?.max_players || 2) - participants.length) }).map((_, i) => (
            <div key={`empty-${i}`} className="w-full p-3 rounded-2xl border border-dashed bg-transparent flex justify-center items-center opacity-100"><span className="text-lg font-black uppercase text-[#66cc33] animate-pulse">Waiting...</span></div>
         ))}
@@ -376,27 +416,45 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
       <div className="w-full mt-auto">
         {isCreator ? (
-          <button onClick={handleStart} disabled={participants.length < 1} className={`w-full h-14 text-white font-black uppercase rounded-2xl border border-zinc-600 text-lg shadow-xl active:scale-95 transition-all ${participants.length < 2 ? 'bg-zinc-800 hover:bg-[#FF9900] hover:text-black' : !isAllReady ? 'bg-green-600 opacity-80' : 'bg-[#22c55e] animate-pulse hover:bg-green-400'}`}>
+          // 1. 방장인 경우: 게임 시작 버튼
+          <button 
+            onClick={handleStart} 
+            disabled={participants.length < 1} 
+            className={`w-full h-14 text-white font-black uppercase rounded-2xl border border-zinc-600 text-lg shadow-xl active:scale-95 transition-all 
+              ${participants.length < 2 
+                ? 'bg-zinc-800 hover:bg-[#FF9900] hover:text-black' 
+                : !isAllReady 
+                  ? 'bg-green-600 opacity-80' 
+                  : 'bg-[#22c55e] animate-pulse hover:bg-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)]'
+              }`}
+          >
             {participants.length < 2 ? 'Practice Start' : isAllReady ? 'Start Game' : 'Wait to Ready'}
           </button>
         ) : (
-          <button 
-            onClick={handleToggleReady} 
-            // 🔥 [수정] 방이 playing 상태면 버튼 비활성화 (레디 못 박게 막음)
-            disabled={!myInfo?.is_ready && roomInfo?.status === 'playing'}
-            className={`w-full h-14 font-black uppercase rounded-2xl text-lg shadow-xl active:scale-95 transition-all 
-                ${myInfo?.is_ready 
-                    ? 'bg-[#22c55e] text-black hover:bg-green-400' 
-                    : (roomInfo?.status === 'playing') 
-                        ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50' // Waiting Host
-                        : 'bg-[#4ade80]/50 text-white/80 animate-pulse hover:bg-[#4ade80]/70' // Ready 가능
-                }`}
-          >
-            {myInfo?.is_ready 
-                ? 'Ready!' 
-                : (roomInfo?.status === 'playing' ? 'Waiting for Host...' : 'Press to Ready')
-            }
-          </button>
+          // 2. 일반 유저인 경우
+          <div className="w-full">
+            {roomInfo?.status === 'playing' ? (
+              // 🚨 방장이 아직 게임 중일 때: 안내 문구 표시
+              <div className="w-full py-4 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800">
+                <p className="text-blue-400 font-black uppercase italic animate-pulse">
+                  Host is in battle... Please wait
+                </p>
+              </div>
+            ) : (
+              // ✅ 방장이 로비에 있을 때 (waiting): 레디 버튼 표시!
+              <button
+                onClick={handleToggleReady}
+                className={`w-full h-14 font-black uppercase rounded-2xl border text-lg shadow-xl active:scale-95 transition-all
+                  ${myInfo?.is_ready 
+                    ? 'bg-green-600 opacity-80' 
+                    : 'bg-[#22c55e] animate-pulse hover:bg-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)]'
+                  }
+                `}
+              >
+                {myInfo?.is_ready ? 'Cancel Ready' : 'Ready'}
+              </button>
+            )}
+          </div>
         )}
       </div>
 

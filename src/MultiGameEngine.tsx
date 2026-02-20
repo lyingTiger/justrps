@@ -57,6 +57,21 @@ export default function MultiGameEngine({
   const [hasAttackedThisRound, setHasAttackedThisRound] = useState(false);
   const [launchedAttackId, setLaunchedAttackId] = useState<string | null>(null);
 
+  // 1. 현재 DB에 저장된 타이머가 '내가 있는 라운드'의 것인지 확인
+  const isTimerForMyRound = roomData?.first_cleared_round === currentRound;
+
+  // 2. 시간차 및 남은 생존 시간 계산
+  const limitTime = configs.multi_limit_time_sec || 30;
+  const timeGap = playTime - (roomData?.first_cleared_at || 0);
+  const remainingDeathTime = limitTime - timeGap;
+
+  // 3. ✨ [핵심 스위치] 현재 라운드 1등이 나왔고, 내가 아직 못 깼을 때만 활성화
+  const showHurryUp = !!roomData?.first_cleared_at && isTimerForMyRound && !isCleared && !isEliminated;
+
+  // 4. 5초 남았을 때의 긴박한 상태
+  const isUrgent = showHurryUp && remainingDeathTime <= 5;
+
+
   // 1. 기존 useState 삭제 또는 주석 처리
   // const [bufferedEffect, setBufferedEffect] = useState<string | null>(null);
 
@@ -164,6 +179,28 @@ export default function MultiGameEngine({
 
     return () => { supabase.removeChannel(channel); };
   }, [roomId, currentUserId]);
+
+
+
+
+  /* 💉 [MultiGameEngine.tsx] 내 존재 여부 감시 (강퇴 감지) */
+  useEffect(() => {
+    if (!currentUserId || !participants || participants.length === 0) return;
+
+    // 참여자 명단에 내가 있는지 확인
+    const amIStillInRoom = participants.some(p => p.user_id === currentUserId);
+
+    // 내가 명단에 없는데, 내가 스스로 나간 게(isExiting) 아니라면 -> 강퇴당한 것!
+    if (!amIStillInRoom && !showResult) {
+      // 게임 중 강퇴당하면 즉시 종료
+      onGameOver(1, 0); 
+      onBackToLobby();
+    } 
+    else if (!amIStillInRoom && showResult) {
+      // 결과창에서 강퇴당하면 알림 없이 조용히 로비로 보냄
+      onBackToLobby();
+    }
+  }, [participants, currentUserId, showResult]);
     
 
 
@@ -192,7 +229,25 @@ export default function MultiGameEngine({
         .eq('user_id', currentUserId).then();
     }, 600);
   };
-      
+
+
+  /* 💉 30초 시간 제한 감시 로직  */
+  useEffect(() => {
+    // ✨ 내 라운드와 기록된 라운드가 같을 때만 시한폭탄 작동
+    const isTimerMatch = roomData?.first_cleared_round === currentRound;
+    
+    if (!roomData?.first_cleared_at || !isTimerMatch || isCleared || isEliminated) return;
+
+    const limitTime = configs.multi_limit_time_sec || 30;
+    const timeGap = playTime - roomData.first_cleared_at;
+
+    if (timeGap >= limitTime) {
+      console.log("💀 30초 경과! 추격 실패로 탈락합니다.");
+      handleElimination("TIME_OVER");
+    }
+  }, [playTime, roomData?.first_cleared_at, roomData?.first_cleared_round, currentRound, isCleared, isEliminated]);
+
+
 
   // 💉 5초 멈춤 발동 함수
   const triggerStopEffect = () => {
@@ -330,20 +385,24 @@ export default function MultiGameEngine({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` }, 
         () => fetchParticipants())
       
-      // 💉 [추가] 유령 유저(이탈자) 발생 시 방장이 대신 처리
-      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-        // 방장만 이 처리를 수행함
-        // if (roomData?.creator_id !== currentUserId) return;
 
-        leftPresences.forEach(async (p: any) => {
-          if (!p.user_id) return;
-          // 나간 유저를 '탈락' 처리하여 게임 결과 판정을 진행시킴
-          await supabase.from('room_participants')
-            .update({ is_dead: true, play_time: 9999.99 })
-            .eq('room_id', roomId)
-            .eq('user_id', p.user_id);
-        });
-      })
+
+      // 💉 유령 유저(이탈자) 발생 시 방장이 대신       "자동""     처리
+      // .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+      //   // 방장만 이 처리를 수행함
+      //   // if (roomData?.creator_id !== currentUserId) return;
+
+      //   leftPresences.forEach(async (p: any) => {
+      //     if (!p.user_id) return;
+      //     // 나간 유저를 '탈락' 처리하여 게임 결과 판정을 진행시킴
+      //     await supabase.from('room_participants')
+      //       .update({ is_dead: true, play_time: 9999.99 })
+      //       .eq('room_id', roomId)
+      //       .eq('user_id', p.user_id);
+      //   });
+      // })
+
+
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && currentUserId) {
           // 💉 [추가] 내 접속 상태 추적 시작
@@ -366,11 +425,25 @@ export default function MultiGameEngine({
   // --- 2. 게임 종료 감지 ---
   useEffect(() => {
     if (!participants || participants.length === 0) return;
-    const allFinished = participants.every(p => p.is_dead || p.is_cleared);
-    if ((isEliminated || isCleared) && allFinished) {
-        if (!showResult) setTimeout(() => setShowResult(true), 1000);
+
+    // 1. [방장 전용] 모든 유저가 현재 라운드 처리가 끝났다면 타이머 초기화
+    const allProcessed = participants.every(p => p.is_dead || p.is_cleared || p.current_round > currentRound);
+    
+    if (allProcessed && roomData?.creator_id === currentUserId && roomData?.first_cleared_at !== null) {
+      supabase.from('rooms').update({ first_cleared_at: null, first_cleared_round: null }).eq('id', roomId).then();
     }
-  }, [participants, isEliminated, isCleared, showResult]);
+
+    // 2. 꼴찌는 죽는 즉시 결과창으로 이동 (남은 사람 기다리지 않음)
+    if (isEliminated && !showResult) {
+      setTimeout(() => setShowResult(true), 1000);
+    }
+
+    // 3. 생존자가 나 하나인데 내가 이미 깼다면 (우승 상황) 결과창 준비
+    const anyoneElseAlive = participants.some(p => p.user_id !== currentUserId && !p.is_dead);
+    if (!anyoneElseAlive && isCleared && !showResult) {
+      setTimeout(() => setShowResult(true), 1000);
+    }
+  }, [participants, isEliminated, isCleared, showResult, currentRound]);
 
 
   const fetchRoomAndParticipants = async () => {
@@ -483,16 +556,32 @@ export default function MultiGameEngine({
 
   // 타이머
   useEffect(() => {
-    if (!isCleared && !isEliminated) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = setInterval(() => {
-        setPlayTime(prev => prev + 0.01);
-      }, 10);
+  // 1. 로딩 중이거나, 암기 단계거나, 클리어/탈락 상태일 때는 타이머를 정지합니다.
+  // (만약 암기 단계(OK 버튼 전)에서도 시간이 흐르길 원하시면 !isMemoryPhase를 제거하세요)
+    const shouldStop = isLoading || isCleared || isEliminated;
+
+    if (shouldStop) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     } else {
-      if (timerRef.current) clearInterval(timerRef.current);
+      // 2. 타이머가 중복 생성되지 않도록 조건부 실행
+      if (!timerRef.current) {
+        timerRef.current = setInterval(() => {
+          setPlayTime(prev => prev + 0.01);
+        }, 10);
+      }
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isCleared, isEliminated]);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+    // 💉 [핵심] isLoading과 isMemoryPhase를 추가하여 상태 변화를 즉시 감지하도록 수술함
+  }, [isLoading, isCleared, isEliminated]);
 
   // 입력 처리
   const handleSelect = async (idx: number) => {
@@ -547,14 +636,24 @@ export default function MultiGameEngine({
     }
 
     if (isRoundClear) {
-        setIsCleared(true);
-        onRoundClear();
+      setIsCleared(true);
+      onRoundClear();
 
-        if (timerRef.current) clearInterval(timerRef.current);
-        const nextRound = myRoundRef.current + 1;
-        
-        // 🔥 [중요] 다음 라운드 DB 저장 시, 시간을 '현재 playTime(==다음라운드 진입시간)'으로 저장
-        await updateMyStatus(nextRound, false, playTime, false);
+      if (timerRef.current) clearInterval(timerRef.current);
+      const nextRound = myRoundRef.current + 1;
+      
+      // ✨ [수정] 1등 기록 로직: !roomData.first_cleared_at (null이나 0일 때 모두 포함)
+      if (!roomData?.first_cleared_at) {
+        const clearTime = Number(playTime.toFixed(2));
+        supabase.from('rooms')
+          .update({ 
+            first_cleared_at: clearTime,
+            first_cleared_round: currentRound // ✨ 중요: 현재 라운드 번호 기록
+          })
+          .eq('id', roomId).then();
+      }
+
+      await updateMyStatus(nextRound, false, playTime, false);
         
         setTimeout(() => {
             startNewRound(nextRound, roomData.seed || 1234, roomData.mode);
@@ -567,7 +666,7 @@ export default function MultiGameEngine({
     playBeepSound();
     if (timerRef.current) clearInterval(timerRef.current);
     
-    // 탈락 기록 저장 로직...
+    // ✨ 탈락하는 즉시 DB에서 is_ready를 false로! (OK 안 눌렀어도 여기서 처리)
     await updateMyStatus(myRoundRef.current, false, roundEntryTimeRef.current, true); 
     saveRecordToLeaderboard(myRoundRef.current, roundEntryTimeRef.current);
   };
@@ -620,42 +719,56 @@ export default function MultiGameEngine({
 
   const updateMyStatus = async (round: number, cleared: boolean, time: number, dead: boolean) => {
     if (!currentUserId) return;
+    
+    const updateData: any = { 
+        current_round: round, 
+        is_cleared: cleared, 
+        play_time: time, 
+        is_dead: dead,
+        earned_coins: coinRef.current 
+    };
+
+    if (dead) updateData.is_ready = false; // ✨ 탈락 시 입장권 강제 반납
+
     await supabase.from('room_participants')
-      .update({ 
-          current_round: round, 
-          is_cleared: cleared, 
-          play_time: time, 
-          is_dead: dead,
-          earned_coins: coinRef.current 
-      })
+      .update(updateData)
       .eq('room_id', roomId).eq('user_id', currentUserId);
   };
 
 
+  /* 방으로 돌아올 때 실행되는 함수 */
   const handleBackToRoom = async () => {
     if (!currentUserId || !roomId) return;
 
-    // 1. 자신의 상태 초기화
+    // 1. 자신의 참여 데이터 초기화 (이중 잠금: 레디 상태 해제)
     await supabase.from('room_participants')
       .update({ 
         current_round: 1, 
         is_cleared: false, 
         is_dead: false, 
+        is_ready: false, // ✨ 입장권 반납
         play_time: 0, 
         earned_coins: 0,
-        is_ready: false 
+        effect_type: null,
+        effect_at: null
       })
       .eq('room_id', roomId)
       .eq('user_id', currentUserId);
 
-    // 2. 💉 [추가] 방장이 방으로 돌아갈 때 유령 유저(이탈자) 정리
+    // 2. 💉 [복구된 방장 전용 로직] 
+    // 방장이 복귀할 때 방 상태를 'waiting'으로 돌려놔야 다른 유저들의 화면에 레디 버튼이 나타납니다.
     if (roomData?.creator_id === currentUserId) {
-        console.log("🧹 Host cleanup: Removing disconnected players...");
-        
-        // ✅ 방 상태만 'waiting'으로 변경
-        await supabase.from('rooms').update({ status: 'waiting', first_cleared_at: null }).eq('id', roomId);
+      console.log("🧹 Host cleanup: Resetting room status to waiting...");
+      await supabase.from('rooms')
+        .update({ 
+          status: 'waiting', 
+          first_cleared_at: null,
+          first_cleared_round: null // ✨ 30초 룰 기록 초기화
+        })
+        .eq('id', roomId);
     }
 
+    // 3. 엔진 종료 및 게임오버 처리
     onGameOver(1, 0); 
   };
 
@@ -670,6 +783,15 @@ export default function MultiGameEngine({
     
     // 1. 즉시 암기 페이즈 종료 (가위바위보 버튼들이 렌더링될 준비를 함)
     setIsMemoryPhase(false); 
+
+    // ✨ 첫 라운드에서 'OK'를 누른 순간, 내 레디 상태를 서버에서 해제합니다.
+    if (currentRound === 1 && currentUserId) {
+      supabase.from('room_participants')
+        .update({ is_ready: false })
+        .eq('room_id', roomId)
+        .eq('user_id', currentUserId)
+        .then(() => console.log("🎫 레디 입장권 반납 완료"));
+    }
 
     // 2. 🔥 [핵심 수술] 'OK'를 누른 순간, 대기 중인 공격(Stop, Switch)이 있다면 즉시 발동!
     const pendingEffect = bufferedEffectRef.current;
@@ -703,7 +825,13 @@ export default function MultiGameEngine({
 
 
   return (
-    <div className="w-full max-w-[360px] flex flex-col h-[100dvh] justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto">
+    <div className="w-full max-w-[360px] flex flex-col h-[100dvh] justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto relative
+    ">
+
+      {/* 🚨 [신규] 5초 남았을 때 화면 전체가 붉게 번쩍이는 오버레이 */}
+      {isUrgent && (
+        <div className="fixed inset-0 z-[100] bg-red-600/20 pointer-events-none animate-[death-flash_0.5s_infinite]" />
+      )}
     
       {/* 1. 헤더 영역 */}
       <div className="w-full flex justify-between items-start flex-none mb-4 px-4">
@@ -727,8 +855,19 @@ export default function MultiGameEngine({
           <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">Round {currentRound}</h2>
           <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-1 leading-none">{playTime.toFixed(2)} sec</p>
           
-          {roomData?.first_cleared_at && !isCleared && !isEliminated && (
-            <div className="text-red-500 text-[10px] font-black uppercase animate-pulse border border-red-500/30 px-2 py-1 rounded w-fit mt-2">Hurry Up!</div>
+          {/* ✨ showHurryUp이 true일 때만 경고 노출 */}
+          {showHurryUp && (
+            <div className={`flex flex-col items-end mt-2 animate-bounce`}>
+              <div className="text-red-500 text-[10px] font-black uppercase border border-red-500/30 px-2 py-1 rounded">
+                Hurry Up!
+              </div>
+              {/* 5초 이하일 때만 빨간 숫자로 카운트다운 */}
+              {remainingDeathTime <= 5 && (
+                <span className="text-red-600 font-mono font-black text-xl leading-none mt-1 shadow-sm">
+                  {Math.max(0, remainingDeathTime).toFixed(2)}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -969,6 +1108,11 @@ export default function MultiGameEngine({
           @keyframes flash {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0; transform: scale(1.1); }
+          }
+          /* 🚨 데스 카운트다운 전용 강렬한 애니메이션 */
+          @keyframes death-flash {
+            0%, 100% { background-color: rgba(220, 38, 38, 0.3); }
+            50% { background-color: rgba(220, 38, 38, 0); }
           }
         `}</style>
       </div>
