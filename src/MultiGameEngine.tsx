@@ -18,6 +18,7 @@ interface MultiGameProps {
   userItems: { stop: number; switch: number; color: number; heal: number };
   onUseItem: (itemType: string) => void; // 아이템 사용 서버 전송용
   playIceSound: () => void;
+  configs: any;
 }
 
 
@@ -37,7 +38,8 @@ export default function MultiGameEngine({
   onEarnCoin, 
   onRoundClear,
   onGameOver, 
-  onBackToLobby 
+  onBackToLobby,
+  configs,
 }: MultiGameProps) {
 
 
@@ -194,11 +196,11 @@ export default function MultiGameEngine({
 
   // 💉 5초 멈춤 발동 함수
   const triggerStopEffect = () => {
-    console.log("❄️ 5초 멈춤 공격 즉시 발동!"); 
+    console.log('❄️ ${configs.multi_item_stop_sec}초 멈춤 공격 즉시 발동!'); 
 
     // 1. 모든 상태를 지연 없이 즉시 업데이트
     setFlashingItem('stop');      // 중앙 아이콘 깜빡임 시작
-    setFreezeCount(5.00);        // 빨간색 소수점 카운트다운 즉시 시작 (버튼은 이때 사라짐)
+    setFreezeCount(configs.multi_item_stop_sec);        // 빨간색 소수점 카운트다운 즉시 시작 (버튼은 이때 사라짐)
     
     if (typeof playIceSound === 'function') playIceSound();
 
@@ -447,7 +449,7 @@ export default function MultiGameEngine({
         return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
     const rng = seededRandom(roundSeed);
-    const questionNum = newRound + 2;
+    const questionNum = newRound + configs.multi_diff_offset;
     const newAiSelect = Array.from({ length: questionNum }, () => Math.floor(rng() * 3));
     
     const conditions = ['WIN', 'DRAW', 'LOSE'];
@@ -975,12 +977,13 @@ export default function MultiGameEngine({
         isOpen={showResult} 
         roomId={roomId} 
         currentUserId={currentUserId}
-        sessionCoins={sessionCoins}     // 💉 App에서 받은 세션 코인 전달
+        sessionCoins={sessionCoins}     
         sessionItems={sessionItems}
-        onSaveRewards={onSaveRewards}   // 💉 App에서 받은 저장 함수 전달
-        playClickSound={playClickSound} // 💉 App에서 받은 사운드 함수 전달
-        onBackToRoom={handleBackToRoom} // 💉 내부 함수 handleBackToRoom 연결
-        onBackToLobby={onBackToLobby}   // 💉 App에서 받은 로비 이동 함수 연결
+        onSaveRewards={onSaveRewards}  
+        playClickSound={playClickSound}
+        onBackToRoom={handleBackToRoom} 
+        onBackToLobby={onBackToLobby}   
+        configs={configs}
       />
     </div>
   );

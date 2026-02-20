@@ -21,6 +21,24 @@ interface UserItems {
   heal: number;
 }
 
+interface RemoteConfigs {
+  init_signup_coins: number;
+  init_signup_item_count: number;
+  daily_gift_item_count: number;
+  item_drop_rate: number;
+  ad_interstitial_freq: number;
+  auto_logout_limit: number;
+  popup_click_delay: number;
+  result_continue_cost: number;
+  load_save_cost_unit: number;
+  // 상점용 추가
+  shop_ad_cooldown_sec: number;
+  shop_ad_reward_coins: number;
+  shop_ad_reward_items: number;
+  shop_ad_free_hours: number;
+  item_stop_duration: number;
+}
+
 export default function App() {
 
   // ------------------------------------------------------------------
@@ -34,7 +52,60 @@ export default function App() {
             ✨ 여기까지 개발자 인증코드- 차후 삭제
   ------------------------------------------------------------------ */}
 
+  const [configs, setConfigs] = useState<RemoteConfigs>({
+    // 초기 로드 전까지 사용할 기본값 (DB 데이터와 키 이름이 일치해야 함)
+    init_signup_coins: 300,
+    init_signup_item_count: 3,
+    daily_gift_item_count: 1,
+    item_drop_rate: 0.02,
+    ad_interstitial_freq: 5,
+    auto_logout_limit: 600000,
+    popup_click_delay: 500,
+    result_continue_cost: 50,
+    load_save_cost_unit: 100,
+    shop_ad_cooldown_sec: 180,
+    shop_ad_reward_coins: 1000,
+    shop_ad_reward_items: 5,
+    shop_ad_free_hours: 50,
+    item_stop_duration: 3
+  });
 
+
+  /* 💉 [App.tsx] 설정 로드 및 실시간 구독 함수 */
+  const fetchAndSyncConfigs = async () => {
+    // 1. 초기 데이터 로드
+    const { data, error } = await supabase.from('game_configs').select('config_key, value');
+    if (!error && data) {
+      const configObj = data.reduce((acc: any, cur) => {
+        acc[cur.config_key] = Number(cur.value);
+        return acc;
+      }, {});
+      setConfigs(prev => ({ ...prev, ...configObj }));
+      console.log("📡 Remote Configs Loaded:", configObj);
+    }
+
+    // 2. 실시간 감시(Realtime) 설정
+    const channel = supabase.channel('remote_config_sync')
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'game_configs' 
+      }, (payload) => {
+        const { config_key, value } = payload.new;
+        setConfigs(prev => ({ ...prev, [config_key]: Number(value) }));
+        console.log(`✨ Config Updated: ${config_key} -> ${value}`);
+      })
+      .subscribe();
+
+    return channel;
+  };
+
+  // 🏁 앱 시작 시 실행
+  useEffect(() => {
+    let channel: any;
+    fetchAndSyncConfigs().then(res => channel = res);
+    return () => { if (channel) supabase.removeChannel(channel); };
+  }, []);
 
 
   // ------------------------------------------------------------------
@@ -231,7 +302,7 @@ export default function App() {
   const [resultData, setResultData] = useState({ round: 0, time: 0, coins: 0, isNewRecord: false });
   const [continueCount, setContinueCount] = useState(3);
   const [sessionCoins, setSessionCoins] = useState(0); 
-  const CONTINUE_COST = 50;
+  const CONTINUE_COST = configs.result_continue_cost;
 
 
 
@@ -381,11 +452,11 @@ export default function App() {
         const { data: newProfile, error: insertError } = await supabase.from('profiles').insert({ 
           id: userId, 
           display_name: googleName, 
-          coins: 300,     // 💰 가입 선물: 300 코인
-          item_stop: 3,   // 🎁 가입 선물: 아이템 3개씩
-          item_switch: 3,
-          item_color: 3,
-          item_heal: 3,
+          coins: configs.init_signup_coins, 
+          item_stop: configs.init_signup_item_count, 
+          item_switch: configs.init_signup_item_count,
+          item_color: configs.init_signup_item_count,
+          item_heal: configs.init_signup_item_count,
           // 💉 중요: 가입 날짜를 '과거'나 '공백'으로 넣어야 바로 아래 일일 보상 로직이 작동합니다.
           last_login_date: '1900-01-01' 
         }).select().single();
@@ -422,7 +493,10 @@ export default function App() {
             // 일일 보상: 아이템 +1씩 추가
             await supabase.rpc('update_user_items', {
               target_user_id: userId,
-              stop_inc: 1, switch_inc: 1, color_inc: 1, heal_inc: 0
+              stop_inc: configs.daily_gift_item_count, 
+              switch_inc: configs.daily_gift_item_count,
+              color_inc: configs.daily_gift_item_count,
+              heal_inc: 0
             });
 
             // 오늘 날짜로 갱신하여 중복 수령 방지
@@ -490,7 +564,7 @@ export default function App() {
 
   // 💉 아이템 획득 확률 계산 함수 (2%)
   const rollForItem = () => {
-    const isHit = Math.random() < 0.02; // 2% 확률 (0.02)
+    const isHit = Math.random() < configs.item_drop_rate;
     if (!isHit) return null;
 
     const itemTypes: (keyof UserItems)[] = ['stop', 'switch', 'color', 'heal'];
@@ -608,7 +682,7 @@ export default function App() {
     if (!isLoggedIn) return;
 
     let timer: NodeJS.Timeout;
-    const LIMIT = 10 * 60 * 1000; // 10분
+    const LIMIT = configs.auto_logout_limit;
 
     // 💉 [핵심 함수] 실제 시차를 계산하여 로그아웃 여부 판정
     const checkTimeout = () => {
@@ -654,7 +728,7 @@ export default function App() {
       events.forEach(event => document.removeEventListener(event, resetTimer));
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isLoggedIn]);
+  }, [isLoggedIn, configs.auto_logout_limit]);
 
 
 
@@ -1672,6 +1746,7 @@ export default function App() {
             sessionItems={sessionItems}
             isItemMatch={currentRoomMode === 'item' || currentRoomMode === 'ITEM'} 
             userItems={userItems || { stop: 0, switch: 0, color: 0, heal: 0 }}
+            configs={configs}
             
 
 
@@ -1779,6 +1854,7 @@ export default function App() {
             round={round} 
             mode={selectedOption} 
             initialTime={sessionStartTime} 
+            configs={configs}
             
             // 💉 추가된 세션 코인 값 (UI 표시용)
             sessionCoins={sessionCoins} 
@@ -1829,7 +1905,8 @@ export default function App() {
           <ShopPage 
             onBack={() => { playClickSound(); setView('lobby'); }} 
             userCoins={userCoins} 
-            userItems={userItems} // ✨ [추가] 보유 아이템 정보 전달
+            userItems={userItems} 
+            configs={configs}
             currentUserId={currentUserId} 
             onUpdateCoins={(newAmount) => { 
               setUserCoins(newAmount); 
@@ -1944,7 +2021,8 @@ export default function App() {
         userCoins={userCoins} 
         isNewRecord={resultData.isNewRecord} 
         continueCount={continueCount} 
-        continueCost={CONTINUE_COST} 
+        continueCost={configs.result_continue_cost} 
+        configs={configs}
         
         // 💉 [신규 추가] 잃어버린 도구들을 여기서 쥐어줍니다.
         playClickSound={playClickSound}

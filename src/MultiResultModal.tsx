@@ -11,12 +11,13 @@ interface MultiResultModalProps {
   sessionItems: { stop: number; switch: number; color: number; heal: number }; // 💉 [필수 추가]
   onSaveRewards: () => Promise<void>; 
   playClickSound: () => void;    
+  configs: any;
 }
 
 export default function MultiResultModal({ 
   isOpen, roomId, currentUserId, onBackToRoom, onBackToLobby,
   sessionCoins, sessionItems, // 💉 [필수 추가] 파라미터에서 꺼내기
-  onSaveRewards, playClickSound 
+  onSaveRewards, playClickSound, configs
 }: MultiResultModalProps) {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +46,9 @@ export default function MultiResultModal({
       const totalPlayers = sorted.length;
       const processedResults = sorted.map((p, index) => {
         const rank = index + 1;
-        const bonus = Math.max(0, (totalPlayers - rank) * 10);
+        const bonusUnit = configs?.multi_rank_bonus_unit || 10;
+        const bonus = Math.max(0, (totalPlayers - rank) * bonusUnit);
+
         return {
           ...p,
           rank,
@@ -59,7 +62,7 @@ export default function MultiResultModal({
     };
 
     fetchResults();
-  }, [isOpen, roomId, currentUserId]);
+  }, [isOpen, roomId, currentUserId, configs.multi_rank_bonus_unit]);
 
   if (!isOpen) return null;
 

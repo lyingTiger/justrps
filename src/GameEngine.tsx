@@ -16,14 +16,15 @@ interface GameProps {
   isModalOpen: boolean; 
   onBackToLobby: () => void;
   t: (key: string) => string;
-   // 💉 언어 전환을 위해 필수적으로 추가된 Prop 외에는 건드리지 않음
+  configs: any;
 }
 
 export default function GameEngine({ 
   round, mode, onGameOver, onRoundClear, playClickSound, 
   playTockSound, playWhickSound, playBeepSound, // 💉 Destructuring 추가
   onEarnCoin, isModalOpen, initialTime, t,
-  onBackToLobby, sessionCoins 
+  onBackToLobby, sessionCoins,
+  configs,
 }: GameProps) {
   
   // 2. [State 초기값 수정]
@@ -51,7 +52,7 @@ export default function GameEngine({
       setEntryTime(playTime);
     }
 
-    const questionNum = round + 2; 
+    const questionNum = round + configs.game_difficulty_offset; 
     const newAiSelect = Array.from({ length: questionNum }, () => Math.floor(Math.random() * 3));
     setAiSelect(newAiSelect);
 
@@ -72,7 +73,7 @@ export default function GameEngine({
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  }, [round, mode]);
+  }, [round, mode, configs.game_difficulty_offset]);
 
 
   // 🚨 [신규 추가] 모달 상태에 따라 타이머를 멈추거나 다시 시작하는 로직
@@ -89,8 +90,8 @@ export default function GameEngine({
       // 💉 모든 창이 닫혀 있을 때만 타이머가 '하나'만 돌아가도록 보장
       if (!timerRef.current) {
         timerRef.current = setInterval(() => {
-          setPlayTime(prev => prev + 0.01);
-        }, 10);
+          setPlayTime(prev => prev + (configs.game_timer_step || 0.01));
+        }, configs.game_timer_interval || 10);
       }
     }
 
@@ -101,7 +102,7 @@ export default function GameEngine({
       }
     };
     // 💉 의존성 배열에 isSaveModalOpen을 반드시 추가!
-  }, [isModalOpen, isSaveModalOpen, round]);
+  }, [isModalOpen, isSaveModalOpen, round, configs.game_timer_step, configs.game_timer_interval]);
 
 
 

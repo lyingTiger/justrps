@@ -16,16 +16,17 @@ interface ResultModalProps {
   onLobby: () => void;
   onShop: () => void;
   onWatchAd: () => void;
-  t: (key: string) => string; // 💉 [추가] 다국어 번역 함수 Prop
+  t: (key: string) => string; 
   playClickSound: () => void; 
   onSaveRewards: () => Promise<void>;
+  configs: any;
 }
 
 export default function ResultModal({ 
   isOpen, mode, round, time, earnedCoins, sessionItems, userCoins, isNewRecord, 
   continueCount, continueCost, onContinue, onRetry, onLobby, onShop,
   onWatchAd, t, playClickSound,
-  onSaveRewards
+  onSaveRewards, configs
 }: ResultModalProps) {
 
   const [canClick, setCanClick] = useState(false);
@@ -36,7 +37,7 @@ export default function ResultModal({
       setCanClick(false);
       const timer = setTimeout(() => {
         setCanClick(true);
-      }, 500); // 0.5초 뒤에 활성화 (더 길게 원하시면 1000으로 수정)
+      }, configs.popup_click_delay || 500); // 0.5초 뒤에 활성화 (더 길게 원하시면 1000으로 수정)
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -164,7 +165,7 @@ export default function ResultModal({
                             {t('continue_question')}
                         </h3>
                         <p className="text-sm text-zinc-500 font-bold uppercase mb-4">
-                            {t('attempts_left')} <span className="text-[#FF9900]">{continueCount}</span>/3
+                            {t('attempts_left')} <span className="text-[#FF9900]">{continueCount}</span>/{configs.result_continue_max || 3}
                         </p>
 
                         <div className="grid grid-cols-2 gap-3 w-full">
