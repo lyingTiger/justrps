@@ -291,10 +291,12 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
     // 1. DB 업데이트: status는 playing으로, 선두 기록은 null로 확실히 초기화!
     const { error } = await supabase.from('rooms')
-      .update({ 
-        status: 'playing', 
-        seed: randomSeed,
-        first_cleared_at: null // ✨ 게임 시작 시 무조건 비우고 시작
+        .update({ 
+        status: 'playing',
+        round_clear_times: {},     // 기록지 초기화
+        first_cleared_at: null,    // 1등 시간 초기화
+        first_cleared_round: null,  // 1등 라운드 초기화
+        seed: Math.floor(Math.random() * 1000000) // 매판 새로운 시드
       })
       .eq('id', roomId);
 

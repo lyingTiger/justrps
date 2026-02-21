@@ -19,6 +19,7 @@ interface MultiGameProps {
   onUseItem: (itemType: string) => void; // 아이템 사용 서버 전송용
   playIceSound: () => void;
   configs: any;
+  
 }
 
 
@@ -57,18 +58,17 @@ export default function MultiGameEngine({
   const [hasAttackedThisRound, setHasAttackedThisRound] = useState(false);
   const [launchedAttackId, setLaunchedAttackId] = useState<string | null>(null);
 
-  // 1. 현재 DB에 저장된 타이머가 '내가 있는 라운드'의 것인지 확인
-  const isTimerForMyRound = roomData?.first_cleared_round === currentRound;
 
-  // 2. 시간차 및 남은 생존 시간 계산
-  const limitTime = configs.multi_limit_time_sec || 30;
-  const timeGap = playTime - (roomData?.first_cleared_at || 0);
-  const remainingDeathTime = limitTime - timeGap;
 
-  // 3. ✨ [핵심 스위치] 현재 라운드 1등이 나왔고, 내가 아직 못 깼을 때만 활성화
-  const showHurryUp = !!roomData?.first_cleared_at && isTimerForMyRound && !isCleared && !isEliminated;
+  // 1. ✨ 내 라운드에 해당하는 1등 기록이 있는지 확인
+  const myRoundFirstClearAt = roomData?.round_clear_times?.[currentRound];
 
-  // 4. 5초 남았을 때의 긴박한 상태
+  // 2. 시간차 계산 (내 라운드 기록이 있을 때만 계산)
+  const timeGap = myRoundFirstClearAt ? (playTime - myRoundFirstClearAt) : 0;
+  const remainingDeathTime = (configs.multi_limit_time_sec || 30) - timeGap;
+
+  // 3. UI 스위치 (내 라운드 기록이 존재할 때만 작동)
+  const showHurryUp = !!myRoundFirstClearAt && !isCleared && !isEliminated && !showResult;
   const isUrgent = showHurryUp && remainingDeathTime <= 5;
 
 
@@ -183,7 +183,7 @@ export default function MultiGameEngine({
 
 
 
-  /* 💉 [MultiGameEngine.tsx] 내 존재 여부 감시 (강퇴 감지) */
+  /* 💉 내 존재 여부 감시 (강퇴 감지) */
   useEffect(() => {
     if (!currentUserId || !participants || participants.length === 0) return;
 
@@ -233,20 +233,20 @@ export default function MultiGameEngine({
 
   /* 💉 30초 시간 제한 감시 로직  */
   useEffect(() => {
-    // ✨ 내 라운드와 기록된 라운드가 같을 때만 시한폭탄 작동
-    const isTimerMatch = roomData?.first_cleared_round === currentRound;
-    
-    if (!roomData?.first_cleared_at || !isTimerMatch || isCleared || isEliminated) return;
+    // ✨ 내 라운드 전용 기록 확인
+    const myRoundFirstClearAt = roomData?.round_clear_times?.[currentRound];
+
+    if (!myRoundFirstClearAt || isCleared || isEliminated) return;
 
     const limitTime = configs.multi_limit_time_sec || 30;
-    const timeGap = playTime - roomData.first_cleared_at;
+    const timeGap = playTime - myRoundFirstClearAt;
+    
 
     if (timeGap >= limitTime) {
-      console.log("💀 30초 경과! 추격 실패로 탈락합니다.");
+      console.log(`💀 ${currentRound}라운드 30초 초과로 탈락!`);
       handleElimination("TIME_OVER");
     }
-  }, [playTime, roomData?.first_cleared_at, roomData?.first_cleared_round, currentRound, isCleared, isEliminated]);
-
+  }, [playTime, roomData?.round_clear_times, currentRound, isCleared, isEliminated]);
 
 
   // 💉 5초 멈춤 발동 함수
@@ -422,28 +422,50 @@ export default function MultiGameEngine({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, currentUserId, roomData?.creator_id]);
 
+
+  
   // --- 2. 게임 종료 감지 ---
   useEffect(() => {
-    if (!participants || participants.length === 0) return;
+    // 0. 기초 검증: 참가자나 방 데이터가 없으면 실행 안 함
+    if (!participants || participants.length === 0 || !roomData) return;
 
-    // 1. [방장 전용] 모든 유저가 현재 라운드 처리가 끝났다면 타이머 초기화
-    const allProcessed = participants.every(p => p.is_dead || p.is_cleared || p.current_round > currentRound);
+    // 1. ✨ [모두 종료 확인]
+    // 모든 참가자가 죽었거나(is_dead), 클리어했거나(is_cleared), 
+    // 혹은 이미 다음 라운드(p.current_round > currentRound)로 넘어갔는지 확인
+    const allFinished = participants.every(p => p.is_dead || p.is_cleared || p.current_round > currentRound);
     
-    if (allProcessed && roomData?.creator_id === currentUserId && roomData?.first_cleared_at !== null) {
-      supabase.from('rooms').update({ first_cleared_at: null, first_cleared_round: null }).eq('id', roomId).then();
+    // 2. ✨ [기록 자동 청소] 
+    // 방장이고 + 모두가 이번 세그먼트를 끝냈고 + 기록지가 비어있지 않을 때만 실행
+    if (allFinished && roomData.creator_id === currentUserId) {
+      const hasRecords = roomData.round_clear_times && Object.keys(roomData.round_clear_times).length > 0;
+      
+      if (hasRecords) {
+        console.log("🧼 모든 유저 종료 확인: 다음 판을 위해 기록지를 비웁니다.");
+        supabase.from('rooms')
+          .update({ 
+            round_clear_times: {}, 
+            first_cleared_at: null,
+            first_cleared_round: null 
+          })
+          .eq('id', roomId).then();
+      }
     }
 
-    // 2. 꼴찌는 죽는 즉시 결과창으로 이동 (남은 사람 기다리지 않음)
+    // 3. 꼴찌(탈락자) 처리: 죽는 즉시 1초 뒤 결과창 노출
     if (isEliminated && !showResult) {
-      setTimeout(() => setShowResult(true), 1000);
+      const timer = setTimeout(() => setShowResult(true), 1000);
+      return () => clearTimeout(timer);
     }
 
-    // 3. 생존자가 나 하나인데 내가 이미 깼다면 (우승 상황) 결과창 준비
+    // 4. 우승자(최후의 생존자) 처리: 나 이외에 생존자가 없고 내가 깼다면 결과창 노출
     const anyoneElseAlive = participants.some(p => p.user_id !== currentUserId && !p.is_dead);
     if (!anyoneElseAlive && isCleared && !showResult) {
-      setTimeout(() => setShowResult(true), 1000);
+      const timer = setTimeout(() => setShowResult(true), 1000);
+      return () => clearTimeout(timer);
     }
-  }, [participants, isEliminated, isCleared, showResult, currentRound]);
+
+    // 💉 의존성 배열에 필요한 상태들을 빠짐없이 넣어줍니다.
+  }, [participants, isEliminated, isCleared, showResult, currentRound, roomData, currentUserId, roomId]);
 
 
   const fetchRoomAndParticipants = async () => {
@@ -642,13 +664,22 @@ export default function MultiGameEngine({
       if (timerRef.current) clearInterval(timerRef.current);
       const nextRound = myRoundRef.current + 1;
       
-      // ✨ [수정] 1등 기록 로직: !roomData.first_cleared_at (null이나 0일 때 모두 포함)
-      if (!roomData?.first_cleared_at) {
+      // 현재 방의 모든 라운드 기록을 가져옵니다.
+      const currentClearTimes = roomData?.round_clear_times || {};
+
+      // ✨ 현재 라운드에 대한 기록이 아직 없을 때만 (내가 이 라운드 1등일 때만) 기록
+      if (!currentClearTimes[currentRound]) {
         const clearTime = Number(playTime.toFixed(2));
+        const nextClearTimes = { 
+          ...currentClearTimes, 
+          [currentRound]: clearTime 
+        };
+
         supabase.from('rooms')
           .update({ 
-            first_cleared_at: clearTime,
-            first_cleared_round: currentRound // ✨ 중요: 현재 라운드 번호 기록
+            round_clear_times: nextClearTimes, // 전체 기록장에 내 기록 추가
+            first_cleared_at: clearTime,       // (하위 호환용 유지)
+            first_cleared_round: currentRound  // (하위 호환용 유지)
           })
           .eq('id', roomId).then();
       }
@@ -760,12 +791,10 @@ export default function MultiGameEngine({
     if (roomData?.creator_id === currentUserId) {
       console.log("🧹 Host cleanup: Resetting room status to waiting...");
       await supabase.from('rooms')
-        .update({ 
-          status: 'waiting', 
-          first_cleared_at: null,
-          first_cleared_round: null // ✨ 30초 룰 기록 초기화
-        })
-        .eq('id', roomId);
+      .update({ 
+        status: 'waiting', 
+      })
+      .eq('id', roomId);
     }
 
     // 3. 엔진 종료 및 게임오버 처리
@@ -823,14 +852,25 @@ export default function MultiGameEngine({
   const canHeal = isUnderAttack && userItems.heal > 0;
 
 
+  // 화면에 뿌려줄 정수형 카운트다운 숫자
+  const displayCountdown = Math.floor(Math.max(0, remainingDeathTime));
+
 
   return (
     <div className="w-full max-w-[360px] flex flex-col h-[100dvh] justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto relative
     ">
 
-      {/* 🚨 [신규] 5초 남았을 때 화면 전체가 붉게 번쩍이는 오버레이 */}
+      {/* 🚨 중앙 거대 타이머 & 레드 플래시 오버레이 */}
       {isUrgent && (
-        <div className="fixed inset-0 z-[100] bg-red-600/20 pointer-events-none animate-[death-flash_0.5s_infinite]" />
+        <div className="fixed inset-0 z-[150] flex items-center justify-center pointer-events-none overflow-hidden">
+          {/* 1. 배경 붉은 물듦 (애니메이션과 연동) */}
+          <div className="absolute inset-0 bg-red-600/30 animate-[death-bg_0.5s_infinite_alternate]" />
+          
+          {/* 2. 중앙 거대 숫자 (화면의 약 50% 크기 감성, 투명도 적용) */}
+          <span className="relative text-[280px] font-black text-red-600 opacity-20 italic font-mono leading-none select-none animate-[death-text_0.5s_infinite_alternate]">
+            {displayCountdown}
+          </span>
+        </div>
       )}
     
       {/* 1. 헤더 영역 */}
@@ -854,21 +894,6 @@ export default function MultiGameEngine({
         <div className="text-right flex flex-col items-end pt-0">
           <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">Round {currentRound}</h2>
           <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-1 leading-none">{playTime.toFixed(2)} sec</p>
-          
-          {/* ✨ showHurryUp이 true일 때만 경고 노출 */}
-          {showHurryUp && (
-            <div className={`flex flex-col items-end mt-2 animate-bounce`}>
-              <div className="text-red-500 text-[10px] font-black uppercase border border-red-500/30 px-2 py-1 rounded">
-                Hurry Up!
-              </div>
-              {/* 5초 이하일 때만 빨간 숫자로 카운트다운 */}
-              {remainingDeathTime <= 5 && (
-                <span className="text-red-600 font-mono font-black text-xl leading-none mt-1 shadow-sm">
-                  {Math.max(0, remainingDeathTime).toFixed(2)}
-                </span>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -890,77 +915,67 @@ export default function MultiGameEngine({
 
 
       {/* 3. 💉 문제 영역 확장 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center justify-center min-h-0">
-        {(isEliminated || isCleared) ? (
-            <div className="text-center animate-in zoom-in py-10">
-                {isEliminated && <div className="text-6xl mb-4">💀</div>}
-                <h3 className={`text-3xl font-black uppercase italic ${isEliminated ? 'text-zinc-600' : 'text-green-500'}`}>
-                    {isEliminated ? "Game over" : "Next Round!"}
-                </h3>
-                {isEliminated && (
-                    <p className="text-zinc-500 text-xs font-bold uppercase mt-2 animate-pulse">
-                        Waiting for others to finish...
-                    </p>
-                )}
+      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center min-h-0">
+      <div className="w-full flex flex-col items-center my-auto py-8">
+  
+        {/* 🅰️ 텍스트 영역 (상단: 모드 표시 + Hurry Up) */}
+        <div className="relative text-center mb-10 flex-non"> 
+          {/* ✨ [Hurry Up] 게임모드 텍스트 바로 위에 겹쳐서 깜빡임 */}
+          {showHurryUp && (
+            <div className="absolute -top-10 inset-x-0 flex justify-center animate-[blink_0.4s_infinite_alternate] pointer-events-none">
+              <span className="text-red-500 text-2xl font-black uppercase italic tracking-tighter drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]">
+                Hurry Up!
+              </span>
             </div>
-        ) : (
-            <div className="w-full flex flex-col items-center">
-                {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
-                    <div className="text-center mb-10 select-none flex-none">
-                        <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
-                            <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
-                        </div>
-                        <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
-                            <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="text-center mb-10 flex-none">
-                        <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">{aiSelect.length} {mode.split(' ')[0]}</p>
-                        <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">{questionTurn} {mode.split(' ')[0]}</p>
-                    </div>
+          )}
+
+          {/* 모드 표시 로직 */}
+          {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
+            <div className="select-none">
+              <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
+                <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
+              </div>
+              <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
+                <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">
+                {aiSelect.length} {mode.split(' ')[0]}
+              </p>
+              <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">
+                {questionTurn} {mode.split(' ')[0]}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 🅱️ 아이콘 영역 (하단: 가위바위보 손 모양) */}
+        <div className="flex flex-wrap justify-center gap-3 w-full">
+          {aiSelect.map((hand, i) => {
+            const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
+            const isCurrent = (i === questionTurn && !isMemoryPhase);
+            const showDetails = isMemoryPhase || isSolved;
+            
+            return (
+              <div key={i} className="relative flex flex-col items-center">
+                {isCurrent && mode === 'EXPERT MODE' && (
+                  <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{targetConditions[i]}</span>
                 )}
-
-                <div className="flex flex-wrap justify-center gap-3 mb-4 w-full">
-                    {aiSelect.map((hand, i) => {
-                        const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
-                        const isCurrent = (i === questionTurn && !isMemoryPhase);
-                        const showDetails = isMemoryPhase || isSolved;
-                        
-                        return (
-                          <div key={i} className="relative flex flex-col items-center">
-                              {isCurrent && mode === 'EXPERT MODE' && (
-                                <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{targetConditions[i]}</span>
-                              )}
-                              <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900
-                                ${showDetails ? (
-                                  hand === 0 ? 'shadow-none' : //[0_0_12px_rgba(236,72,153,0.7)]
-                                  hand === 1 ? 'shadow-none' : //[0_0_12px_rgba(34,197,94,0.7)]
-                                  'shadow-none') : //[0_0_12px_rgba(34,197,94,0.7)]
-                                  isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'
-                                  }`}>
-
-                                  {isMemoryPhase ? (
-                                    /* 🎨 [핵심 수술] 암기 단계 + 칼라공격 활성 시 _g 파일 호출 */
-                                    <img 
-                                      src={`/images/${['scissor', 'rock', 'paper'][hand]}${isColorActive ? '_g' : ''}.png`} 
-                                      className="w-full h-full object-cover" 
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                      {isSolved && (
-                                        /* ✅ 정답을 맞춘 뒤 나오는 아이콘은 항상 원래 색상(isColorActive 무시) */
-                                        <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-100" />
-                                      )}
-                                    </div>
-                                  )}
-                              </div>
-                          </div>
-                        );
-                      })}
+                <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900
+                  ${showDetails ? 'shadow-none' : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
+                  {/* ... 이미지 렌더링 로직 생략 ... */}
+                  <img 
+                    src={`/images/${['scissor', 'rock', 'paper'][hand]}${(isMemoryPhase && isColorActive) ? '_g' : ''}.png`} 
+                    className={`w-full h-full object-cover ${(!isMemoryPhase && !isSolved) ? 'opacity-0' : 'opacity-100'}`} 
+                  />
                 </div>
-            </div>
-        )}
+              </div>
+            );
+          })}
+        </div>
+        </div>
       </div>
 
 
@@ -1105,14 +1120,27 @@ export default function MultiGameEngine({
 
         {/* 💉 4. 깜빡임 애니메이션 정의 (Tailwind 커스텀 애니메이션 미설정 대비) */}
         <style>{`
+          /* 배경 붉은색 깜빡임 */
+          @keyframes death-bg {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+          }
+
+          /* 중앙 숫자 깜빡임 (배경과 엇박자로 작동하도록 설정 가능) */
+          @keyframes death-text {
+            0% { transform: scale(0.9); opacity: 0.1; }
+            100% { transform: scale(1.1); opacity: 0.3; }
+          }
+
+          /* HURRY UP 텍스트 깜빡임 */
+          @keyframes blink {
+            0% { opacity: 0.2; transform: translateY(2px); }
+            100% { opacity: 1; transform: translateY(0px); }
+          }
+
           @keyframes flash {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0; transform: scale(1.1); }
-          }
-          /* 🚨 데스 카운트다운 전용 강렬한 애니메이션 */
-          @keyframes death-flash {
-            0%, 100% { background-color: rgba(220, 38, 38, 0.3); }
-            50% { background-color: rgba(220, 38, 38, 0); }
           }
         `}</style>
       </div>
