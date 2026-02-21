@@ -423,7 +423,7 @@ export default function MultiGameEngine({
   }, [roomId, currentUserId, roomData?.creator_id]);
 
 
-  
+
   // --- 2. 게임 종료 감지 ---
   useEffect(() => {
     // 0. 기초 검증: 참가자나 방 데이터가 없으면 실행 안 함
@@ -900,16 +900,31 @@ export default function MultiGameEngine({
       {/* 2. 플레이어 현황판 - 멀티 전용 (고정 높이) */}
       <div className="w-full bg-zinc-900/50 rounded-3xl p-3 mb-4 flex-none space-y-2 mx-4 w-[calc(100%-32px)]">
         <div className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Other Players</div>
-        {participants.filter(p => p.user_id !== currentUserId).map(p => (
-          <div key={p.user_id} className="flex justify-between items-center opacity-80">
-            <span className={`text-[10px] font-black uppercase flex items-center gap-1 ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : 'text-zinc-500'}`}>
-              {p.is_dead && "💀"} {p.profiles?.display_name}
-            </span>
-            <span className={`text-xs font-mono mr-5 font-bold ${p.is_dead ? 'text-red-900' : 'text-white'}`}>
-              {p.is_dead ? "FAIL" : `Round ${p.current_round || 1}`}
-            </span>
-          </div>
-        ))}
+        {participants.filter(p => p.user_id !== currentUserId).map(p => {
+          
+          // ✨ [판정] 이 유저가 로비로 복귀했는지 확인
+          // 라운드는 1인데 플레이 시간이 0이라면, 게임을 마치고 로비에서 대기 중인 상태입니다.
+          const isBackInLobby = p.current_round === 1 && p.play_time === 0 && !p.is_dead;
+
+          return (
+            <div key={p.user_id} className="flex justify-between items-center opacity-80">
+              <span className={`text-[10px] font-black uppercase flex items-center gap-1 
+                ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : 'text-zinc-500'}`}>
+                {p.is_dead ? "💀" : isBackInLobby ? "🏠" : "🎮"} {p.profiles?.display_name}
+              </span>
+
+              <span className={`text-xs mr-5 font-black 
+                ${p.is_dead ? 'text-red-900' : isBackInLobby ? 'text-green-500' : 'text-white'}`}>
+                {p.is_dead 
+                  ? "FAIL" 
+                  : isBackInLobby 
+                    ? "IN LOBBY" // 👈 "Round 1" 대신 표시될 문구
+                    : `Round ${p.current_round || 1}`
+                }
+              </span>
+            </div>
+          );
+        })}
       </div>
 
 
