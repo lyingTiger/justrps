@@ -52,8 +52,8 @@ export default function GameEngine({
       setEntryTime(playTime);
     }
 
-    const questionNum = round + configs.game_difficulty_offset; 
-    const newAiSelect = Array.from({ length: questionNum }, () => Math.floor(Math.random() * 3));
+    const questionNum = round + (configs?.multi_diff_offset || 2); 
+    const newAiSelect = Array.from({ length: Math.max(1, questionNum) }, () => Math.floor(Math.random() * 3));
     setAiSelect(newAiSelect);
 
     if (mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') {

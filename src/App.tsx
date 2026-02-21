@@ -1516,8 +1516,8 @@ export default function App() {
       
       {/* 💉 상단 헤더 섹션 (로고, 설정, 재화 표시) */}
       {!(view === 'battle' || view === 'multiBattle') && (
-      <header className="w-full border-b border-zinc-800 bg-black sticky top-0 z-50 flex-none animate-in fade-in duration-300">
-        <div className="max-w-[800px] w-full mx-auto p-6 flex justify-between items-center">
+      <header className="w-full h-14 border-b border-zinc-800 bg-black sticky top-0 z-50 flex-none animate-in fade-in duration-300">
+        <div className="max-w-[800px] w-full mx-auto px-6 pt-3 pb-2 flex justify-between items-center">
           
           <div className="flex items-center gap-1">
             <div className="relative">
@@ -1549,7 +1549,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-5 mt-1">
             <div className="relative">
               <button onClick={(e) => { e.stopPropagation(); playClickSound(); setIsUserMenuOpen(!isUserMenuOpen); }} className="font-bold text-sm tracking-tight text-zinc-300 hover:text-white transition-colors">
                 {userNickname.length > 10 ? userNickname.substring(0, 10) + '...' : userNickname} 
