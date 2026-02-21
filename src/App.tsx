@@ -1859,6 +1859,8 @@ export default function App() {
             playIceSound={playIceSound}
             playClickSound={playClickSound} 
             playBeepSound={playBeepSound}
+            playWhickSound={playWhickSound}
+            playTockSound={playTockSound}
             onSaveRewards={saveSessionRewards}
             onEarnCoin={() => setSessionCoins(prev => prev + 1)} // 💉 수정: 세션 코인만 증가
 

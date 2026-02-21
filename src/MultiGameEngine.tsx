@@ -8,8 +8,10 @@ interface MultiGameProps {
   onSaveRewards: () => Promise<void>;
   playClickSound: () => void;
   playBeepSound: () => void;
+  playWhickSound: () => void;
+  playTockSound: () => void;
   onEarnCoin: () => void;
-  onRoundClear: () => void;
+  onRoundClear: (nextRound: number) => void;
   onGameOver: (finalRound: number, totalTime: number) => void;
   onBackToLobby: () => void;
   sessionCoins: number;
@@ -35,6 +37,8 @@ export default function MultiGameEngine({
   playClickSound, 
   playBeepSound, 
   playIceSound,
+  playWhickSound,
+  playTockSound,
   onSaveRewards, 
   onEarnCoin, 
   onRoundClear,
@@ -58,7 +62,8 @@ export default function MultiGameEngine({
   const [hasAttackedThisRound, setHasAttackedThisRound] = useState(false);
   const [launchedAttackId, setLaunchedAttackId] = useState<string | null>(null);
 
-
+  const [isRoundTransition, setIsRoundTransition] = useState(false);
+  const [isGameOverTransition, setIsGameOverTransition] = useState(false);
 
   // 1. ✨ 내 라운드에 해당하는 1등 기록이 있는지 확인
   const myRoundFirstClearAt = roomData?.round_clear_times?.[currentRound];
@@ -109,8 +114,8 @@ export default function MultiGameEngine({
 
     const isCreator = roomData?.creator_id === currentUserId;
 
+    // 1. 👑 방장 권한 승계 로직 (기존 로직 유지)
     if (isCreator) {
-      // 1. 방장일 경우 다음 순번 유저 찾기
       const { data: others } = await supabase
         .from('room_participants')
         .select('user_id')
@@ -120,24 +125,28 @@ export default function MultiGameEngine({
         .limit(1);
 
       if (others && others.length > 0) {
-        // 다음 사람에게 방장 넘기기
+        // 다음 사람에게 왕관 넘기기
         await supabase.from('rooms').update({ creator_id: others[0].user_id }).eq('id', roomId);
       } else {
-        // 아무도 없으면 방 삭제
+        // 나밖에 없으면 방 폭파
         await supabase.from('rooms').delete().eq('id', roomId);
         return;
       }
     }
-    // 💉 delete 대신 update를 사용하여 결과창에 'FAIL'로 남게 합니다.
-    // .then()을 사용하여 브라우저가 닫히기 전 최대한 빠르게 요청을 보냅니다.
+
+    // 2. 🧼 [수정 포인트] 유령 데이터 세척
+    // 'is_dead: true'로 남기면 상대방 화면에 'FAIL'로 고정되어 버립니다.
+    // 수치를 1라운드/0초로 닦아내야 다시 들어왔을 때 'LOBBY' 상태로 예쁘게 보입니다.
     supabase.from('room_participants')
       .update({ 
-        is_dead: true, 
-        play_time: 9999.99 
+        is_dead: false,      // 🧼 탈락 상태 해제
+        is_cleared: false,   // 🧼 클리어 상태 해제
+        current_round: 1,    // 🧼 라운드 리셋
+        play_time: 0         // 🧼 시간 리셋
       })
       .eq('room_id', roomId)
       .eq('user_id', currentUserId)
-      .then();
+      .then(); // 브라우저가 닫히기 전 최대한 빨리 전송
   };
 
 
@@ -387,20 +396,42 @@ export default function MultiGameEngine({
       
 
 
-      // 💉 유령 유저(이탈자) 발생 시 방장이 대신       "자동""     처리
-      // .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-      //   // 방장만 이 처리를 수행함
-      //   // if (roomData?.creator_id !== currentUserId) return;
+      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+        // 🛡️ 1. 방장만 수행
+        if (roomData?.creator_id !== currentUserId) return;
 
-      //   leftPresences.forEach(async (p: any) => {
-      //     if (!p.user_id) return;
-      //     // 나간 유저를 '탈락' 처리하여 게임 결과 판정을 진행시킴
-      //     await supabase.from('room_participants')
-      //       .update({ is_dead: true, play_time: 9999.99 })
-      //       .eq('room_id', roomId)
-      //       .eq('user_id', p.user_id);
-      //   });
-      // })
+        leftPresences.forEach(async (p: any) => {
+          if (!p.user_id) return;
+
+          // 🔥 [안전장치 1] 아주 짧은 지연시간(예: 1초)을 주어 재접속 기회를 줍니다.
+          // 새로고침 시 '나감 -> 들어옴'이 거의 동시에 일어나기 때문입니다.
+          setTimeout(async () => {
+            
+            // 🔥 [안전장치 2] 현재 채널의 최신 Presence 상태를 다시 확인합니다.
+            const currentPresences = channel.presenceState();
+            const isStillGone = !Object.values(currentPresences).some((pres: any) => 
+              pres.some((u: any) => u.user_id === p.user_id)
+            );
+
+            // 진짜로 아직도 목록에 없을 때만 청소를 집도합니다.
+            if (isStillGone) {
+              console.log(`🧼 유저 ${p.user_id}가 확실히 떠났습니다. 데이터 정리 중...`);
+              
+              await supabase.from('room_participants')
+                .update({ 
+                  is_dead: true, 
+                  is_cleared: false, 
+                  current_round: 1, 
+                  play_time: 0 
+                })
+                .eq('room_id', roomId)
+                .eq('user_id', p.user_id);
+            } else {
+              console.log(`♻️ 유저 ${p.user_id}가 즉시 복귀했습니다. 청소를 취소합니다.`);
+            }
+          }, 1000); // 1초의 유예 시간
+        });
+      })
 
 
       .subscribe(async (status) => {
@@ -421,6 +452,20 @@ export default function MultiGameEngine({
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, currentUserId, roomData?.creator_id]);
+
+
+
+  /* 💉 [MultiGameEngine.tsx] 라운드 클리어 로직 수정 */
+  const handleLocalRoundClear = () => {
+    setIsRoundTransition(true); // 🎬 연출 시작!
+    
+    // 1초(혹은 0.8초) 후에 실제 다음 라운드로 전환
+    setTimeout(() => {
+      playWhickSound(); //
+      setIsRoundTransition(false);
+      onRoundClear(currentRound + 1); // 실제 부모(App.tsx)의 라운드 증가 호출
+    }, 1000);
+  };
 
 
 
@@ -466,6 +511,22 @@ export default function MultiGameEngine({
 
     // 💉 의존성 배열에 필요한 상태들을 빠짐없이 넣어줍니다.
   }, [participants, isEliminated, isCleared, showResult, currentRound, roomData, currentUserId, roomId]);
+
+
+
+  /* 💉 게임 오버 중계 함수 */
+  const handleLocalGameOver = () => {
+    setIsGameOverTransition(true); // 1. 전광판 띄우기
+    playBeepSound();               // 2. 삐빅! 실패 효과음 재생
+    
+    // 1초 뒤에 실제 게임 오버 처리 실행
+    setTimeout(() => {
+      setIsGameOverTransition(false);
+      onGameOver(currentRound, parseFloat(playTime.toFixed(2))); 
+    }, 1000);
+  };
+
+
 
 
   const fetchRoomAndParticipants = async () => {
@@ -611,84 +672,99 @@ export default function MultiGameEngine({
     playClickSound();
 
     let isRoundClear = false;
-    let isCorrectAnswer = false;
+    let isCorrectAnswer = false; // ✨ 이 변수를 판정의 주인공으로 사용합니다.
 
+    // 1️⃣ [판정 구역] 모드별 정답 체크
     if (mode === 'SHUFFLE MODE') {
-        let foundMatch = false;
-        for (let i = 0; i < aiSelect.length; i++) {
-            if (solvedIndices.includes(i)) continue;
-            const hand = aiSelect[i];
-            const result = idx === hand ? 'DRAW' : ((hand === 0 && idx === 1) || (hand === 1 && idx === 2) || (hand === 2 && idx === 0) ? 'WIN' : 'LOSE');
-            
-            const needed = totalTargetCounts[result as keyof typeof totalTargetCounts];
-            const current = satisfiedConditions.filter(c => c === result).length;
+      let foundMatch = false;
+      for (let i = 0; i < aiSelect.length; i++) {
+        if (solvedIndices.includes(i)) continue;
+        const hand = aiSelect[i];
+        const result = idx === hand ? 'DRAW' : ((hand === 0 && idx === 1) || (hand === 1 && idx === 2) || (hand === 2 && idx === 0) ? 'WIN' : 'LOSE');
+        
+        const needed = totalTargetCounts[result as keyof typeof totalTargetCounts];
+        const current = satisfiedConditions.filter(c => c === result).length;
 
-            if (needed > current) {
-                isCorrectAnswer = true;
-                const newSolvedIndices = [...solvedIndices, i];
-                const newSatisfiedConditions = [...satisfiedConditions, result];
-                setSolvedIndices(newSolvedIndices);
-                setSatisfiedConditions(newSatisfiedConditions);
-                foundMatch = true;
-                if (newSatisfiedConditions.length === aiSelect.length) isRoundClear = true;
-                break;
-            }
+        if (needed > current) {
+          isCorrectAnswer = true; // ✨ 정답 확인
+          const newSolvedIndices = [...solvedIndices, i];
+          const newSatisfiedConditions = [...satisfiedConditions, result];
+          setSolvedIndices(newSolvedIndices);
+          setSatisfiedConditions(newSatisfiedConditions);
+          foundMatch = true;
+          if (newSatisfiedConditions.length === aiSelect.length) isRoundClear = true;
+          break;
         }
-        if (!foundMatch) { handleElimination("WRONG"); return; }
+      }
+      // 셔플 모드에서 매칭되는 패가 없을 경우 실패
+      if (!foundMatch) isCorrectAnswer = false; 
+
     } else {
-        const aiHand = aiSelect[questionTurn];
-        const condition = targetConditions[questionTurn];
-        let isCorrect = false;
-        if (condition === 'DRAW') isCorrect = idx === aiHand;
-        else if (condition === 'WIN') isCorrect = (aiHand === 0 && idx === 1) || (aiHand === 1 && idx === 2) || (aiHand === 2 && idx === 0);
-        else if (condition === 'LOSE') isCorrect = (aiHand === 0 && idx === 2) || (aiHand === 1 && idx === 0) || (aiHand === 2 && idx === 1);
+      const aiHand = aiSelect[questionTurn];
+      const condition = targetConditions[questionTurn];
+      let isCorrect = false; // 일반 모드용 지역 변수
 
-        if (isCorrect) {
-            isCorrectAnswer = true;
-            if (questionTurn + 1 === aiSelect.length) isRoundClear = true;
-            else setQuestionTurn(prev => prev + 1);
-        } else {
-            handleElimination("WRONG"); return;
-        }
+      if (condition === 'DRAW') isCorrect = idx === aiHand;
+      else if (condition === 'WIN') isCorrect = (aiHand === 0 && idx === 1) || (aiHand === 1 && idx === 2) || (aiHand === 2 && idx === 0);
+      else if (condition === 'LOSE') isCorrect = (aiHand === 0 && idx === 2) || (aiHand === 1 && idx === 0) || (aiHand === 2 && idx === 1);
+
+      if (isCorrect) {
+        isCorrectAnswer = true; // ✨ 정답 확인
+        if (questionTurn + 1 === aiSelect.length) isRoundClear = true;
+        else setQuestionTurn(prev => prev + 1);
+      } else {
+        isCorrectAnswer = false; // ✨ 오답 확인
+      }
     }
 
+    // 2️⃣ [결과 처리 구역 - 실패]
+    if (!isCorrectAnswer) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      
+      // ✨ 1초간 "GAME OVER" 연출 후 결과창으로 이동
+      handleLocalGameOver(); 
+      return;
+    }
+
+    // 3️⃣ [결과 처리 구역 - 정답]
     if (isCorrectAnswer) {
-        coinRef.current += 1;
-        onEarnCoin(); 
+      coinRef.current += 1;
+      onEarnCoin();
+      playTockSound?.(); // 정답 효과음
     }
 
+    // 4️⃣ [결과 처리 구역 - 라운드 클리어]
     if (isRoundClear) {
       setIsCleared(true);
-      onRoundClear();
-
       if (timerRef.current) clearInterval(timerRef.current);
+
+      // ✨ 1초간 "ROUND CLEAR!" 연출 시작
+      handleLocalRoundClear();
+
       const nextRound = myRoundRef.current + 1;
-      
-      // 현재 방의 모든 라운드 기록을 가져옵니다.
       const currentClearTimes = roomData?.round_clear_times || {};
 
-      // ✨ 현재 라운드에 대한 기록이 아직 없을 때만 (내가 이 라운드 1등일 때만) 기록
+      // 1등 기록 로직 (30초 룰 트리거)
       if (!currentClearTimes[currentRound]) {
         const clearTime = Number(playTime.toFixed(2));
-        const nextClearTimes = { 
-          ...currentClearTimes, 
-          [currentRound]: clearTime 
-        };
+        const nextClearTimes = { ...currentClearTimes, [currentRound]: clearTime };
 
         supabase.from('rooms')
           .update({ 
-            round_clear_times: nextClearTimes, // 전체 기록장에 내 기록 추가
-            first_cleared_at: clearTime,       // (하위 호환용 유지)
-            first_cleared_round: currentRound  // (하위 호환용 유지)
+            round_clear_times: nextClearTimes,
+            first_cleared_at: clearTime,
+            first_cleared_round: currentRound
           })
           .eq('id', roomId).then();
       }
 
+      // 내 상태 업데이트 (DB)
       await updateMyStatus(nextRound, false, playTime, false);
         
-        setTimeout(() => {
-            startNewRound(nextRound, roomData.seed || 1234, roomData.mode);
-        }, 1000); 
+      // 연출 시간(1초)에 맞춰 새 라운드 시작
+      setTimeout(() => {
+        startNewRound(nextRound, roomData?.seed || 1234, roomData?.mode);
+      }, 1000); 
     }
   };
 
@@ -910,7 +986,7 @@ export default function MultiGameEngine({
             <div key={p.user_id} className="flex justify-between items-center opacity-80">
               <span className={`text-[10px] font-black uppercase flex items-center gap-1 
                 ${p.is_dead ? 'text-zinc-600 line-through decoration-red-500' : 'text-zinc-500'}`}>
-                {p.is_dead ? "💀" : isBackInLobby ? "🏠" : "🎮"} {p.profiles?.display_name}
+                {p.profiles?.display_name}
               </span>
 
               <span className={`text-xs mr-5 font-black 
@@ -1132,6 +1208,35 @@ export default function MultiGameEngine({
         ) : (
           null 
         )}
+
+
+
+       
+        {isRoundTransition && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/100 backdrop-blur-sm">
+            {/* ❌ animate-in fade-in 삭제, zoom-in 삭제 */}
+            <div className="text-center">
+              <h2 className="text-3xl font-black text-green-500 uppercase tracking-tighter ">
+                Loading ...
+              </h2>
+              {/* ❌ "Ready for Next?" 텍스트 삭제 */}
+            </div>
+          </div>
+        )}
+
+
+
+        {isGameOverTransition && (
+          <div className="fixed inset-0 z-[151] flex items-center justify-center bg-black/70 backdrop-blur-md">
+            <div className="text-center">
+              <h2 className="text-6xl font-black text-red-600 italic uppercase tracking-tighter drop-shadow-[0_0_30px_rgba(220,38,38,0.8)]">
+                GAME OVER
+              </h2>
+            </div>
+          </div>
+        )}
+
+
 
         {/* 💉 4. 깜빡임 애니메이션 정의 (Tailwind 커스텀 애니메이션 미설정 대비) */}
         <style>{`

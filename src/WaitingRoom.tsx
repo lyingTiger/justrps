@@ -195,6 +195,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
   }, [roomId]); // roomId가 바뀔 때마다 재실행
 
 
+
   // 💉 방에 입장(또는 복귀)한 후 5초간은 오프라인 판정을 유예합니다.
   useEffect(() => {
     setIsGracePeriod(true);
@@ -203,6 +204,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
     }, 5000); // 5초 후부터 오프라인 체크 시작
     return () => clearTimeout(timer);
   }, [roomId]); // 방에 들어올 때마다 타이머 작동
+
 
 
   // --- 강퇴 감지 ---
@@ -226,6 +228,31 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
     }
   // 💉 [수정] roomInfo?.status를 의존성 배열에 추가
   }, [participants, currentUserId, roomInfo?.status]);
+
+
+
+  /* 💉 [WaitingRoom.tsx] 컴포넌트 진입 시 상태 리셋 */
+  useEffect(() => {
+    const resetMyStatus = async () => {
+      if (!roomId || !currentUserId) return;
+
+      // 🧼 입장하자마자 나의 게임 진행 정보를 깨끗이 비웁니다.
+      await supabase.from('room_participants')
+        .update({
+          current_round: 1,
+          is_cleared: false,
+          is_dead: false,
+          play_time: 0,
+          is_ready: false // 방장은 ready가 필요 없지만 일괄 리셋
+        })
+        .eq('room_id', roomId)
+        .eq('user_id', currentUserId);
+    };
+
+    resetMyStatus();
+  }, [roomId, currentUserId]);
+
+
 
 
   // --- Handlers ---
@@ -336,79 +363,84 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
       <div className="w-full space-y-2 mb-8">
         {participants.map((p) => {
-  const isHost = p.user_id === roomInfo?.creator_id;
-  const isMe = p.user_id === currentUserId;
-  const isOnline = onlineUserIds.has(p.user_id); // 대기실 채널 접속 여부
+          const isHost = p.user_id === roomInfo?.creator_id;
+          const isMe = p.user_id === currentUserId;
+          const isOnline = onlineUserIds.has(p.user_id); // 대기실 채널 접속 여부
 
-  // 1. ✨ [Lobby] 최우선 순위: 실시간 신호가 있다면 무조건 로비에 있는 것입니다.
-  const isInLobby = isOnline;
+          // 1. ✨ [Lobby] 최우선 순위: 실시간 신호가 있다면 무조건 로비에 있는 것입니다.
+          const isInLobby = isOnline;
 
-  // 2. ✨ [In Battle] 
-  // 신호가 없는데, 아직 죽지(is_dead) 않았고 최종 클리어(is_cleared)도 안 했다면 '무조건' 배틀 중입니다.
-  // (방의 status가 'waiting'으로 바뀌었어도 유저 데이터가 그대로면 아직 게임판을 안 떠난 것입니다.)
-  const isStillInBattle = !isInLobby && !p.is_dead && !p.is_cleared && p.current_round >= 1;
+          // 2. ✨ [In Battle] 수정됨
+          // 신호가 없는데, DB상 라운드가 1보다 크고, 아직 종료(is_cleared/dead) 안 했다면 배틀 중입니다.
+          // 추가 조건: 방 상태가 'playing'일 때만 배틀 중으로 표시 (로비에선 배틀 중 표시 방지)
+          const isStillInBattle = !isInLobby && 
+                                  !p.is_dead && 
+                                  !p.is_cleared && 
+                                  (p.current_round > 1 || p.play_time > 0) &&
+                                  roomInfo?.status === 'playing';
 
-  // 3. ✨ [Result Screen]
-  // 신호가 없는데, 죽었거나 클리어했다면 결과창을 보고 있는 것입니다.
-  const isInResultScreen = !isInLobby && (p.is_dead || p.is_cleared);
+          // 3. ✨ [Result Screen] 수정됨
+          // 신호가 없는데, 죽었거나 클리어했다면 결과창입니다.
+          // 추가 조건: 역시 방 상태가 'playing'일 때(혹은 방금 끝났을 때) 유효합니다.
+          const isInResultScreen = !isInLobby && (p.is_dead || p.is_cleared) && roomInfo?.status === 'playing';
 
-  // 4. ✨ [Offline] 진짜 튕김
-  // 위 세 상황이 모두 아니고, 신호가 5초 이상 없을 때만 오프라인으로 판정합니다.
-  const showAsOffline = !isMe && !isInLobby && !isStillInBattle && !isInResultScreen && !isGracePeriod;
+          // 4. ✨ [Offline] 진짜 튕김
+          // 위 세 상황이 모두 아니고, 신호가 5초 이상 없을 때만 오프라인으로 판정합니다.
+          const showAsOffline = !isMe && !isInLobby && !isStillInBattle && !isInResultScreen && !isGracePeriod;
 
-  return (
-    <div key={p.user_id} className={`w-full p-3 rounded-2xl border flex justify-between items-center transition-all duration-300
-      ${isMe ? 'bg-zinc-800 border-zinc-700' : 'bg-zinc-900 border-zinc-800'}
-      ${showAsOffline ? 'border-red-500/40 bg-red-500/5' : ''} 
-    `}>
-      <div className="flex flex-col">
-        <div className="flex items-center gap-2">
-          <span className={`text-sm font-black italic ${isHost ? 'text-[#FF9900]' : 'text-white'}`}>
-            {p.profiles?.display_name || "Unknown"}
-          </span>
-          {isHost && <span className="text-[8px] bg-[#FF9900] text-black font-bold px-1 rounded shadow-sm">HOST</span>}
-          
-          {/* ✨ 상태 라벨 (우선순위에 따른 렌더링) */}
-          {isInLobby ? (
-            <span className="text-[8px] bg-green-900/50 text-green-500 font-black px-1 rounded">LOBBY</span>
-          ) : isStillInBattle ? (
-            <span className="text-[8px] bg-blue-600 text-white font-black px-1 rounded animate-pulse shadow-[0_0_8px_rgba(37,99,235,0.4)]">IN BATTLE</span>
-          ) : isInResultScreen ? (
-            <span className="text-[8px] bg-purple-600 text-white font-black px-1 rounded animate-pulse">RESULT SCREEN</span>
-          ) : showAsOffline ? (
-            <span className="text-[8px] bg-red-600 text-white font-black px-1 rounded shadow-sm">OFFLINE</span>
-          ) : (
-            <span className="text-[8px] bg-zinc-700 text-zinc-400 font-black px-1 rounded animate-pulse">SYNCING...</span>
-          )}
-        </div>
-      </div>
+          return (
+            <div key={p.user_id} className={`w-full p-3 rounded-2xl border flex justify-between items-center transition-all duration-300
+              ${isMe ? 'bg-zinc-800 border-zinc-700' : 'bg-zinc-900 border-zinc-800'}
+              ${showAsOffline ? 'border-red-500/40 bg-red-500/5' : ''} 
+            `}>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-black italic ${isHost ? 'text-[#FF9900]' : 'text-white'}`}>
+                    {p.profiles?.display_name || "Unknown"}
+                  </span>
+                  {isHost && <span className="text-[8px] bg-[#FF9900] text-black font-bold px-1 rounded shadow-sm">HOST</span>}
+                  
+                  {/* ✨ 상태 라벨 (우선순위에 따른 렌더링) */}
+                  {isInLobby ? (
+                    <span className="text-[8px] bg-green-900/50 text-green-500 font-black px-1 rounded">LOBBY</span>
+                  ) : isStillInBattle ? (
+                    <span className="text-[8px] bg-blue-600 text-white font-black px-1 rounded animate-pulse shadow-[0_0_8px_rgba(37,99,235,0.4)]">IN BATTLE</span>
+                  ) : isInResultScreen ? (
+                    <span className="text-[8px] bg-purple-600 text-white font-black px-1 rounded animate-pulse">RESULT SCREEN</span>
+                  ) : showAsOffline ? (
+                    <span className="text-[8px] bg-red-600 text-white font-black px-1 rounded shadow-sm">OFFLINE</span>
+                  ) : (
+                    <span className="text-[8px] bg-zinc-700 text-zinc-400 font-black px-1 rounded animate-pulse">SYNCING...</span>
+                  )}
+                </div>
+              </div>
 
-      <div className="flex items-center gap-2">
-        {isInLobby ? (
-          // 로비에 있을 때만 READY/WAITING 표시
-          <span className={`${p.is_ready ? 'text-green-500' : 'text-zinc-600'} font-black text-xs uppercase`}>
-            {isHost ? 'Host' : p.is_ready ? 'READY' : 'WAITING'}
-          </span>
-        ) : isStillInBattle ? (
-          <span className="text-blue-400 font-black text-[10px] uppercase italic">
-            Round {p.current_round}
-          </span>
-        ) : isInResultScreen ? (
-          <span className="text-purple-400 font-black text-[10px] uppercase italic">Reviewing...</span>
-        ) : (
-          <span className="text-red-500 font-black text-[10px] uppercase italic tracking-widest">
-            {showAsOffline ? 'Disconnected' : 'Connecting...'}
-          </span>
-        )}
-        
-        {/* 강퇴 버튼: 나 이외의 모든 유저는 방장이 정리 가능 */}
-        {isCreator && !isMe && (
-          <button onClick={() => openKickModal(p.user_id)} className="ml-2 w-5 h-5 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-500 text-[10px] hover:bg-red-600 hover:text-white transition-colors">✕</button>
-        )}
-      </div>
-    </div>
-  );
-})}
+              <div className="flex items-center gap-2">
+                {isInLobby ? (
+                  // 로비에 있을 때만 READY/WAITING 표시
+                  <span className={`${p.is_ready ? 'text-green-500' : 'text-zinc-600'} font-black text-xs uppercase`}>
+                    {isHost ? 'Host' : p.is_ready ? 'READY' : 'WAITING'}
+                  </span>
+                ) : isStillInBattle ? (
+                  <span className="text-blue-400 font-black text-[10px] uppercase italic">
+                    Round {p.current_round}
+                  </span>
+                ) : isInResultScreen ? (
+                  <span className="text-purple-400 font-black text-[10px] uppercase italic">Reviewing...</span>
+                ) : (
+                  <span className="text-red-500 font-black text-[10px] uppercase italic tracking-widest">
+                    {showAsOffline ? 'Disconnected' : 'Connecting...'}
+                  </span>
+                )}
+                
+                {/* 강퇴 버튼: 나 이외의 모든 유저는 방장이 정리 가능 */}
+                {isCreator && !isMe && (
+                  <button onClick={() => openKickModal(p.user_id)} className="ml-2 w-5 h-5 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-500 text-[10px] hover:bg-red-600 hover:text-white transition-colors">✕</button>
+                )}
+              </div>
+            </div>
+          );
+        })}
 
 
         {Array.from({ length: Math.max(0, (roomInfo?.max_players || 2) - participants.length) }).map((_, i) => (
