@@ -1230,6 +1230,41 @@ export default function App() {
   };
 
 
+
+  /* 💉 공통 세이브 함수 추가 */
+  const handleSaveGame = async (gameMode: string, gameRound: number, gameTime: number) => {
+    if (!currentUserId) return;
+
+    try {
+      // 1. game_saves 테이블에 현재 기록 저장 (덮어쓰기)
+      const { error: saveError } = await supabase.from('game_saves').upsert({
+        user_id: currentUserId,
+        mode: gameMode,
+        round: gameRound,
+        entry_time: gameTime,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+
+      if (saveError) throw saveError;
+
+      // 2. ✨ [핵심 로직] 이어하기 비용 카운트 리셋 (유저님의 기획 반영)
+      await supabase.from('profiles').update({ load_count: 0 }).eq('id', currentUserId);
+
+      // 3. 성공 알림 및 데이터 갱신
+      fetchUserData(currentUserId);
+      setMsgPopup({
+        isOpen: true,
+        title: "SUCCESS",
+        desc: lang === 'ko' ? "기록이 저장되었습니다!" : "Game Saved!"
+      });
+
+    } catch (e) {
+      console.error("Save Error:", e);
+      setMsgPopup({ isOpen: true, title: "ERROR", desc: "Save Failed." });
+    }
+  };
+
+
   // ------------------------------------------------------------------
   // 💉 [플레이 로직] 저장된 기록에서 이어하기 (비용 점증 로직 포함)
   // ------------------------------------------------------------------
@@ -1869,6 +1904,7 @@ export default function App() {
             // 💉 즉시 서버에 저장하지 않고, 세션 상태값만 올림
             onEarnCoin={() => setSessionCoins(prev => prev + 1)} 
             
+            onExecuteSave={handleSaveGame}
 
             onRoundClear={(next) => { 
               playWhickSound(); 
@@ -2025,6 +2061,7 @@ export default function App() {
         continueCount={continueCount} 
         continueCost={configs.result_continue_cost} 
         configs={configs}
+        onSaveGame={handleSaveGame}
         
         // 💉 [신규 추가] 잃어버린 도구들을 여기서 쥐어줍니다.
         playClickSound={playClickSound}

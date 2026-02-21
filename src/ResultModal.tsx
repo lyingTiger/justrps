@@ -20,13 +20,14 @@ interface ResultModalProps {
   playClickSound: () => void; 
   onSaveRewards: () => Promise<void>;
   configs: any;
+  onSaveGame: (mode: string, round: number, entryTime: number) => Promise<void>;
 }
 
 export default function ResultModal({ 
   isOpen, mode, round, time, earnedCoins, sessionItems, userCoins, isNewRecord, 
   continueCount, continueCost, onContinue, onRetry, onLobby, onShop,
   onWatchAd, t, playClickSound,
-  onSaveRewards, configs
+  onSaveRewards, configs, onSaveGame
 }: ResultModalProps) {
 
   const [canClick, setCanClick] = useState(false);
@@ -200,6 +201,18 @@ export default function ResultModal({
                     {t('no_continues')}
                 </div>
             )}
+
+
+            <div className="w-full px-2 mb-6">
+              <button
+                onClick={() => onSaveGame(mode, round, time)}
+                className="w-full h-12 bg-zinc-800 border-1 border-zinc-600 rounded-[20px] hover:bg-[#FF9900] hover:text-black font-black uppercase italic text-white active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <span className="text-xl"></span> {t('Save Game') || 'Save Game Result'}
+              </button>
+            </div>
+
+
 
             <div className="w-full grid grid-cols-2 gap-3">
                 <button 

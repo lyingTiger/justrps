@@ -17,6 +17,7 @@ interface GameProps {
   onBackToLobby: () => void;
   t: (key: string) => string;
   configs: any;
+  onExecuteSave: (mode: string, round: number, entryTime: number) => Promise<void>;
 }
 
 export default function GameEngine({ 
@@ -24,7 +25,7 @@ export default function GameEngine({
   playTockSound, playWhickSound, playBeepSound, // 💉 Destructuring 추가
   onEarnCoin, isModalOpen, initialTime, t,
   onBackToLobby, sessionCoins,
-  configs,
+  configs,onExecuteSave,
 }: GameProps) {
   
   // 2. [State 초기값 수정]
@@ -135,27 +136,11 @@ export default function GameEngine({
   // 💉 [함수 추가] 최종 저장 실행 (덮어쓰기)
   const executeSave = async () => {
     playClickSound();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    await supabase.from('game_saves').upsert({
-      user_id: user.id,
-      mode: mode,
-      round: round,
-      entry_time: entryTime,
-      updated_at: new Date().toISOString()
-    });
-
-    // 💉 새로운 저장이 발생했으므로 '이어하기 비용' 카운트를 0으로 리셋합니다.
-    // 이렇게 해야 다음번에 로비에서 불러올 때 다시 '무료'부터 시작합니다.
-    await supabase
-      .from('profiles')
-      .update({ load_count: 0 })
-      .eq('id', user.id);
+    
+    // 🚀 부모가 준 강력한 세이브 함수 호출!
+    await onExecuteSave(mode, round, entryTime);
 
     setIsSaveModalOpen(false);
-    // 타이머 재개
-    // timerRef.current = setInterval(() => setPlayTime(prev => prev + 0.01), 10);
   };
 
 
