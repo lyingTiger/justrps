@@ -5,7 +5,7 @@ import { RemoteConfigs } from './App';
 
 interface ShopPageProps {
   userCoins: number;
-  userItems: { stop: number; switch: number; color: number; heal: number };
+  userItems: { stop: number; switch: number; gray: number; heal: number };
   onPurchaseItem: (type: string, amount: number) => Promise<void>;
   onBack: () => void;
   currentUserId: string | null;
@@ -31,7 +31,7 @@ export default function ShopPage({
 
   // 💉 광고 관련 상태
   const [isAdOpen, setIsAdOpen] = useState(false);
-  const [adType, setAdType] = useState<'stop' | 'switch' | 'color' | 'heal' | 'coins' | 'remove_ads'>('coins');
+  const [adType, setAdType] = useState<'stop' | 'switch' | 'gray' | 'heal' | 'coins' | 'remove_ads'>('coins');
   const [adCooldown, setAdCooldown] = useState(0);
   const [adFreeTimeLeft, setAdFreeTimeLeft] = useState(0);
 
@@ -72,7 +72,7 @@ export default function ShopPage({
   const itemNames = { 
     stop: `STOP ${configs.multi_item_stop_sec} sec`, 
     switch: 'SWITCH Btns', 
-    color: 'Kill COLORS', 
+    gray: 'Kill COLORS', 
     heal: 'HEAL now' 
   };
 
@@ -99,14 +99,35 @@ export default function ShopPage({
           icon: "/images/icon_noAd.png" 
         });
     } else {
-        await onPurchaseItem(adType, configs.shop_ad_reward_items); // 👈 5 대신 사용
-        setRewardPopup({ isOpen: true, title: `"${adType.toUpperCase()}" x${configs.shop_ad_reward_items}`, desc: "ITEMS ADDED TO INVENTORY.", icon: `/images/item${adType.charAt(0).toUpperCase() + adType.slice(1)}.png` });
-      }
+        // 🎁 아이템 보상 파트
+        await onPurchaseItem(adType, configs.shop_ad_reward_items);
+        
+        // 💉 [수술 포인트] adType에 따른 정확한 파일명 매핑
+        // adType이 'gray'여도 이미지는 'itemColor.png'를 보여줘야 함
+        let iconName = "";
+        if (adType === 'stop') iconName = "itemStop3sec.png";
+        else if (adType === 'switch') iconName = "itemSwitchBtn.png";
+        else if (adType === 'gray') iconName = "itemGray.png"; 
+        else if (adType === 'heal') iconName = "itemHeal.png";
+
+        setRewardPopup({ 
+          isOpen: true, 
+          title: `"${adType.toUpperCase()}" x${configs.shop_ad_reward_items}`, 
+          desc: "ITEMS ADDED TO INVENTORY.", 
+          icon: `/images/${iconName}` // ✨ 매핑된 정확한 파일명 사용
+        });
+    }
   };
 
   return (
     <div className="w-full max-w-[360px] flex flex-col items-center mt-4 gap-2 px-4 pb-10 select-none">
-      <AdOverlay isOpen={isAdOpen} onClose={() => setIsAdOpen(false)} onReward={handleAdReward} />
+      <div className={isAdOpen ? "relative z-[2000]" : ""}>
+        <AdOverlay 
+          isOpen={isAdOpen} 
+          onClose={() => setIsAdOpen(false)} 
+          onReward={handleAdReward} 
+        />
+      </div>
 
       {/* 💉 [신규] 외부 클릭 감지용 투명 레이어: 인벤토리 아이템 안내창이 열려있을 때만 활성화 */}
       {infoTarget && (
@@ -129,7 +150,7 @@ export default function ShopPage({
         {[
           { id: 'stop', img: 'itemStop3sec.png', count: userItems.stop },
           { id: 'switch', img: 'itemSwitchBtn.png', count: userItems.switch },
-          { id: 'gray', img: 'itemColor.png', count: userItems.color },
+          { id: 'gray', img: 'itemColor.png', count: userItems.gray },
           { id: 'heal', img: 'itemHeal.png', count: userItems.heal }
         ].map((item) => (
           <div 
@@ -178,7 +199,7 @@ export default function ShopPage({
           {[
             { id: 'stop', img: 'itemStop3sec.png', label: `+${configs.shop_ad_reward_items}개` },
             { id: 'switch', img: 'itemSwitchBtn.png', label: `+${configs.shop_ad_reward_items}개` },
-            { id: 'color', img: 'itemColor.png', label: `+${configs.shop_ad_reward_items}개` },
+            { id: 'gray', img: 'itemColor.png', label: `+${configs.shop_ad_reward_items}개` },
             { id: 'heal', img: 'itemHeal.png', label: `+${configs.shop_ad_reward_items}개` },
             { id: 'remove_ads', img: 'icon_noAd.png', label: `No Ad ${configs.shop_ad_free_hours}H` },
             { id: 'coins', img: 'coins.png', label: `+${configs.shop_ad_reward_coins?.toLocaleString()}` }

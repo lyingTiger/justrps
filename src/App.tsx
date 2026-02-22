@@ -17,7 +17,7 @@ import { translations } from './constants/translations';
 interface UserItems {
   stop: number;
   switch: number;
-  color: number;
+  gray: number;
   heal: number;
 }
 
@@ -135,8 +135,8 @@ export default function App() {
   const [isItemMode, setIsItemMode] = useState<boolean>(false);
   
   // App 컴포넌트 내부 상태 선언
-  const [userItems, setUserItems] = useState<UserItems>({ stop: 0, switch: 0, color: 0, heal: 0 });
-  const [sessionItems, setSessionItems] = useState<UserItems>({ stop: 0, switch: 0, color: 0, heal: 0 });
+  const [userItems, setUserItems] = useState<UserItems>({ stop: 0, switch: 0, gray: 0, heal: 0 });
+  const [sessionItems, setSessionItems] = useState<UserItems>({ stop: 0, switch: 0, gray: 0, heal: 0 });
 
   const lastActivityTimeRef = useRef(Date.now()); // 💉 마지막 활동 시각 타임스탬프
 
@@ -331,7 +331,7 @@ export default function App() {
           target_user_id: currentUserId,
           stop_inc: sessionItems.stop,
           switch_inc: sessionItems.switch,
-          color_inc: sessionItems.color,
+          gray: sessionItems.gray,
           heal_inc: sessionItems.heal
         });
       }
@@ -341,7 +341,7 @@ export default function App() {
       // UI 및 상태 갱신
       if (currentUserId) fetchUserData(currentUserId); 
       setSessionCoins(0);
-      setSessionItems({ stop: 0, switch: 0, color: 0, heal: 0 }); // 💉 아이템 세션 초기화
+      setSessionItems({ stop: 0, switch: 0, gray: 0, heal: 0 }); // 💉 아이템 세션 초기화
     } catch (e) {
       console.error("보상 저장 중 오류 발생:", e);
     }
@@ -462,7 +462,7 @@ export default function App() {
           coins: configs.init_signup_coins, 
           item_stop: configs.init_signup_item_count, 
           item_switch: configs.init_signup_item_count,
-          item_color: configs.init_signup_item_count,
+          item_gray: configs.init_signup_item_count,
           item_heal: configs.init_signup_item_count,
           // 💉 중요: 가입 날짜를 '과거'나 '공백'으로 넣어야 바로 아래 일일 보상 로직이 작동합니다.
           last_login_date: '1900-01-01' 
@@ -502,7 +502,7 @@ export default function App() {
               target_user_id: userId,
               stop_inc: configs.daily_gift_item_count, 
               switch_inc: configs.daily_gift_item_count,
-              color_inc: configs.daily_gift_item_count,
+              gray_inc: configs.daily_gift_item_count,
               heal_inc: 0
             });
 
@@ -547,7 +547,7 @@ export default function App() {
       setUserItems({
         stop: profile.item_stop || 0,
         switch: profile.item_switch || 0,
-        color: profile.item_color || 0,
+        gray: profile.item_gray || 0,
         heal: profile.item_heal || 0
       });
 
@@ -574,7 +574,7 @@ export default function App() {
     const isHit = Math.random() < configs.item_drop_rate;
     if (!isHit) return null;
 
-    const itemTypes: (keyof UserItems)[] = ['stop', 'switch', 'color', 'heal'];
+    const itemTypes: (keyof UserItems)[] = ['stop', 'switch', 'gray', 'heal'];
     const randomIndex = Math.floor(Math.random() * itemTypes.length);
     return itemTypes[randomIndex];
   };
@@ -1802,7 +1802,7 @@ export default function App() {
             sessionCoins={sessionCoins} 
             sessionItems={sessionItems}
             isItemMatch={currentRoomMode === 'item' || currentRoomMode === 'ITEM'} 
-            userItems={userItems || { stop: 0, switch: 0, color: 0, heal: 0 }}
+            userItems={userItems || { stop: 0, switch: 0, gray: 0, heal: 0 }}
             configs={configs}
             
 
@@ -1837,7 +1837,7 @@ export default function App() {
                 target_user_id: currentUserId,
                 stop_inc: itemType === 'stop' ? -1 : 0,
                 switch_inc: itemType === 'switch' ? -1 : 0,
-                color_inc: itemType === 'color' ? -1 : 0,
+                gray: itemType === 'gray' ? -1 : 0,
                 heal_inc: itemType === 'heal' ? -1 : 0
               });
 
@@ -1992,7 +1992,7 @@ export default function App() {
                   target_user_id: currentUserId,
                   stop_inc: (type === 'all' || type === 'stop') ? amount : 0,
                   switch_inc: (type === 'all' || type === 'switch') ? amount : 0,
-                  color_inc: (type === 'all' || type === 'color') ? amount : 0,
+                  gray: (type === 'all' || type === 'gray') ? amount : 0,
                   heal_inc: (type === 'all' || type === 'heal') ? amount : 0
                 });
 
