@@ -21,24 +21,25 @@ interface UserItems {
   heal: number;
 }
 
-interface RemoteConfigs {
-  init_signup_coins: number;
-  init_signup_item_count: number;
-  daily_gift_item_count: number;
-  item_drop_rate: number;
-  ad_interstitial_freq: number;
-  auto_logout_limit: number;
-  popup_click_delay: number;
-  result_continue_cost: number;
-  load_save_cost_unit: number;
-  multi_limit_time_sec: number;
-  // 상점용 추가
-  shop_ad_cooldown_sec: number;
-  shop_ad_reward_coins: number;
-  shop_ad_reward_items: number;
-  shop_ad_free_hours: number;
-  item_stop_duration: number;
-}
+export interface RemoteConfigs {
+    init_signup_coins: number;
+    init_signup_item_count: number;
+    daily_gift_item_count: number;
+    item_drop_rate: number;
+    ad_interstitial_freq: number;
+    auto_logout_limit: number;
+    popup_click_delay: number;
+    result_continue_cost: number;
+    result_continue_max: number;
+    load_save_cost_unit: number;
+    multi_limit_time_sec: number;
+    shop_ad_cooldown_sec: number;
+    shop_ad_reward_coins: number;
+    shop_ad_reward_items: number;
+    shop_ad_free_hours: number;
+    multi_item_stop_sec: number; 
+    multi_diff_offset: number; 
+  }
 
 export default function App() {
 
@@ -63,14 +64,18 @@ export default function App() {
     auto_logout_limit: 600000,
     popup_click_delay: 500,
     result_continue_cost: 50,
+    result_continue_max: 3,        
     load_save_cost_unit: 100,
     multi_limit_time_sec: 30,
     shop_ad_cooldown_sec: 180,
     shop_ad_reward_coins: 1000,
     shop_ad_reward_items: 5,
     shop_ad_free_hours: 50,
-    item_stop_duration: 3
+    multi_item_stop_sec: 3,         
+    multi_diff_offset: 0,
   });
+
+  
 
 
   /* 💉 [App.tsx] 설정 로드 및 실시간 구독 함수 */
@@ -772,12 +777,15 @@ export default function App() {
   }, [view, isLoggedIn, currentUserId]); // currentUserId가 생겼을 때도 실행되도록 의존성 추가
 
 
-  // 💉 [교체 2] 인증 및 초기 설정 (방문자 로직 분리됨)
+  // 💉 인증 및 초기 설정 (방문자 로직 분리됨)
   useEffect(() => {
     document.title = "just RPS";
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
+        // ✨ [추가] 로그아웃 시 현재 참여 중인 모든 방에서 퇴장 처리
+        handleLeaveAllRooms(); 
+        
         lastFetchedId.current = null; 
         resetUserState();
       } 
@@ -794,7 +802,19 @@ export default function App() {
       }
     });
 
-    return () => { subscription.unsubscribe(); };
+
+
+    // 💉 [추가] 브라우저 탭을 닫거나 새로고침할 때 방 퇴장 처리
+    const handleBeforeUnload = () => {
+      handleLeaveAllRooms();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => { 
+      subscription.unsubscribe(); 
+      // 💉 클린업 시 이벤트 제거
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, [currentUserId]);
 
 
@@ -1873,7 +1893,18 @@ export default function App() {
               }
             }}
 
-            onGameOver={() => { if (currentUserId) fetchUserData(currentUserId); setView('waitingRoom'); }} 
+            onGameOver={(finalRound, totalTime) => { 
+              // 💉 뷰 전환(setView) 코드를 삭제하여 결과창 모달이 유지되도록 함
+              if (currentUserId) fetchUserData(currentUserId); 
+              
+              // 필요하다면 여기서 게임 로그 기록 등 비동기 로직만 수행
+              console.log(`🏁 Game Finished: Round ${finalRound}`);
+            }}
+
+            onBackToRoom={() => {
+              setView('waitingRoom');
+            }}
+
             onBackToLobby={async () => {
               playClickSound();
               await saveSessionRewards(); 

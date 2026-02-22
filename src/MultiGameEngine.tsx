@@ -14,6 +14,7 @@ interface MultiGameProps {
   onRoundClear: (nextRound: number) => void;
   onGameOver: (finalRound: number, totalTime: number) => void;
   onBackToLobby: () => void;
+  onBackToRoom: () => void;
   sessionCoins: number;
   sessionItems: { stop: number; switch: number; color: number; heal: number };
   isItemMatch: boolean; // 💉 아이템전 여부 추가
@@ -44,6 +45,7 @@ export default function MultiGameEngine({
   onRoundClear,
   onGameOver, 
   onBackToLobby,
+  onBackToRoom,
   configs,
 }: MultiGameProps) {
 
@@ -179,6 +181,7 @@ export default function MultiGameEngine({
         filter: `user_id=eq.${currentUserId}` 
       }, (payload) => {
         const { effect_type, effect_at } = payload.new;
+
         if (effect_at && effect_type) {
           console.log("📥 [최신 공격 수신]:", effect_type);
           // 💉 즉시 Ref에 저장하여 함수들이 바로 읽을 수 있게 합니다.
@@ -471,8 +474,15 @@ export default function MultiGameEngine({
 
   // --- 2. 게임 종료 감지 ---
   useEffect(() => {
+
     // 0. 기초 검증: 참가자나 방 데이터가 없으면 실행 안 함
     if (!participants || participants.length === 0 || !roomData) return;
+
+
+    // ✨ [추가] 이미 결과창이 떠 있다면 아래 로직을 더 이상 실행하지 않음
+    if (showResult) return;
+
+
 
     // 1. ✨ [모두 종료 확인]
     // 모든 참가자가 죽었거나(is_dead), 클리어했거나(is_cleared), 
@@ -521,7 +531,12 @@ export default function MultiGameEngine({
     
     // 1초 뒤에 실제 게임 오버 처리 실행
     setTimeout(() => {
-      setIsGameOverTransition(false);
+      setShowResult(true);
+
+      setTimeout(() => {
+        setIsGameOverTransition(false); 
+      }, 500);
+
       onGameOver(currentRound, parseFloat(playTime.toFixed(2))); 
     }, 1000);
   };
@@ -641,7 +656,7 @@ export default function MultiGameEngine({
   useEffect(() => {
   // 1. 로딩 중이거나, 암기 단계거나, 클리어/탈락 상태일 때는 타이머를 정지합니다.
   // (만약 암기 단계(OK 버튼 전)에서도 시간이 흐르길 원하시면 !isMemoryPhase를 제거하세요)
-    const shouldStop = isLoading || isCleared || isEliminated;
+    const shouldStop = isLoading || isCleared || isEliminated|| showResult;
 
     if (shouldStop) {
       if (timerRef.current) {
@@ -664,11 +679,11 @@ export default function MultiGameEngine({
       }
     };
     // 💉 [핵심] isLoading과 isMemoryPhase를 추가하여 상태 변화를 즉시 감지하도록 수술함
-  }, [isLoading, isCleared, isEliminated]);
+  }, [isLoading, isCleared, isEliminated, showResult]);
 
   // 입력 처리
   const handleSelect = async (idx: number) => {
-    if (isEliminated || isCleared) return;
+    if (isEliminated || isCleared || showResult) return;
     playClickSound();
 
     let isRoundClear = false;
@@ -943,7 +958,7 @@ export default function MultiGameEngine({
           <div className="absolute inset-0 bg-red-600/30 animate-[death-bg_0.5s_infinite_alternate]" />
           
           {/* 2. 중앙 거대 숫자 (화면의 약 50% 크기 감성, 투명도 적용) */}
-          <span className="relative text-[280px] font-black text-red-600 opacity-20 italic font-mono leading-none select-none animate-[death-text_0.5s_infinite_alternate]">
+          <span className="relative text-[50vw] font-black text-red-600 opacity-20 italic font-mono leading-none select-none animate-[death-text_0.5s_infinite_alternate]">
             {displayCountdown}
           </span>
         </div>
@@ -1273,7 +1288,10 @@ export default function MultiGameEngine({
         sessionItems={sessionItems}
         onSaveRewards={onSaveRewards}  
         playClickSound={playClickSound}
-        onBackToRoom={handleBackToRoom} 
+        onBackToRoom={async () => {
+          await handleBackToRoom(); // 1. DB 정리 (레디 해제 등)
+          onBackToRoom();           // 2. 부모 뷰 전환 (setView)
+        }}
         onBackToLobby={onBackToLobby}   
         configs={configs}
       />

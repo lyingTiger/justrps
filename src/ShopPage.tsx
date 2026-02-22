@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import AdOverlay from './AdOverlay';
+import { RemoteConfigs } from './App';
 
 interface ShopPageProps {
   userCoins: number;
@@ -10,14 +11,10 @@ interface ShopPageProps {
   currentUserId: string | null;
   onUpdateCoins: (newAmount: number) => void;
   playClickSound?: () => void; // 💉 사운드 프롭 추가됨
-  configs: {
-    shop_ad_cooldown_sec: number;
-    shop_ad_reward_coins: number;
-    shop_ad_reward_items: number;
-    shop_ad_free_hours: number;
-    item_stop_duration: number;
+  configs: RemoteConfigs;
   }
-}
+
+
 
 export default function ShopPage({ 
   userCoins, 
@@ -72,7 +69,12 @@ export default function ShopPage({
     setIsAdOpen(true);
   };
 
-  const itemNames = { stop: 'STOP ${configs.multi_item_stop_sec} sec', switch: 'SWITCH Btns', color: 'Kill COLORS', heal: 'HEAL now' };
+  const itemNames = { 
+    stop: `STOP ${configs.multi_item_stop_sec} sec`, 
+    switch: 'SWITCH Btns', 
+    color: 'Kill COLORS', 
+    heal: 'HEAL now' 
+  };
 
 
   const handleAdReward = async () => {
@@ -90,7 +92,12 @@ export default function ShopPage({
         const newAdFreeUntil = new Date(Date.now() + duration).toISOString();
         await supabase.from('profiles').update({ ad_free_until: newAdFreeUntil }).eq('id', currentUserId);
         setAdFreeTimeLeft(configs.shop_ad_free_hours * 60 * 60); 
-        setRewardPopup({ isOpen: true, title: '${configs.shop_ad_free_hours} Hours AD-FREE!', desc: "ENJOY PURE GAME.", icon: "/images/icon_noAd.png" });
+        setRewardPopup({ 
+          isOpen: true, 
+          title: `${configs.shop_ad_free_hours} Hours AD-FREE!`, 
+          desc: "ENJOY PURE GAME.", 
+          icon: "/images/icon_noAd.png" 
+        });
     } else {
         await onPurchaseItem(adType, configs.shop_ad_reward_items); // 👈 5 대신 사용
         setRewardPopup({ isOpen: true, title: `"${adType.toUpperCase()}" x${configs.shop_ad_reward_items}`, desc: "ITEMS ADDED TO INVENTORY.", icon: `/images/item${adType.charAt(0).toUpperCase() + adType.slice(1)}.png` });
@@ -149,9 +156,9 @@ export default function ShopPage({
                   <div className="absolute -top-[10px] left-1/2 -translate-x-1/2 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-[#FF9900]"></div>
                   <h4 className="text-[#FF9900] text-[11px] font-black uppercase mb-1">{item.id}</h4>
                   <p className="text-zinc-200 text-[10px] font-bold leading-tight whitespace-pre-line break-keep">
-                    {item.id === 'stop' && "다음 라운드에서\n상대방의 시간을\n${config.multi_item_stop_sec}초간 정지시킵니다."}
+                    {item.id === 'stop' && `다음 라운드에서\n상대방의 시간을\n${configs.multi_item_stop_sec}초간 정지시킵니다.`}
                     {item.id === 'switch' && "다음 라운드에서\n상대방의 버튼 위치를\n뒤바꿉니다."}
-                    {item.id === 'gray' && "다음 라운드에서\n상대방의 모든 문제를\n흑백으로 만듭니다."}
+                    {item.id === 'gray' && "다음 라운드에서\n상대방의 모든 문제를\n흑백으로 만듭니다."} 
                     {item.id === 'heal' && "공격당한 상태를\n즉시 회복합니다."}
                   </p>
                 </div>
@@ -169,12 +176,12 @@ export default function ShopPage({
       <div className="relative w-full mb-8">
         <div className="grid grid-cols-3 gap-2">
           {[
-            { id: 'stop', img: 'itemStop3sec.png', label: '+${configs.shop_ad_reward_items}개' },
-            { id: 'switch', img: 'itemSwitchBtn.png', label: '+${configs.shop_ad_reward_items}개' },
-            { id: 'color', img: 'itemColor.png', label: '+${configs.shop_ad_reward_items}개' },
-            { id: 'heal', img: 'itemHeal.png', label: '+${configs.shop_ad_reward_items}개' },
-            { id: 'remove_ads', img: 'icon_noAd.png', label: 'No Ad ${configs.shop_ad_free_hours}H' },
-            { id: 'coins', img: 'coins.png', label: '+${configs.shop_ad_reward_coins.toLocaleString()}' }
+            { id: 'stop', img: 'itemStop3sec.png', label: `+${configs.shop_ad_reward_items}개` },
+            { id: 'switch', img: 'itemSwitchBtn.png', label: `+${configs.shop_ad_reward_items}개` },
+            { id: 'color', img: 'itemColor.png', label: `+${configs.shop_ad_reward_items}개` },
+            { id: 'heal', img: 'itemHeal.png', label: `+${configs.shop_ad_reward_items}개` },
+            { id: 'remove_ads', img: 'icon_noAd.png', label: `No Ad ${configs.shop_ad_free_hours}H` },
+            { id: 'coins', img: 'coins.png', label: `+${configs.shop_ad_reward_coins?.toLocaleString()}` }
           ].map((item: any) => (
             <button 
               key={item.id}
