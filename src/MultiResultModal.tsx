@@ -8,7 +8,7 @@ interface MultiResultModalProps {
   onBackToRoom: () => void | Promise<void>;
   onBackToLobby: () => void;
   sessionCoins: number;          
-  sessionItems: { stop: number; switch: number; gray: number; heal: number }; // 💉 [필수 추가]
+  sessionItems: { stop: number; switch: number; color: number; heal: number }; // 💉 [필수 추가]
   onSaveRewards: () => Promise<void>; 
   playClickSound: () => void;    
   configs: any;
@@ -132,11 +132,11 @@ export default function MultiResultModal({
                               </span>
                             </div>
                           )}
-                          {sessionItems.gray > 0 && (
+                          {sessionItems.color > 0 && (
                             <div className="relative">
                               <img src="/images/itemColor.png" className="w-8 h-8 object-contain" alt="color" />
                               <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-black min-w-[14px] h-3.5 rounded-full flex items-center justify-center border border-zinc-900 px-0.5">
-                                {sessionItems.gray}
+                                {sessionItems.color}
                               </span>
                             </div>
                           )}

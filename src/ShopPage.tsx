@@ -5,7 +5,7 @@ import { RemoteConfigs } from './App';
 
 interface ShopPageProps {
   userCoins: number;
-  userItems: { stop: number; switch: number; gray: number; heal: number };
+  userItems: { stop: number; switch: number; color: number; heal: number };
   onPurchaseItem: (type: string, amount: number) => Promise<void>;
   onBack: () => void;
   currentUserId: string | null;
@@ -31,7 +31,7 @@ export default function ShopPage({
 
   // 💉 광고 관련 상태
   const [isAdOpen, setIsAdOpen] = useState(false);
-  const [adType, setAdType] = useState<'stop' | 'switch' | 'gray' | 'heal' | 'coins' | 'remove_ads'>('coins');
+  const [adType, setAdType] = useState<'stop' | 'switch' | 'color' | 'heal' | 'coins' | 'remove_ads'>('coins');
   const [adCooldown, setAdCooldown] = useState(0);
   const [adFreeTimeLeft, setAdFreeTimeLeft] = useState(0);
 
@@ -72,7 +72,7 @@ export default function ShopPage({
   const itemNames = { 
     stop: `STOP ${configs.multi_item_stop_sec} sec`, 
     switch: 'SWITCH Btns', 
-    gray: 'Kill COLORS', 
+    color: 'Kill COLORS', 
     heal: 'HEAL now' 
   };
 
@@ -103,11 +103,11 @@ export default function ShopPage({
         await onPurchaseItem(adType, configs.shop_ad_reward_items);
         
         // 💉 [수술 포인트] adType에 따른 정확한 파일명 매핑
-        // adType이 'gray'여도 이미지는 'itemColor.png'를 보여줘야 함
+        // adType이 'color'여도 이미지는 'itemColor.png'를 보여줘야 함
         let iconName = "";
         if (adType === 'stop') iconName = "itemStop3sec.png";
         else if (adType === 'switch') iconName = "itemSwitchBtn.png";
-        else if (adType === 'gray') iconName = "itemGray.png"; 
+        else if (adType === 'color') iconName = "itemColor.png"; 
         else if (adType === 'heal') iconName = "itemHeal.png";
 
         setRewardPopup({ 
@@ -150,7 +150,7 @@ export default function ShopPage({
         {[
           { id: 'stop', img: 'itemStop3sec.png', count: userItems.stop },
           { id: 'switch', img: 'itemSwitchBtn.png', count: userItems.switch },
-          { id: 'gray', img: 'itemColor.png', count: userItems.gray },
+          { id: 'color', img: 'itemColor.png', count: userItems.color },
           { id: 'heal', img: 'itemHeal.png', count: userItems.heal }
         ].map((item) => (
           <div 
@@ -179,7 +179,7 @@ export default function ShopPage({
                   <p className="text-zinc-200 text-[10px] font-bold leading-tight whitespace-pre-line break-keep">
                     {item.id === 'stop' && `다음 라운드에서\n상대방의 시간을\n${configs.multi_item_stop_sec}초간 정지시킵니다.`}
                     {item.id === 'switch' && "다음 라운드에서\n상대방의 버튼 위치를\n뒤바꿉니다."}
-                    {item.id === 'gray' && "다음 라운드에서\n상대방의 모든 문제를\n흑백으로 만듭니다."} 
+                    {item.id === 'color' && "다음 라운드에서\n상대방의 모든 문제를\n흑백으로 만듭니다."} 
                     {item.id === 'heal' && "공격당한 상태를\n즉시 회복합니다."}
                   </p>
                 </div>
@@ -199,7 +199,7 @@ export default function ShopPage({
           {[
             { id: 'stop', img: 'itemStop3sec.png', label: `+${configs.shop_ad_reward_items}개` },
             { id: 'switch', img: 'itemSwitchBtn.png', label: `+${configs.shop_ad_reward_items}개` },
-            { id: 'gray', img: 'itemColor.png', label: `+${configs.shop_ad_reward_items}개` },
+            { id: 'color', img: 'itemColor.png', label: `+${configs.shop_ad_reward_items}개` },
             { id: 'heal', img: 'itemHeal.png', label: `+${configs.shop_ad_reward_items}개` },
             { id: 'remove_ads', img: 'icon_noAd.png', label: `No Ad ${configs.shop_ad_free_hours}H` },
             { id: 'coins', img: 'coins.png', label: `+${configs.shop_ad_reward_coins?.toLocaleString()}` }

@@ -16,9 +16,9 @@ interface MultiGameProps {
   onBackToLobby: () => void;
   onBackToRoom: () => void;
   sessionCoins: number;
-  sessionItems: { stop: number; switch: number; gray: number; heal: number };
+  sessionItems: { stop: number; switch: number; color: number; heal: number };
   isItemMatch: boolean; // 💉 아이템전 여부 추가
-  userItems: { stop: number; switch: number; gray: number; heal: number };
+  userItems: { stop: number; switch: number; color: number; heal: number };
   onUseItem: (itemType: string) => void; // 아이템 사용 서버 전송용
   playIceSound: () => void;
   configs: any;
@@ -90,7 +90,7 @@ export default function MultiGameEngine({
   // 칼라 공격 발동 함수
   const triggerColorEffect = () => {
     console.log("🎨 칼라 공격 발동: 문제 색상 제거!");
-    setFlashingItem('gray'); // 중앙에 itemColor.png 번쩍임
+    setFlashingItem('color'); // 중앙에 itemColor.png 번쩍임
     setIsColorActive(true);   // 칼라 효과 활성화
     
     if (typeof playBeepSound === 'function') playBeepSound();
@@ -600,7 +600,7 @@ export default function MultiGameEngine({
       setLaunchedAttackId(null); 
 
       // 🔥 Ref의 current 값을 확인하여 시차 없이 공격 발동!
-      if (bufferedEffectRef.current === 'gray') {
+      if (bufferedEffectRef.current === 'color') {
           console.log(`🎨 ${newRound}라운드 전환! 칼라 공격 즉시 발동.`);
           triggerColorEffect();
           bufferedEffectRef.current = null; // 사용 후 비우기
@@ -1095,7 +1095,7 @@ export default function MultiGameEngine({
               {[
                 { id: 'stop', img: 'itemStop3sec.png' },
                 { id: 'switch', img: 'itemSwitchBtn.png' },
-                { id: 'gray', img: 'itemColor.png' }
+                { id: 'color', img: 'itemColor.png' }
               ].map((item) => {
                 const isLaunched = launchedAttackId === item.id; // 🔥 내가 이번에 쏜 아이템인가?
                 const isNoStock = userItems[item.id as keyof typeof userItems] <= 0;
@@ -1161,7 +1161,7 @@ export default function MultiGameEngine({
               src={
                 flashingItem === 'stop' ? "/images/itemStop3sec.png" : 
                 flashingItem === 'switch' ? "/images/itemSwitchBtn.png" : 
-                flashingItem === 'gray' ? "/images/itemColor.png" : ""
+                flashingItem === 'color' ? "/images/itemColor.png" : ""
               }
               alt="attack effect"
               className="w-1/2 aspect-square object-contain animate-[flash_0.2s_ease-in-out_3]"
