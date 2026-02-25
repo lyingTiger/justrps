@@ -1307,6 +1307,14 @@ export default function App() {
       return;
     }
 
+    // ✨ 해당 모드의 내 최고 기록 가져오기
+    const { data: bestRecord } = await supabase
+      .from('mode_records')
+      .select('best_round, best_time')
+      .eq('user_id', currentUserId)
+      .eq('mode', save.mode)
+      .maybeSingle();
+
     // 2. 비용 계산 (0, 100, 200...)
     const cost = loadCount * 100;
 
@@ -1319,13 +1327,30 @@ export default function App() {
       return;
     }
 
-    // 3. 확인 팝업
+    // 3. 확인 팝업 - 현재 기록 정보 추가
+    // 기록 정보만 구성 (UI의 info 영역)
+    const modeName = save.mode.replace(' MODE', '');
+    const formattedSaveTime = Number(save.entry_time).toFixed(2);
+    const formattedBestTime = bestRecord ? Number(bestRecord.best_time).toFixed(2) : "0.00";
+    const bestRound = bestRecord?.best_round || 0;
+
+    // 🚨 [수술] 최고기록(best)과 저장기록(save) 정보를 모두 포함하여 구성
+    const recordInfo = lang === 'ko' 
+      ? `저장된 모드 ${modeName}\n내 최고기록@@@${bestRound}라운드 ${formattedBestTime}초\n저장기록@@@${save.round}라운드 ${formattedSaveTime}초`
+      : `${modeName} mode saved\nmy best rec.@@@Round ${bestRound}, ${formattedBestTime}s\nsave rec.@@@Round ${save.round}, ${formattedSaveTime}s`;
+
+    // 2. ✨ 비용 정보만 구성 (UI의 desc 영역)
+    const costText = cost === 0 
+      ? t('popup', 'msg_save_load_free') 
+      : `-${cost}`; // 강조를 위해 숫자만 표시
+
     setMsgPopup({
       isOpen: true,
-      title: t('popup', 'msg_save_load_title'), // 💉 [수정] 전용 타이틀로 변경
-      desc: cost === 0 
-        ? t('popup', 'msg_save_load_free') 
-        : t('popup', 'msg_save_load_cost').replace('{{cost}}', cost.toString()),
+      title: t('popup', 'msg_save_load_title'),
+      // 구분자로 데이터 분리 전달
+      desc: `${recordInfo}###${costText}`,
+
+
       onConfirm: async () => {
         // 코인 차감 및 카운트 증가
         if (cost > 0) {
@@ -1992,7 +2017,7 @@ export default function App() {
                   target_user_id: currentUserId,
                   stop_inc: (type === 'all' || type === 'stop') ? amount : 0,
                   switch_inc: (type === 'all' || type === 'switch') ? amount : 0,
-                  color_inc: (type === 'all' || type === 'color') ? amount : 0,
+                  color: (type === 'all' || type === 'color') ? amount : 0,
                   heal_inc: (type === 'all' || type === 'heal') ? amount : 0
                 });
 
@@ -2148,28 +2173,57 @@ export default function App() {
               </p>
             )}
 
-            {/* 💉 [신규] 세이브 로드 팝업일 때만 출력되는 보조 문구 */}
+            {/* 💉 [수술 포인트] 세이브 로드 팝업 전용 레이아웃 */}
             {msgPopup.title === t('popup', 'msg_save_load_title') && (
-              <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-6 whitespace-pre-line">
-                {t('popup', 'load_game_info')}
-              </p>
+              <>
+                <p className="text-base font-bold text-zinc-500 uppercase tracking-tight mb-10 whitespace-pre-line">
+                  {t('popup', 'load_game_info')}
+                </p>
+                
+                <div className="text-base font-black italic uppercase tracking-tight mb-10 whitespace-pre-line leading-tight">
+                  {/* 1. 모드 이름 (첫 줄) */}
+                  <span className="text-[#FF9900] text-[18px] block mb-2 underline decoration-zinc-700">
+                    {msgPopup.desc.split('###')[0].split('\n')[0]}
+                  </span>
+                  
+                  <div className="flex flex-col gap-1.5 ">
+                    {/* 2. 최고 기록 (둘째 줄) */}
+                    <div className="flex flex-col items-center  opacity-40">
+                      <span className="text-white">
+                        {msgPopup.desc.split('###')[0].split('\n')[1].split('@@@')[0]}
+                      </span>
+                      <span className="text-white ">
+                        {msgPopup.desc.split('###')[0].split('\n')[1].split('@@@')[1]}
+                      </span>
+                    </div>
+
+                    {/* 3. 저장 기록 (셋째 줄) */}
+                    <div className="flex flex-col items-center">
+                      <span className="text-white">
+                        {msgPopup.desc.split('###')[0].split('\n')[2].split('@@@')[0]}
+                      </span>
+                      <span className="text-white">
+                        {msgPopup.desc.split('###')[0].split('\n')[2].split('@@@')[1]}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
             
             {/* 6. 메인 설명(Description) 및 아이콘 */}
             <div className="flex items-center justify-center gap-3 mb-10">
-              {/* 조건 1: 최고기록 이어하기 아이콘 */}
-              {msgPopup.title === t('popup', 'msg_continue_title') && (
-                <img src="/images/coin.png" alt="coin" className="w-6 h-6 object-contain" />
-              )}
-              
-              {/* 조건 2: 세이브 로드인데 유료(무료가 아님)일 때만 아이콘 노출 */}
-              {msgPopup.title === t('popup', 'msg_save_load_title') && 
-              !msgPopup.desc.includes(t('popup', 'msg_save_load_free')) && (
+              {/* 코인 아이콘 조건부 노출 로직 유지 */}
+              {((msgPopup.title === t('popup', 'msg_continue_title')) || 
+                (msgPopup.title === t('popup', 'msg_save_load_title') && !msgPopup.desc.includes(t('popup', 'msg_save_load_free')))) && (
                 <img src="/images/coin.png" alt="coin" className="w-6 h-6 object-contain" />
               )}
 
               <p className="text-2xl text-zinc-300 font-black italic uppercase tracking-tighter whitespace-pre-line">
-                {msgPopup.desc}
+                {/* ✨ [수정] 세이브 팝업일 때는 구분자 뒤의 금액만 출력 */}
+                {msgPopup.title === t('popup', 'msg_save_load_title') 
+                  ? msgPopup.desc.split('###')[1] 
+                  : msgPopup.desc}
               </p>
             </div>
 
