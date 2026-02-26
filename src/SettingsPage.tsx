@@ -99,7 +99,7 @@ export default function SettingsPage({
             </button>
           </div>
 
-          {/* 💉 [신규] 계정 관리 섹션 */}
+          {/* 💉 계정 관리 섹션 */}
           <div className="w-full mt-12 pt-8 border-t border-zinc-800 space-y-4">
             <p className="text-[10px] text-zinc-500 font-black uppercase ml-1 tracking-widest">Account Management</p>
             

@@ -12,12 +12,13 @@ interface MultiResultModalProps {
   onSaveRewards: () => Promise<void>; 
   playClickSound: () => void;    
   configs: any;
+  t: (view: string, key: string) => string;
 }
 
 export default function MultiResultModal({ 
   isOpen, roomId, currentUserId, onBackToRoom, onBackToLobby,
   sessionCoins, sessionItems, // 💉 [필수 추가] 파라미터에서 꺼내기
-  onSaveRewards, playClickSound, configs
+  onSaveRewards, playClickSound, configs, t,
 }: MultiResultModalProps) {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,14 +72,16 @@ export default function MultiResultModal({
         <div className="w-full max-w-[360px] bg-zinc-900 border border-zinc-800 rounded-[32px] p-6 shadow-2xl flex flex-col items-center">
           
           <div className="mb-6 text-center">
-              <h2 className="text-3xl font-black text-[#FF9900] italic uppercase tracking-tighter">Play Result</h2>
+              <h2 className="text-3xl font-black text-[#FF9900] italic uppercase tracking-tighter">
+                {t('resultModal', 'play_result')}
+              </h2>
           </div>
 
           {/* 💉 렌더링 영역 최적화: 이중 div 구조를 하나로 합침 */}
           <div className="w-full mb-8 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
             {loading ? (
               <div className="text-center text-zinc-500 text-xs py-10 italic uppercase animate-pulse">
-                  Calculating Results...
+                  {t('resultModal', 'calculating')}
               </div>
             ) : (
               <div className="w-full space-y-3">
@@ -166,7 +169,7 @@ export default function MultiResultModal({
                   }}
                   className="h-14 bg-zinc-800 border border-zinc-600 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] hover:text-black active:scale-95 transition-all"
               >
-                  Exit
+                  {t('resultModal', 'game_lobby')}
               </button>
               <button 
                   onClick={async () => { 
@@ -176,7 +179,7 @@ export default function MultiResultModal({
                   }}
                   className="h-14 bg-zinc-800 border border-zinc-600 text-white font-black text-sm rounded-2xl uppercase hover:bg-[#ff9933] hover:text-black active:scale-95 transition-all"
               >
-                  Back to Room
+                  {t('resultModal', 'back_to_room')}
               </button>
           </div>
         </div>

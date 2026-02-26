@@ -99,6 +99,14 @@ export const translations = {
       OVERWRITE: "OVERWRITE",
       CANCEL: "CANCEL",
       MODE: "MODE",
+      OTHER_PLAYERS: "Other Players",
+      HURRY_UP: "Hurry Up!",
+      LOADING_BATTLE: "Loading Battle...",
+      NEXT_ROUND_LOADING: "Loading...",
+      GAME_OVER_TITLE: "GAME OVER",
+      IN_LOBBY: "IN LOBBY",
+      FAIL: "FAIL",
+      TICKET_RETURNED: "Ticket Returned",
     },
 
     // --- 7. 랭킹 페이지 (ranking) ---
@@ -122,12 +130,13 @@ export const translations = {
     game_over: "Game Over",
     round_label: "ROUND",
     new_record: "New Record!",
-    clear_time: "Clear Time",
+    clear_time: "ENTRY TIME",
     earned: "Earned",
     continue_question: "Continue?",
-    attempts_left: "Attempts Left:",
+    attempts_left: "Chance Left:",
     watch_ad: "WATCH AD",
     no_continues: "No Continues Left",
+    SAVE_GAME: "SAVE DATA",
     retry: "Retry",
     game_lobby: "game lobby",
     time_suffix: "s",
@@ -137,7 +146,10 @@ export const translations = {
     DRAW: "DRAW",
     LOSE: "LOSE",
     SHUFFLE: "SHUFFLE",
-    EXPERT: "EXPERT"
+    EXPERT: "EXPERT",
+    play_result: "PLAY RESULT",
+    calculating: "Calculating Results...",
+    back_to_room: "Back to Room",
     },
 
     // --- 9. 멀티플레이 페이지 (multiplay) ---
@@ -163,6 +175,26 @@ export const translations = {
     msg_create_failed: "Failed to \ncreate room: ",
     msg_no_public_rooms: "No public rooms \navailable.",
     msg_wrong_pass: "Incorrect password."
+    },
+
+    waitingRoom: {
+    loading: "Loading...",
+    btn_leave: "Leave",
+    host_label: "HOST",
+    status_lobby: "LOBBY",
+    status_battle: "IN BATTLE",
+    status_result: "RESULT SCREEN",
+    status_offline: "OFFLINE",
+    status_sync: "SYNCING...",
+    ready: "READY",
+    waiting: "WAITING",
+    waiting_empty: "Waiting...",
+    btn_practice: "Practice Start",
+    btn_start: "Start Game",
+    btn_wait_ready: "Wait to Ready",
+    btn_ready: "Ready",
+    btn_cancel_ready: "Cancel Ready",
+    msg_host_battle: "Host is in battle... Please wait",
     },
 
     footer: {
@@ -279,6 +311,14 @@ export const translations = {
       OVERWRITE: "덮어쓰기",
       CANCEL: "취소",
       MODE: "모드",
+      OTHER_PLAYERS: "다른 플레이어",
+      HURRY_UP: "서두르세요!",
+      LOADING_BATTLE: "배틀 로딩 중...",
+      NEXT_ROUND_LOADING: "다음 라운드 준비 중...",
+      GAME_OVER_TITLE: "게임 오버",
+      IN_LOBBY: "대기실",
+      FAIL: "탈락",
+      TICKET_RETURNED: "입장권 반납 완료",
     },
 
     // --- 7. 랭킹 페이지 (ranking) ---
@@ -302,12 +342,13 @@ export const translations = {
     game_over: "게임 오버",
     round_label: "라운드",
     new_record: "신기록!",
-    clear_time: "클리어 타임",
+    clear_time: "진입 시간",
     earned: "획득 코인",
-    continue_question: "계속할까요?",
+    continue_question: "이어서 할까요?",
     attempts_left: "남은 기회:",
     watch_ad: "광고 시청",
     no_continues: "남은 기회 없음",
+    SAVE_GAME: "기록 저장",
     retry: "다시하기",
     game_lobby: "로비로",
     time_suffix: "초",
@@ -317,7 +358,10 @@ export const translations = {
     DRAW: "무승부",
     LOSE: "패배",
     SHUFFLE: "무작위",
-    EXPERT: "초고난도"
+    EXPERT: "초고난도",
+    play_result: "게임 결과",
+    calculating: "결과 집계 중...",
+    back_to_room: "대기실로",
     },
 
     // --- 9. 멀티플레이 페이지 (multiplay) ---
@@ -343,6 +387,26 @@ export const translations = {
     msg_create_failed: "방 생성 실패: ",
     msg_no_public_rooms: "입장 가능한 \n방이 없습니다.",
     msg_wrong_pass: "비밀번호가 \n틀렸습니다."
+    },
+
+    waitingRoom: {
+    loading: "로딩 중...",
+    btn_leave: "나가기",
+    host_label: "방장",
+    status_lobby: "대기실",
+    status_battle: "전투 중",
+    status_result: "결과 확인 중",
+    status_offline: "오프라인",
+    status_sync: "동기화 중...",
+    ready: "준비 완료",
+    waiting: "대기 중",
+    waiting_empty: "기다리는 중...",
+    btn_practice: "연습 시작",
+    btn_start: "게임 시작",
+    btn_wait_ready: "준비 대기 중",
+    btn_ready: "준비 하기",
+    btn_cancel_ready: "준비 취소",
+    msg_host_battle: "방장이 전투 중입니다. 잠시만 기다려 주세요.",
     },
 
     footer: {

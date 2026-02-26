@@ -6,9 +6,10 @@ interface WaitingRoomProps {
   roomId: string | null;
   onLeave: () => void;
   onStartGame: () => void;
+  t: (view: string, key: string) => string;
 }
 
-export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoomProps) {
+export default function WaitingRoom({ roomId, onLeave, onStartGame, t }: WaitingRoomProps) {
   // --- State ---
   const [roomInfo, setRoomInfo] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
@@ -348,7 +349,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
         <div>
            {/* 🔻 [수정] 방 코드(UUID) <p> 태그 삭제함 */}
            <h2 className="text-4xl font-black italic uppercase tracking-tighter text-white leading-none">
-             {roomInfo?.name || "Loading..."}
+             {roomInfo?.name || t('waitingRoom', 'loading')}
            </h2>
         </div>
         
@@ -357,7 +358,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
           onClick={handleManualExit} 
           className="px-4 py-1 bg-zinc-900 text-white text-[10px] font-black uppercase border border-zinc-800 rounded-[10px] transition-all hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] hover:shadow-[0_0_15px_rgba(255,153,0,0.5)] active:bg-[#FF9900] active:text-black active:border-[#FF9900] active:scale-95"
         >
-          Leave
+          {t('waitingRoom', 'btn_leave')}
         </button>
       </div>
 
@@ -398,19 +399,37 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
                   <span className={`text-sm font-black italic ${isHost ? 'text-[#FF9900]' : 'text-white'}`}>
                     {p.profiles?.display_name || "Unknown"}
                   </span>
-                  {isHost && <span className="text-[8px] bg-[#FF9900] text-black font-bold px-1 rounded shadow-sm">HOST</span>}
+                  {isHost && 
+                  <span className="text-[8px] bg-[#FF9900] text-black font-bold px-1 rounded shadow-sm">
+                    {t('waitingRoom', 'host_label')}
+                  </span>}
                   
                   {/* ✨ 상태 라벨 (우선순위에 따른 렌더링) */}
                   {isInLobby ? (
-                    <span className="text-[8px] bg-green-900/50 text-green-500 font-black px-1 rounded">LOBBY</span>
+
+                    <span className="text-[8px] bg-green-900/50 text-green-500 font-black px-1 rounded">
+                      {t('waitingRoom', 'status_lobby')}
+                    </span>
+
                   ) : isStillInBattle ? (
-                    <span className="text-[8px] bg-blue-600 text-white font-black px-1 rounded animate-pulse shadow-[0_0_8px_rgba(37,99,235,0.4)]">IN BATTLE</span>
+                    <span className="text-[8px] bg-blue-600 text-white font-black px-1 rounded animate-pulse shadow-[0_0_8px_rgba(37,99,235,0.4)]">
+                      {t('waitingRoom', 'status_battle')}
+                    </span>
+
                   ) : isInResultScreen ? (
-                    <span className="text-[8px] bg-purple-600 text-white font-black px-1 rounded animate-pulse">RESULT SCREEN</span>
+                    <span className="text-[8px] bg-purple-600 text-white font-black px-1 rounded animate-pulse">
+                      {t('waitingRoom', 'status_result')}
+                    </span>
+
                   ) : showAsOffline ? (
-                    <span className="text-[8px] bg-red-600 text-white font-black px-1 rounded shadow-sm">OFFLINE</span>
+                    <span className="text-[8px] bg-red-600 text-white font-black px-1 rounded shadow-sm">
+                      {t('waitingRoom', 'status_offline')}
+                    </span>
+
                   ) : (
-                    <span className="text-[8px] bg-zinc-700 text-zinc-400 font-black px-1 rounded animate-pulse">SYNCING...</span>
+                    <span className="text-[8px] bg-zinc-700 text-zinc-400 font-black px-1 rounded animate-pulse">
+                      {t('waitingRoom', 'status_sync')}
+                    </span>
                   )}
                 </div>
               </div>
@@ -419,11 +438,11 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
                 {isInLobby ? (
                   // 로비에 있을 때만 READY/WAITING 표시
                   <span className={`${p.is_ready ? 'text-green-500' : 'text-zinc-600'} font-black text-xs uppercase`}>
-                    {isHost ? 'Host' : p.is_ready ? 'READY' : 'WAITING'}
+                    {isHost ? 'Host' : p.is_ready ? t('waitingRoom', 'ready') : t('waitingRoom', 'waiting')}
                   </span>
                 ) : isStillInBattle ? (
                   <span className="text-blue-400 font-black text-[10px] uppercase italic">
-                    Round {p.current_round}
+                    {t('game', 'ROUND')} {p.current_round}
                   </span>
                 ) : isInResultScreen ? (
                   <span className="text-purple-400 font-black text-[10px] uppercase italic">Reviewing...</span>
@@ -444,7 +463,11 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
 
 
         {Array.from({ length: Math.max(0, (roomInfo?.max_players || 2) - participants.length) }).map((_, i) => (
-           <div key={`empty-${i}`} className="w-full p-3 rounded-2xl border border-dashed bg-transparent flex justify-center items-center opacity-100"><span className="text-lg font-black uppercase text-[#66cc33] animate-pulse">Waiting...</span></div>
+           <div key={`empty-${i}`} className="w-full p-3 rounded-2xl border border-dashed bg-transparent flex justify-center items-center opacity-100">
+              <span className="text-lg font-black uppercase text-[#66cc33] animate-pulse">
+                {t('waitingRoom', 'waiting_empty')}
+              </span>
+            </div>
         ))}
       </div>
 
@@ -462,7 +485,11 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
                   : 'bg-[#22c55e] animate-pulse hover:bg-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)]'
               }`}
           >
-            {participants.length < 2 ? 'Practice Start' : isAllReady ? 'Start Game' : 'Wait to Ready'}
+            {participants.length < 2 
+              ? t('waitingRoom', 'btn_practice') 
+              : isAllReady 
+                ? t('waitingRoom', 'btn_start') 
+                : t('waitingRoom', 'btn_wait_ready')}
           </button>
         ) : (
           // 2. 일반 유저인 경우
@@ -471,7 +498,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
               // 🚨 방장이 아직 게임 중일 때: 안내 문구 표시
               <div className="w-full py-4 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800">
                 <p className="text-blue-400 font-black uppercase italic animate-pulse">
-                  Host is in battle... Please wait
+                  {t('waitingRoom', 'msg_host_battle')}
                 </p>
               </div>
             ) : (
@@ -485,7 +512,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame }: WaitingRoo
                   }
                 `}
               >
-                {myInfo?.is_ready ? 'Cancel Ready' : 'Ready'}
+                {myInfo?.is_ready ? t('waitingRoom', 'btn_cancel_ready') : t('waitingRoom', 'btn_ready')}
               </button>
             )}
           </div>

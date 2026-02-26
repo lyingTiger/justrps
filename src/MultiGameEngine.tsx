@@ -22,7 +22,7 @@ interface MultiGameProps {
   onUseItem: (itemType: string) => void; // 아이템 사용 서버 전송용
   playIceSound: () => void;
   configs: any;
-  
+  t: (view: string, key: string) => string;
 }
 
 
@@ -47,6 +47,7 @@ export default function MultiGameEngine({
   onBackToLobby,
   onBackToRoom,
   configs,
+  t,
 }: MultiGameProps) {
 
 
@@ -983,14 +984,16 @@ export default function MultiGameEngine({
         
         {/* [우측] 정보 영역 */}
         <div className="text-right flex flex-col items-end pt-0">
-          <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">Round {currentRound}</h2>
+          <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">
+            {t('game', 'ROUND')} {currentRound}
+          </h2>
           <p className="text-zinc-500 text-[14px] font-mono tracking-tighter mt-1 leading-none">{playTime.toFixed(2)} sec</p>
         </div>
       </div>
 
       {/* 2. 플레이어 현황판 - 멀티 전용 (고정 높이) */}
       <div className="w-full bg-zinc-900/50 rounded-3xl p-3 mb-4 flex-none space-y-2 mx-4 w-[calc(100%-32px)]">
-        <div className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Other Players</div>
+        <div className="text-[10px] text-zinc-600 font-bold uppercase mb-2">{t('game','OTHER_PLAYERS')}</div>
         {participants.filter(p => p.user_id !== currentUserId).map(p => {
           
           // ✨ [판정] 이 유저가 로비로 복귀했는지 확인
@@ -1007,9 +1010,9 @@ export default function MultiGameEngine({
               <span className={`text-xs mr-5 font-black 
                 ${p.is_dead ? 'text-red-900' : isBackInLobby ? 'text-green-500' : 'text-white'}`}>
                 {p.is_dead 
-                  ? "FAIL" 
+                  ? t('game','FAIL') 
                   : isBackInLobby 
-                    ? "IN LOBBY" // 👈 "Round 1" 대신 표시될 문구
+                    ? t('game','IN_LOBBY') 
                     : `Round ${p.current_round || 1}`
                 }
               </span>
@@ -1029,8 +1032,8 @@ export default function MultiGameEngine({
           {/* ✨ [Hurry Up] 게임모드 텍스트 바로 위에 겹쳐서 깜빡임 */}
           {showHurryUp && (
             <div className="absolute -top-10 inset-x-0 flex justify-center animate-[blink_0.4s_infinite_alternate] pointer-events-none">
-              <span className="text-red-500 text-2xl font-black uppercase italic tracking-tighter drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]">
-                Hurry Up!
+              <span className="text-red-500 text-2xl font-black uppercase italic tracking-tighter ...">
+                {t('game','game.HURRY_UP')}
               </span>
             </div>
           )}
@@ -1039,19 +1042,23 @@ export default function MultiGameEngine({
           {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
             <div className="select-none">
               <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
-                <span>{totalTargetCounts.WIN} WIN</span><span>{totalTargetCounts.DRAW} DRAW</span><span>{totalTargetCounts.LOSE} LOSE</span>
+                <span>{totalTargetCounts.WIN} {t('game', 'WIN')}</span>
+                <span>{totalTargetCounts.DRAW} {t('game', 'DRAW')}</span>
+                <span>{totalTargetCounts.LOSE} {t('game', 'LOSE')}</span>
               </div>
               <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
-                <span>{currentSolvedCounts.WIN} WIN</span><span>{currentSolvedCounts.DRAW} DRAW</span><span>{currentSolvedCounts.LOSE} LOSE</span>
+                <span>{currentSolvedCounts.WIN} {t('game', 'WIN')}</span>
+                <span>{currentSolvedCounts.DRAW} {t('game', 'DRAW')}</span>
+                <span>{currentSolvedCounts.LOSE} {t('game', 'LOSE')}</span>
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center">
               <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">
-                {aiSelect.length} {mode.split(' ')[0]}
+                {aiSelect.length} {t('game', mode.split(' ')[0])}
               </p>
               <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">
-                {questionTurn} {mode.split(' ')[0]}
+                {questionTurn} {t('game', mode.split(' ')[0])}
               </p>
             </div>
           )}
@@ -1188,7 +1195,7 @@ export default function MultiGameEngine({
                 onClick={handleStartSolvePhase} 
                 className="w-full h-14 rounded-md font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic hover:scale-105 transition-transform animate-pulse cursor-pointer pointer-events-auto"
               >
-                OK, I got it
+                {t('game', 'OK_I_GOT_IT')}
               </button>
             ) : (
               /* 가위바위보 버튼 영역 (60% 너비 유지) */
@@ -1231,8 +1238,8 @@ export default function MultiGameEngine({
           <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/100 backdrop-blur-sm">
             {/* ❌ animate-in fade-in 삭제, zoom-in 삭제 */}
             <div className="text-center">
-              <h2 className="text-3xl font-black text-green-500 uppercase tracking-tighter ">
-                Loading ...
+              <h2 className="text-3xl font-black text-green-500 uppercase tracking-tighter">
+                {t('game','NEXT_ROUND_LOADING')}
               </h2>
               {/* ❌ "Ready for Next?" 텍스트 삭제 */}
             </div>

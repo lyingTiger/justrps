@@ -1814,7 +1814,7 @@ export default function App() {
         />}
 
         {view === 'waitingRoom' && currentRoomId && 
-          <WaitingRoom roomId={currentRoomId} 
+          <WaitingRoom roomId={currentRoomId} t={(viewKey, itemKey) => t(viewKey as any, itemKey)}
           onLeave={async () => { playClickSound(); await leaveCurrentRoom(); setView('multiplay'); }} 
           onStartGame={() => { playClickSound(); setView('multiBattle'); }} />}
 
@@ -1829,7 +1829,7 @@ export default function App() {
             isItemMatch={currentRoomMode === 'item' || currentRoomMode === 'ITEM'} 
             userItems={userItems || { stop: 0, switch: 0, color: 0, heal: 0 }}
             configs={configs}
-            
+            t={(viewKey, itemKey) => t(viewKey as any, itemKey)}
 
 
             // 💉 아이템 사용 시 실제 차감 로직
