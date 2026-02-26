@@ -177,6 +177,7 @@ export const translations = {
     msg_wrong_pass: "Incorrect password."
     },
 
+    // --- 10. 웨이팅룸 ---
     waitingRoom: {
     loading: "Loading...",
     btn_leave: "Leave",
@@ -195,6 +196,28 @@ export const translations = {
     btn_ready: "Ready",
     btn_cancel_ready: "Cancel Ready",
     msg_host_battle: "Host is in battle... Please wait",
+    },
+
+    // --- 11. 샵 ---
+    shop: {
+    INVENTORY: "Inventory",
+    ADS_FOR_REWARDS: "Ads for Rewards",
+    BACK: "Back",
+    CONFIRM: "Confirm",
+    REWARD_TITLE: "ITEMS ADDED",
+    REWARD_DESC: "ITEMS ADDED TO INVENTORY.",
+    WAIT_AD: "Wait for Prepairing Ad",
+    NO_AD_FREE: "No Ad",
+    STOP: "STOP",
+    SWITCH: "SWITCH",
+    COLOR: "MONO",
+    HEAL: "HEAL",
+    DESC_STOP: "Stops opponent's \ntime for {{sec}} sec \nin the next round.",
+    DESC_SWITCH: "Shuffles opponent's buttons\nin the next round.",
+    DESC_COLOR: "Turns opponent's problems to grayscale\n in the next round.",
+    DESC_HEAL: "Instantly recovers from\nany active attacks.",
+    EA: "EA",
+    HOURS: "H"
     },
 
     footer: {
@@ -389,6 +412,7 @@ export const translations = {
     msg_wrong_pass: "비밀번호가 \n틀렸습니다."
     },
 
+    // --- 10. 웨이팅룸 ---
     waitingRoom: {
     loading: "로딩 중...",
     btn_leave: "나가기",
@@ -407,6 +431,28 @@ export const translations = {
     btn_ready: "준비 완료",
     btn_cancel_ready: "준비 취소",
     msg_host_battle: "방장이 전투 중입니다. 잠시만 기다려 주세요.",
+    },
+
+    // --- 11. 샵 ---
+    shop: {
+    INVENTORY: "보유 아이템",
+    ADS_FOR_REWARDS: "광고 보고 보상 받기",
+    BACK: "뒤로",
+    CONFIRM: "확인",
+    REWARD_TITLE: "보상 획득",
+    REWARD_DESC: "아이템이 추가되었습니다.",
+    WAIT_AD: "광고 대기 중",
+    NO_AD_FREE: "광고 제거",
+    STOP: "STOP",
+    SWITCH: "SWITCH",
+    COLOR: "MONO",
+    HEAL: "HEAL",
+    DESC_STOP: "다음 라운드에서\n상대방의 시간을\n{{sec}}초간 정지시킵니다.",
+    DESC_SWITCH: "다음 라운드에서\n상대방의 버튼 위치를\n뒤바꿉니다.",
+    DESC_COLOR: "다음 라운드에서\n상대방의 모든 문제를\n흑백으로 만듭니다.",
+    DESC_HEAL: "공격당한 상태를\n즉시 회복합니다.",
+    EA: "개",
+    HOURS: "시간"
     },
 
     footer: {

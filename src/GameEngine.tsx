@@ -230,7 +230,7 @@ export default function GameEngine({
             </h2>
           </button>
 
-          {/* 💉 [추가] 로고 아래 획득 코인 애니메이션 UI */}
+          {/* 💉 로고 아래 획득 코인 애니메이션 UI */}
           <div className="flex items-center gap-1.5 mt-2 ml-1 animate-bounce-subtle">
             <img src="/images/coin.png" alt="earned coin" className="w-4 h-4 object-contain" />
             <span className="text-white font-black text-sm font-mono">+{sessionCoins}</span>
@@ -255,7 +255,7 @@ export default function GameEngine({
       </div>
 
 
-      {/* 2. 💉 [수정] 문제 영역: flex-1을 주어 버튼 위쪽까지 공간을 모두 확장 */}
+      {/* 2. 💉 문제 영역: flex-1을 주어 버튼 위쪽까지 공간을 모두 확장 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center justify-center min-h-0">
         {/* justify-center를 추가하여 문제가 적을 때는 중앙에, 많을 때는 위에서부터 스크롤되게 함 */}
 
@@ -292,7 +292,7 @@ export default function GameEngine({
 
               {/* 💉 EXPERT MODE 조건명 */}
               {isCurrent && mode === 'EXPERT MODE' && (
-                <span className="absolute -top-7 text-[16px] font-black text-white ">
+                <span className="w-10 h-10 flex items-center justify-center shrink-0 aspect-square absolute rounded-full bg-black/50 -top-2 text-base font-black text-[#FF9900] animate-pulse -m-7">
                   {t(targetConditions[i])}
                 </span>
               )}

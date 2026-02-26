@@ -2004,6 +2004,7 @@ export default function App() {
             userItems={userItems} 
             configs={configs}
             currentUserId={currentUserId} 
+            t={(viewKey, itemKey) => t(viewKey as any, itemKey)}
             onUpdateCoins={(newAmount) => { 
               setUserCoins(newAmount); 
               localStorage.setItem('cached_coins', newAmount.toString()); 

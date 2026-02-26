@@ -1074,7 +1074,9 @@ export default function MultiGameEngine({
             return (
               <div key={i} className="relative flex flex-col items-center">
                 {isCurrent && mode === 'EXPERT MODE' && (
-                  <span className="absolute -top-5 text-[9px] font-black text-[#FF9900] animate-pulse">{targetConditions[i]}</span>
+                  <span className="w-10 h-10 flex items-center justify-center shrink-0 aspect-square absolute rounded-full bg-black/50 -top-2 text-base font-black text-[#FF9900] animate-pulse -m-7">
+                    {t('game', targetConditions[i])}
+                  </span>
                 )}
                 <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900
                   ${showDetails ? 'shadow-none' : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
@@ -1195,7 +1197,7 @@ export default function MultiGameEngine({
                 onClick={handleStartSolvePhase} 
                 className="w-full h-14 rounded-md font-bold uppercase transition-all text-[#ffcc33] text-4xl font-black italic hover:scale-105 transition-transform animate-pulse cursor-pointer pointer-events-auto"
               >
-                {t('game', 'OK_I_GOT_IT')}
+                {t('game', 'OK_GOT_IT')}
               </button>
             ) : (
               /* 가위바위보 버튼 영역 (60% 너비 유지) */

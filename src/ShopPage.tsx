@@ -12,6 +12,7 @@ interface ShopPageProps {
   onUpdateCoins: (newAmount: number) => void;
   playClickSound?: () => void; // 💉 사운드 프롭 추가됨
   configs: RemoteConfigs;
+  t: (view: string, key: string) => string;
   }
 
 
@@ -24,7 +25,8 @@ export default function ShopPage({
   currentUserId,
   onUpdateCoins,
   playClickSound,
-  configs
+  configs,
+  t
 }: ShopPageProps) {
 
   const [infoTarget, setInfoTarget] = useState<string | null>(null);
@@ -138,11 +140,15 @@ export default function ShopPage({
       )}
 
       <div className="w-full flex justify-end mb-2">
-        <button onClick={onBack} className="px-4 py-1 bg-zinc-800 hover:bg-[#ff9900] text-white hover:text-black text-[10px] font-black uppercase border border-zinc-600 rounded-[10px]">Back</button>
+        <button onClick={onBack} className="px-4 py-1 bg-zinc-800 hover:bg-[#ff9900] text-white hover:text-black text-[10px] font-black uppercase border border-zinc-600 rounded-[10px]">
+          {t('shop', 'BACK')}
+        </button>
       </div>
 
       <div className="w-full mb-1 ml-1 text-left">
-        <span className="text-[10px] font-black text-[#ffcc33] uppercase tracking-widest italic">Inventory</span>
+        <span className="text-[10px] font-black text-[#ffcc33] uppercase tracking-widest italic">
+          {t('shop', 'INVENTORY')}
+        </span>
       </div>
 
       {/* 💉 1. 보유 아이템 인벤토리 (구조 정상화) */}
@@ -181,12 +187,14 @@ export default function ShopPage({
                   <div className="bg-zinc-900 border-2 border-[#FF9900] rounded-xl p-3 shadow-[0_10px_30px_rgba(0,0,0,0.8)] text-center relative h-24 flex flex-col justify-center">
 
                   <div className="absolute -top-[10px] left-1/2 -translate-x-1/2 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-[#FF9900]"></div>
-                  <h4 className="text-[#FF9900] text-[11px] font-black uppercase mb-1">{item.id}</h4>
+                  <h4 className="text-[#FF9900] text-[11px] font-black uppercase mb-1">
+                    {t('shop', item.id.toUpperCase())}
+                  </h4>
                   <p className="text-zinc-200 text-[10px] font-bold leading-tight whitespace-pre-line break-keep">
-                    {item.id === 'stop' && `다음 라운드에서\n상대방의 시간을\n${configs.multi_item_stop_sec}초간 정지시킵니다.`}
-                    {item.id === 'switch' && "다음 라운드에서\n상대방의 버튼 위치를\n뒤바꿉니다."}
-                    {item.id === 'color' && "다음 라운드에서\n상대방의 모든 문제를\n흑백으로 만듭니다."} 
-                    {item.id === 'heal' && "공격당한 상태를\n즉시 회복합니다."}
+                    {item.id === 'stop' && t('shop', 'DESC_STOP').replace('{{sec}}', configs.multi_item_stop_sec.toString())}
+                    {item.id === 'switch' && t('shop', 'DESC_SWITCH')}
+                    {item.id === 'color' && t('shop', 'DESC_COLOR')} 
+                    {item.id === 'heal' && t('shop', 'DESC_HEAL')}
                   </p>
                 </div>
               </div>
@@ -196,18 +204,20 @@ export default function ShopPage({
       </div>
 
       <div className="w-full mb-1 ml-1 text-left">
-        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest italic">Ads for Rewards</span>
+        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest italic">
+          {t('shop', 'ADS_FOR_REWARDS')}
+        </span>
       </div>
 
       {/* 💉 2. 광고 그리드 영역 */}
       <div className="relative w-full mb-8">
         <div className="grid grid-cols-3 gap-2">
           {[
-            { id: 'stop', img: 'itemStop3sec.png', label: `+${configs.shop_ad_reward_items}개` },
-            { id: 'switch', img: 'itemSwitchBtn.png', label: `+${configs.shop_ad_reward_items}개` },
-            { id: 'color', img: 'itemColor.png', label: `+${configs.shop_ad_reward_items}개` },
-            { id: 'heal', img: 'itemHeal.png', label: `+${configs.shop_ad_reward_items}개` },
-            { id: 'remove_ads', img: 'icon_noAd.png', label: `No Ad ${configs.shop_ad_free_hours}H` },
+            { id: 'stop', img: 'itemStop3sec.png', label: `+${configs.shop_ad_reward_items} ${t('shop', 'EA')}` },
+            { id: 'switch', img: 'itemSwitchBtn.png', label: `+${configs.shop_ad_reward_items} ${t('shop', 'EA')}` },
+            { id: 'color', img: 'itemColor.png', label: `+${configs.shop_ad_reward_items} ${t('shop', 'EA')}` },
+            { id: 'heal', img: 'itemHeal.png', label: `+${configs.shop_ad_reward_items} ${t('shop', 'EA')}` },
+            { id: 'remove_ads', img: 'icon_noAd.png', label: `No Ad ${configs.shop_ad_free_hours} ${t('shop', 'HOURS')}` },
             { id: 'coins', img: 'coins.png', label: `+${configs.shop_ad_reward_coins?.toLocaleString()}` }
           ].map((item: any) => (
             <button 
@@ -217,7 +227,11 @@ export default function ShopPage({
               className={`flex flex-col items-center py-5 border rounded-[12px] transition-all active:scale-95 shadow-lg
                 ${adCooldown > 0 ? 'bg-zinc-900/50 border-zinc-800 opacity-50' : 'bg-zinc-800 border-zinc-700 hover:border-[#FF9900]'}`}
             >
-              <span className="text-[12px] font-black text-[#FF9900] uppercase leading-none mb-3">{item.label}</span>
+              <span className="text-[12px] font-black text-[#FF9900] uppercase leading-none mb-3">
+                {item.id === 'remove_ads' 
+                  ? `${configs.shop_ad_free_hours} ${t('shop', 'HOURS')} ${t('shop', 'NO_AD_FREE')} ` 
+                  : item.label}
+              </span>
               <img src={`/images/${item.img}`} className="w-12 h-12 object-contain" alt={item.id} />
             </button>
           ))}
@@ -228,7 +242,9 @@ export default function ShopPage({
           <div className="absolute inset-0 z-10 bg-black/70 backdrop-blur-sm rounded-[12px] flex flex-col items-center justify-center border border-zinc-800 animate-in fade-in duration-300">
             <img src="/images/icon_houseglass.png" alt="cooldown" className="w-10 h-10 object-contain mb-2" />
             <span className="text-3xl font-black text-red-500 font-mono italic">{Math.floor(adCooldown / 60)}:{(adCooldown % 60).toString().padStart(2, '0')}</span>
-            <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1">Wait for next Ad</span>
+            <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1">
+              {t('shop', 'WAIT_AD')}
+            </span>
           </div>
         )}
       </div>
@@ -238,9 +254,15 @@ export default function ShopPage({
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div className="w-full max-w-[280px] bg-zinc-900 border-2 border-[#FF9900] rounded-[40px] px-8 pb-8 pt-12 flex flex-col items-center text-center animate-in zoom-in-95">
             <img src={rewardPopup.icon} alt="reward" className="w-16 h-16 mb-6 object-contain animate-bounce" />
-            <h3 className="text-xl font-black text-white italic uppercase mb-2">{rewardPopup.title}</h3>
-            <p className="text-[11px] text-zinc-400 font-bold uppercase mb-8">{rewardPopup.desc}</p>
-            <button onClick={() => setRewardPopup(prev => ({ ...prev, isOpen: false }))} className="w-full h-12 bg-[#FF9900] text-black font-black text-sm rounded-2xl uppercase">Confirm</button>
+            <h3 className="text-xl font-black text-white italic uppercase mb-2">
+              {rewardPopup.title}
+            </h3>
+            <p className="text-[11px] text-zinc-400 font-bold uppercase mb-8">
+              {t('shop', 'REWARD_DESC')}
+            </p>
+            <button onClick={() => setRewardPopup(prev => ({ ...prev, isOpen: false }))} className="w-full h-12 bg-[#FF9900] text-black font-black text-sm rounded-2xl uppercase">
+              {t('shop', 'CONFIRM')}
+            </button>
           </div>
         </div>
       )}
