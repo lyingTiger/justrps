@@ -1301,6 +1301,7 @@ export default function MultiGameEngine({
         }}
         onBackToLobby={onBackToLobby}   
         configs={configs}
+        t={(viewKey, itemKey) => t(viewKey as any, itemKey)}
       />
     </div>
   );
