@@ -148,10 +148,10 @@ export default function ShopPage({
       {/* 💉 1. 보유 아이템 인벤토리 (구조 정상화) */}
       <div className="w-full grid grid-cols-4 gap-2 mb-8 p-3 rounded-[12px] bg-zinc-900/50 relative">
         {[
-          { id: 'stop', img: 'itemStop3sec.png', count: userItems.stop },
-          { id: 'switch', img: 'itemSwitchBtn.png', count: userItems.switch },
-          { id: 'color', img: 'itemColor.png', count: userItems.color },
-          { id: 'heal', img: 'itemHeal.png', count: userItems.heal }
+          { id: 'stop', img: 'itemStop3sec.png', count: userItems.stop, label: 'STOP' },
+          { id: 'switch', img: 'itemSwitchBtn.png', count: userItems.switch, label: 'SWITCH' },
+          { id: 'color', img: 'itemColor.png', count: userItems.color, label: 'COLOR' },
+          { id: 'heal', img: 'itemHeal.png', count: userItems.heal, label: 'HEAL' }
         ].map((item) => (
           <div 
             key={item.id} 
@@ -163,6 +163,12 @@ export default function ShopPage({
             }}
           >
             <img src={`/images/${item.img}`} alt={item.id} className="w-14 h-14 object-contain" />
+
+            {/* 💉 [신규] 아이템 이름 라벨 추가 */}
+            <span className="text-[9px] font-black text-[#ffcc33] mt-1 uppercase tracking-tighter">
+              {item.label}
+            </span>
+
             <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black min-w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-zinc-900 px-1 shadow-lg">
               {item.count}
             </div>

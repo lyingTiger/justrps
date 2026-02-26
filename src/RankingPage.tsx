@@ -52,11 +52,13 @@ export default function RankingPage({ onBack, playClickSound, userNickname, t }:
     
     try {
       if (activeMode === myBestLabel) {
+        // 💉 [수정] 최신순(updated_at)이 아닌 기록 순(best_round DESC, best_time ASC)으로 정렬
         const { data: myAllRecords, error } = await supabase
           .from('mode_records')
           .select('*, profiles(display_name)')
           .eq('user_id', myUserId)
-          .order('updated_at', { ascending: false });
+          .order('best_round', { ascending: false }) // 라운드 높은 순
+          .order('best_time', { ascending: true });   // 시간 짧은 순
 
         if (error) throw error;
 
@@ -179,20 +181,13 @@ export default function RankingPage({ onBack, playClickSound, userNickname, t }:
             <>
               {(() => {
                 const isMyBestTab = activeMode === myBestLabel;
-                
-                // 💉 [로직 보존] 내 기록 중 최고의 기록 인덱스 계산 (황금색 강조용)
-                const overallBestIndex = isMyBestTab 
-                  ? rankings.reduce((bestIdx, curr, idx, arr) => {
-                      if (curr.best_round > arr[bestIdx].best_round) return idx;
-                      if (curr.best_round === arr[bestIdx].best_round && curr.best_time < arr[bestIdx].best_time) return idx;
-                      return bestIdx;
-                    }, 0)
-                  : -1;
+                const overallBestIndex = 0; 
 
-                return rankings.map((res, i) => {
-                  const isMe = myUserId && res.id === myUserId;
-                  const isTopRecord = isMyBestTab && i === overallBestIndex;
-                  const isFloatingUser = !isMyBestTab && i === 10;
+                  return rankings.map((res, i) => {
+                    const isMe = myUserId && res.id === myUserId;
+                    // 💉 [수정] 내 기록 탭에서는 가장 상단(0번) 기록만 황금색으로 강조
+                    const isTopRecord = isMyBestTab && i === overallBestIndex;
+                    const isFloatingUser = !isMyBestTab && i === 10;
 
                   return (
                     <div key={i}>

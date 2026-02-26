@@ -202,7 +202,7 @@ export const translations = {
     lobby: {
       btn_share: "게임 공유",
       btn_tutorial: "게임 방법",
-      btn_ranking: "베스트 플레이어",
+      btn_ranking: "최고 기록",
       btn_inventory: "아이템 & 샵",
       btn_play: "게임 시작",
       stats_total_play: "총 플레이",

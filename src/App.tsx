@@ -331,7 +331,7 @@ export default function App() {
           target_user_id: currentUserId,
           stop_inc: sessionItems.stop,
           switch_inc: sessionItems.switch,
-          color: sessionItems.color,
+          color_inc: sessionItems.color,
           heal_inc: sessionItems.heal
         });
       }
@@ -2011,15 +2011,24 @@ export default function App() {
             // ✨ [신규] 아이템 구매 처리 함수
             onPurchaseItem={async (type, amount) => {
               if (!currentUserId) return;
+
+              // 1. 💉 [UI 선반영] DB 통신 전 UI 숫자를 먼저 올립니다 (사용자 경험 향상)
+              setUserItems(prev => ({
+                ...prev,
+                [type]: prev[type as keyof UserItems] + amount
+              }));
+
               try {
                 // DB의 아이템 수량 업데이트 (우리가 만든 RPC 호출)
-                await supabase.rpc('update_user_items', {
+                const { error } = await supabase.rpc('update_user_items', {
                   target_user_id: currentUserId,
                   stop_inc: (type === 'all' || type === 'stop') ? amount : 0,
                   switch_inc: (type === 'all' || type === 'switch') ? amount : 0,
-                  color: (type === 'all' || type === 'color') ? amount : 0,
+                  color_inc: (type === 'all' || type === 'color') ? amount : 0,
                   heal_inc: (type === 'all' || type === 'heal') ? amount : 0
                 });
+
+                if (error) throw error;
 
                 // 구매 후 최신 유저 데이터 다시 불러오기
                 await fetchUserData(currentUserId);
@@ -2029,6 +2038,8 @@ export default function App() {
                 console.log(`🎁 ${type} 아이템 ${amount}개 구매 완료!`);
               } catch (e) {
                 console.error("구매 처리 중 오류:", e);
+                // 에러 발생 시 원래대로 롤백 (선택 사항)
+                fetchUserData(currentUserId);
               }
             }}
           />
