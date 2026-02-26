@@ -692,28 +692,33 @@ export default function MultiGameEngine({
 
     // 1️⃣ [판정 구역] 모드별 정답 체크
     if (mode === 'SHUFFLE MODE') {
-      let foundMatch = false;
-      for (let i = 0; i < aiSelect.length; i++) {
-        if (solvedIndices.includes(i)) continue;
-        const hand = aiSelect[i];
-        const result = idx === hand ? 'DRAW' : ((hand === 0 && idx === 1) || (hand === 1 && idx === 2) || (hand === 2 && idx === 0) ? 'WIN' : 'LOSE');
+      // 💉 [수술 포인트] 루프를 돌지 않고, 시각적으로 오픈될 '가장 앞쪽 인덱스'를 타겟팅합니다.
+      const currentIndex = solvedIndices.length; 
+      
+      if (currentIndex < aiSelect.length) {
+        const hand = aiSelect[currentIndex]; // 판정의 주인공 (가장 왼쪽 카드)
+        // 주인공 카드와 내가 낸 패를 비교한 결과
+        const myResult = idx === hand ? 'DRAW' : ((hand === 0 && idx === 1) || (hand === 1 && idx === 2) || (hand === 2 && idx === 0) ? 'WIN' : 'LOSE');
         
-        const needed = totalTargetCounts[result as keyof typeof totalTargetCounts];
-        const current = satisfiedConditions.filter(c => c === result).length;
+        // 💡 핵심: 이 결과(myResult)가 '전체 남은 조건 리스트' 안에 포함되어 있는지 확인
+        const needed = totalTargetCounts[myResult as keyof typeof totalTargetCounts];
+        const current = satisfiedConditions.filter(c => c === myResult).length;
 
         if (needed > current) {
-          isCorrectAnswer = true; // ✨ 정답 확인
-          const newSolvedIndices = [...solvedIndices, i];
-          const newSatisfiedConditions = [...satisfiedConditions, result];
+          // ✅ 정답 확인: 주인공 카드를 정답 처리함
+          isCorrectAnswer = true; 
+          const newSolvedIndices = [...solvedIndices, currentIndex];
+          const newSatisfiedConditions = [...satisfiedConditions, myResult];
+          
           setSolvedIndices(newSolvedIndices);
           setSatisfiedConditions(newSatisfiedConditions);
-          foundMatch = true;
+          
           if (newSatisfiedConditions.length === aiSelect.length) isRoundClear = true;
-          break;
+        } else {
+          // ❌ 오답 확인: 주인공 카드와의 결과가 남은 조건 리스트에 없음
+          isCorrectAnswer = false; 
         }
       }
-      // 셔플 모드에서 매칭되는 패가 없을 경우 실패
-      if (!foundMatch) isCorrectAnswer = false; 
 
     } else {
       const aiHand = aiSelect[questionTurn];

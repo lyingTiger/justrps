@@ -158,39 +158,41 @@ export default function GameEngine({
     
     // [1] 셔플 모드
     if (mode === 'SHUFFLE MODE') {
-      let foundMatch = false;
-      for (let i = 0; i < aiSelect.length; i++) {
-        if (solvedIndices.includes(i)) continue;
-        const hand = aiSelect[i];
-        const result = idx === hand ? 'DRAW' : ((hand === 0 && idx === 1) || (hand === 1 && idx === 2) || (hand === 2 && idx === 0) ? 'WIN' : 'LOSE');
-        
-        const needed = totalTargetCounts[result as keyof typeof totalTargetCounts];
-        const current = satisfiedConditions.filter(c => c === result).length;
-
-        if (needed > current) {
-          onEarnCoin();
-          playTockSound(); // 💉 정답 효과음 재생
-          const newSolvedIndices = [...solvedIndices, i];
-          const newSatisfiedConditions = [...satisfiedConditions, result];
-          setSolvedIndices(newSolvedIndices);
-          setSatisfiedConditions(newSatisfiedConditions);
-
-          if (newSatisfiedConditions.length === aiSelect.length) {
-            if (timerRef.current) clearInterval(timerRef.current);
-            // 💉 (App.tsx에서 넘겨받은 onRoundClear가 whickSound를 포함하고 있음)
-            onRoundClear(round + 1);
-          }
-          foundMatch = true; 
-          break;
-        }
-      }
+    // 1. 🎯 판정의 주인공: 아직 풀리지 않은 '가장 앞쪽 카드'를 타겟팅
+    const currentIndex = solvedIndices.length; 
+    
+    if (currentIndex < aiSelect.length) {
+      const hand = aiSelect[currentIndex]; // 주인공 카드 (가장 앞)
+      // 💡 주인공 카드와 내가 낸 패를 비교했을 때 나오는 결과(WIN/DRAW/LOSE)
+      const myResult = idx === hand ? 'DRAW' : ((hand === 0 && idx === 1) || (hand === 1 && idx === 2) || (hand === 2 && idx === 0) ? 'WIN' : 'LOSE');
       
-      if (!foundMatch) { 
+      // 2. 🔍 확인: 이 결과(myResult)가 '전체 남은 조건들' 중에 존재하는지 체크
+      const needed = totalTargetCounts[myResult as keyof typeof totalTargetCounts];
+      const currentCount = satisfiedConditions.filter(c => c === myResult).length;
+
+      // 남은 조건 중에 내가 만든 결과가 있다면 정답!
+      if (needed > currentCount) {
+        // ✅ 정답 처리: 가장 앞의 주인공 카드를 해결함
+        onEarnCoin();
+        playTockSound(); 
+        
+        const newSolvedIndices = [...solvedIndices, currentIndex];
+        const newSatisfiedConditions = [...satisfiedConditions, myResult];
+        setSolvedIndices(newSolvedIndices);
+        setSatisfiedConditions(newSatisfiedConditions);
+
+        if (newSatisfiedConditions.length === aiSelect.length) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          onRoundClear(round + 1);
+        }
+      } else {
+        // ❌ 오답 처리: 주인공 카드와 비교한 결과가 남은 조건 리스트에 없으면 실패
         if (timerRef.current) clearInterval(timerRef.current); 
-        onGameOver(round, parseFloat(entryTime.toFixed(2))); // 💉 (App.tsx에서 beepSound 처리)
+        onGameOver(round, parseFloat(entryTime.toFixed(2)));
       }
-      return;
     }
+    return;
+  }
 
     // [2] 일반/익스퍼트 모드
     const aiHand = aiSelect[questionTurn];
