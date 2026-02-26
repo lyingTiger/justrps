@@ -1334,10 +1334,10 @@ export default function App() {
     const formattedBestTime = bestRecord ? Number(bestRecord.best_time).toFixed(2) : "0.00";
     const bestRound = bestRecord?.best_round || 0;
 
-    // 🚨 [수술] 최고기록(best)과 저장기록(save) 정보를 모두 포함하여 구성
+    // 🚨 최고기록(best)과 저장기록(save) 정보를 모두 포함하여 구성
     const recordInfo = lang === 'ko' 
-      ? `저장된 모드 ${modeName}\n내 최고기록@@@${bestRound}라운드 ${formattedBestTime}초\n저장기록@@@${save.round}라운드 ${formattedSaveTime}초`
-      : `${modeName} mode saved\nmy best rec.@@@Round ${bestRound}, ${formattedBestTime}s\nsave rec.@@@Round ${save.round}, ${formattedSaveTime}s`;
+      ? `${modeName}모드\n저장기록@@@${save.round}라운드 ${formattedSaveTime}초\n내 최고기록@@@${bestRound}라운드 ${formattedBestTime}초`
+      : `${modeName} mode saved\nmsave rec.@@@Round ${save.round}, ${formattedSaveTime}s\ny best rec.@@@Round ${bestRound}, ${formattedBestTime}s`;
 
     // 2. ✨ 비용 정보만 구성 (UI의 desc 영역)
     const costText = cost === 0 
@@ -2081,7 +2081,7 @@ export default function App() {
 
 
 
-      {/* 💉 [신규] 웹 전용 푸터: 게임 중에는 숨기고, 평소에는 스크롤해야 보임 */}
+      {/* 💉 웹 전용 푸터: 게임 중에는 숨기고, 평소에는 스크롤해야 보임 */}
       {!(view === 'battle' || view === 'multiBattle') && (
         <footer className="w-full py-10 bg-black border-t border-zinc-800 flex flex-col items-center justify-center gap-3 flex-none">
           <div className="max-w-[360px] w-full text-center px-6">
@@ -2193,31 +2193,33 @@ export default function App() {
                 </p>
                 
                 <div className="text-base font-black italic uppercase tracking-tight mb-10 whitespace-pre-line leading-tight">
-                  {/* 1. 모드 이름 (첫 줄) */}
+                  {/* 1. 모드 이름  */}
                   <span className="text-[#FF9900] text-[18px] block mb-2 underline decoration-zinc-700">
                     {msgPopup.desc.split('###')[0].split('\n')[0]}
                   </span>
                   
                   <div className="flex flex-col gap-1.5 ">
-                    {/* 2. 최고 기록 (둘째 줄) */}
-                    <div className="flex flex-col items-center  opacity-40">
-                      <span className="text-white">
-                        {msgPopup.desc.split('###')[0].split('\n')[1].split('@@@')[0]}
-                      </span>
-                      <span className="text-white ">
-                        {msgPopup.desc.split('###')[0].split('\n')[1].split('@@@')[1]}
-                      </span>
-                    </div>
 
-                    {/* 3. 저장 기록 (셋째 줄) */}
-                    <div className="flex flex-col items-center">
+                    {/* 2. 저장 기록  */}
+                      <div className="flex flex-col items-center">
+                        <span className="text-white">
+                          {msgPopup.desc.split('###')[0].split('\n')[1].split('@@@')[0]}
+                        </span>
+                        <span className="text-white">
+                          {msgPopup.desc.split('###')[0].split('\n')[1].split('@@@')[1]}
+                        </span>
+                      </div>
+
+                    {/* 3. 최고 기록  */}
+                    <div className="flex flex-col items-center  opacity-40">
                       <span className="text-white">
                         {msgPopup.desc.split('###')[0].split('\n')[2].split('@@@')[0]}
                       </span>
-                      <span className="text-white">
+                      <span className="text-white ">
                         {msgPopup.desc.split('###')[0].split('\n')[2].split('@@@')[1]}
                       </span>
                     </div>
+                    
                   </div>
                 </div>
               </>
@@ -2249,7 +2251,7 @@ export default function App() {
                   onClick={() => { if(canClickPopup) { playClickSound(); msgPopup.onConfirm?.(); } }} 
                   disabled={!canClickPopup}
                   className={`flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all bg-zinc-800 text-white border border-zinc-600 
-                    ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900]" : "opacity-50"}`}
+                    ${canClickPopup ? "hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:scale-90" : "opacity-50"}`}
                 >
                   {t('settings', 'confirm')}
                 </button>
@@ -2273,7 +2275,7 @@ export default function App() {
                   } 
                 }} 
                 disabled={!canClickPopup} 
-                className={`flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all border border-zinc-600
+                className={`flex-1 h-10 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all border border-zinc-600 hover:bg-[#FF9900] hover:text-black hover:border-[#FF9900] active:scale-90
                   ${(msgPopup.onConfirm && msgPopup.title !== (lang === 'ko' ? "오늘의 출석 보상" : "DAILY GIFT")) 
                     ? "bg-zinc-800 text-white" // 일반 선택 팝업의 경우 '취소' 스타일
                     : "w-full bg-[#FF9900] text-black" // 보상/가입 선물의 경우 '단독 확인' 스타일

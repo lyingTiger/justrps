@@ -312,7 +312,7 @@ export const translations = {
       daily_reward_title: "일일 보상!",
       daily_reward_desc: "오늘의 첫 접속 보상입니다!\n공격 아이템 3종 세트 (각 1개)",
       msg_save_load_title: "게임 불러오기",
-      load_game_info: "저장된 게임을 불러옵니다.\n기록 재사용 시 비용이 증가합니다.",
+      load_game_info: "저장된 게임을 불러옵니다.\n재사용 시 비용이 증가합니다.",
       msg_save_load_free: "첫 회 무료",
       msg_save_load_cost: "-{{cost}} 코인",
     },
