@@ -143,6 +143,9 @@ export default function App() {
   // 💉 [상태 추가] 이어하기 횟수 관리용
   const [loadCount, setLoadCount] = useState(0);
 
+  // 💉 추천인 입력값 저장을 위한 상태 
+const [referrerName, setReferrerName] = useState('');
+
 
   // 비밀번호 변경 핸들러
   const handleChangePassword = async () => {
@@ -857,16 +860,56 @@ export default function App() {
     setLoading(true);
     try {
       if (isSignUpMode) {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: username } } });
-        if (error) throw error;
-        if (data.user) {
-          await supabase.from('profiles').insert({ id: data.user.id, display_name: username, coins: 0 });
+
+        // 💉 [보안 수술] 셀프 추천 방지 로직 (trim으로 공백 제거 후 비교)
+        if (referrerName.trim() === username.trim()) {
+          setMsgPopup({
+            isOpen: true,
+            title: "NOTICE",
+            desc: lang === 'ko' 
+              ? "본인은 추천할 수 없습니다." 
+              : "You cannot refer yourself."
+          });
+          setLoading(false);
+          return; // 로직 중단
         }
-        setMsgPopup({
-          isOpen: true,
-          title: t('popup', 'msg_welcome_title'),
-          desc: t('popup', 'msg_signin_to_start')
+
+        const { data, error } = await supabase.auth.signUp({ 
+          email, 
+          password, 
+          options: { data: { display_name: username } } 
         });
+
+        if (error) throw error;
+
+        if (data.user) {
+          // 1. 기본 프로필 생성
+          await supabase.from('profiles').insert({ id: data.user.id, display_name: username, coins: 0 });
+
+          // 2. 💉 추천인 보상 로직 실행
+          if (referrerName.trim()) {
+            const { data: refResult } = await supabase.rpc('handle_referral_bonus', {
+              new_user_id: data.user.id,
+              referrer_nick: referrerName.trim(),
+              bonus_coins: 500,
+              bonus_items: 5
+            });
+
+            if (refResult === 'SUCCESS') {
+              // 3. 💉 성공 시 게임 내 알림창 (요청하신 내용 적용)
+              setMsgPopup({
+                isOpen: true,
+                title: lang === 'ko' ? "추천 보상 증정" : "REFERRAL BONUS",
+                desc: lang === 'ko' 
+                  ? `추천인 & ${username}\n+500코인 + 아이템 5세트`
+                  : `Referral & ${username}\n+500 Coins + Item 5 Sets`
+              });
+            }
+          } else {
+            // 추천인 없을 때 기존 환영 메시지
+            setMsgPopup({ isOpen: true, title: "WELCOME", desc: t('popup', 'msg_signin_to_start') });
+          }
+        }
         setIsSignUpMode(false); 
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -1508,15 +1551,30 @@ export default function App() {
 
 
           
-          <form onSubmit={handleAuthSubmit} className="space-y-4">
+          <form onSubmit={handleAuthSubmit} className="space-y-2">
+            {/* 이메일 */}
             <input type="email" placeholder={t('main', 'email_placeholder')} value={email} onChange={(e) => setEmail(e.target.value)} 
             className="mt-10 w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />
             
+            {/* 닉네임 (회원가입 시) */}
             {isSignUpMode && <input type="text" placeholder={t('main', 'nickname_placeholder')} value={username} onChange={(e) => setUsername(e.target.value)} 
             className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold" required />}
             
+            {/* 비밀번호 */}
             <input type="password" placeholder={t('main', 'password_placeholder')} value={password} onChange={(e) => setPassword(e.target.value)} 
-            className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold -mt-2" required />
+            className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-white outline-none font-bold " required />
+
+            {/* 💉 1 & 2. 추천인 입력창 추가 (회원가입 시 비밀번호 아래 위치) */}
+            {isSignUpMode && (
+              <input 
+                type="text" 
+                placeholder={lang === 'ko' ? "추천인 닉네임 (선택)" : "Referrer Nickname (Optional)"} 
+                value={referrerName} 
+                onChange={(e) => setReferrerName(e.target.value)} 
+                className="w-full h-12 bg-zinc-900 border border-zinc-800 rounded-lg px-4 text-[#FFcc33] outline-none font-bold placeholder:text-zinc-600 focus:border-[#FF9900]/50 transition-all" 
+              />
+            )}
+
 
             <button 
               type="submit" 
@@ -1539,10 +1597,6 @@ export default function App() {
             {t('main', 'google_login')}
           </button>
           
-
-          {/* ------------------------------------------------------------------
-          💉 카카오 로그인 버튼 추가 
-          ------------------------------------------------------------------ */}
           <button 
             type="button" 
             onClick={() => { playClickSound(); handleKakaoLogin(); }} 

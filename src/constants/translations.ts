@@ -16,6 +16,7 @@ export const translations = {
       back_to_login: "Back to Login",
       create_acc: "Create Account",
       kakao_login: "LOGIN WITH KAKAO",
+      referral_placeholder: "Referrer Nickname (Optional)",
     },
 
     // --- 2. 메인 로비 및 헤더 (lobby) ---
@@ -255,6 +256,7 @@ export const translations = {
       back_to_login: "로그인으로 돌아가기",
       create_acc: "계정 만들기",
       kakao_login: "카카오 로그인",
+      referral_placeholder: "추천인 닉네임 (선택 사항)",
     },
 
     // --- 2. 메인 로비 및 헤더 (lobby) ---
