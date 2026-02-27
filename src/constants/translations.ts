@@ -80,6 +80,10 @@ export const translations = {
       load_game_info: "Start from saved game",
       msg_save_load_free: "Continue from your save for free?",
       msg_save_load_cost: "-{{cost}} coins",
+      auth_error_title: "AUTH ERROR",
+      auth_error_desc: "Invalid credentials.",
+      session_expired_title: "SESSION EXPIRED",
+      session_expired_desc: "Please login again.",
     }, 
 
     // --- 6. 게임 엔진 (game) : 💉 코드 로직에 맞춰 대문자 키로 수정 ---
@@ -315,6 +319,10 @@ export const translations = {
       load_game_info: "저장된 게임을 불러옵니다.\n재사용 시 비용이 증가합니다.",
       msg_save_load_free: "첫 회 무료",
       msg_save_load_cost: "-{{cost}} 코인",
+      auth_error_title: "인증 오류",
+      auth_error_desc: "정보가 일치하지 않습니다.",
+      session_expired_title: "세션 만료",
+      session_expired_desc: "다시 로그인 해주세요.",
     },
 
     // --- 6. 게임 엔진 (game)  ---

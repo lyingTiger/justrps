@@ -155,9 +155,19 @@ export default function App() {
     });
 
     if (error) {
-      setMsgPopup({ isOpen: true, title: "Error", desc: "요청 실패:\n잠시 후 다시 시도해주세요.", onConfirm: null });
+      setMsgPopup({ 
+        isOpen: true, 
+        title: "ERROR", 
+        desc: lang === 'ko' ? "요청 실패:\n다시 시도해주세요." : "Request failed.\nPlease try again.", 
+        onConfirm: null 
+      });
     } else {
-      setMsgPopup({ isOpen: true, title: "Success", desc: "비밀번호 재설정 이메일이\n발송되었습니다.", onConfirm: null });
+      setMsgPopup({ 
+        isOpen: true, 
+        title: "SUCCESS", 
+        desc: lang === 'ko' ? "이메일이\n발송되었습니다." : "Reset email\nhas been sent.", 
+        onConfirm: null 
+      });
     }
   };
 
@@ -868,7 +878,32 @@ export default function App() {
           }
         }
       }
-    } catch (err: any) { alert("Error: " + err.message); } finally { setLoading(false); }
+    } catch (err: any) {
+      // 💉 에러 메시지에 따른 분기 처리
+      let errorDesc = lang === 'ko' ? "인증에 실패했습니다." : "Auth failed.";
+      
+      // 비밀번호가 너무 짧은 경우 (Supabase 기본 에러 메시지 키워드 체크)
+      if (err.message.includes("weak_password") || err.message.includes("at least 6 characters")) {
+        errorDesc = lang === 'ko' 
+          ? "비밀번호가 너무 짧습니다.\n(최소 6자 이상)" 
+          : "Password is too short.\n(Min 6 characters)";
+      } 
+      // 이미 가입된 이메일인 경우
+      else if (err.message.includes("already registered")) {
+        errorDesc = lang === 'ko'
+          ? "이미 가입된 이메일입니다."
+          : "Email already registered.";
+      }
+
+      setMsgPopup({
+        isOpen: true,
+        title: "AUTH ERROR",
+        desc: errorDesc,
+        onConfirm: null
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
 
@@ -1108,9 +1143,14 @@ export default function App() {
   // ------------------------------------------------------------------
   const handleLobbyNavigation = async (targetView: 'modeSelect' | 'ranking' | 'shop' | 'tutorial') => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      alert(t('popup', 'msg_session_expired'));
-      handleLogout();
+      if (!session) {
+        setMsgPopup({
+        isOpen: true,
+        title: "SESSION EXPIRED",
+        desc: t('popup', 'msg_session_expired'),
+        onConfirm: () => handleLogout() // 확인 누르면 로그아웃 실행
+      });
+
       return;
     }
     if (targetView === 'modeSelect') resetGameSession();
@@ -1813,10 +1853,18 @@ export default function App() {
           }}
         />}
 
-        {view === 'waitingRoom' && currentRoomId && 
-          <WaitingRoom roomId={currentRoomId} t={(viewKey, itemKey) => t(viewKey as any, itemKey)}
-          onLeave={async () => { playClickSound(); await leaveCurrentRoom(); setView('multiplay'); }} 
-          onStartGame={() => { playClickSound(); setView('multiBattle'); }} />}
+        {view === 'waitingRoom' && currentRoomId && (
+          <WaitingRoom 
+            roomId={currentRoomId} 
+            t={(viewKey, itemKey) => t(viewKey as any, itemKey)}
+            onLeave={async () => { playClickSound(); await leaveCurrentRoom(); setView('multiplay'); }} 
+            onStartGame={() => { playClickSound(); setView('multiBattle'); }}
+            // ✨ [추가] 팝업 제어 함수를 props로 내려줍니다.
+            onShowPopup={(title: string, desc: string) => {
+              setMsgPopup({ isOpen: true, title, desc, onConfirm: null });
+            }}
+          />
+        )}
 
 
         {/* 멀티플레이 게임 엔진 */}

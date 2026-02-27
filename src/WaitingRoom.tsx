@@ -7,9 +7,10 @@ interface WaitingRoomProps {
   onLeave: () => void;
   onStartGame: () => void;
   t: (view: string, key: string) => string;
+  onShowPopup: (title: string, desc: string) => void;
 }
 
-export default function WaitingRoom({ roomId, onLeave, onStartGame, t }: WaitingRoomProps) {
+export default function WaitingRoom({ roomId, onLeave, onStartGame, t, onShowPopup }: WaitingRoomProps) {
   // --- State ---
   const [roomInfo, setRoomInfo] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
@@ -267,7 +268,8 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame, t }: Waiting
   const executeKick = async () => {
     if (!roomId || !kickTargetId) return;
     const { error } = await supabase.from('room_participants').delete().eq('room_id', roomId).eq('user_id', kickTargetId);
-    if (error) alert("강퇴 실패");
+    if (error) 
+      onShowPopup("KICK ERROR", "Failed to kick user.");
     setKickTargetId(null);
   };
 
@@ -276,7 +278,7 @@ export default function WaitingRoom({ roomId, onLeave, onStartGame, t }: Waiting
     
     // 🔥 [추가] 방이 아직 게임 중이면 레디 금지 (alert 추가)
     if (roomInfo?.status === 'playing') {
-        alert("방장이 이전 게임을 정리 중입니다. 잠시만 기다려 주세요.");
+        onShowPopup("PLEASE WAIT", "Host is cleaning up\nthe previous game.");
         return;
     }
 

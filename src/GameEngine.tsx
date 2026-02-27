@@ -257,77 +257,79 @@ export default function GameEngine({
       </div>
 
 
-      {/* 2. 💉 문제 영역: flex-1을 주어 버튼 위쪽까지 공간을 모두 확장 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center justify-center min-h-0">
-        {/* justify-center를 추가하여 문제가 적을 때는 중앙에, 많을 때는 위에서부터 스크롤되게 함 */}
-
-        {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
-        <div className="text-center mb-8 flex-none">
-          <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
-            {/* 💉 텍스트 번역 적용: WIN, DRAW, LOSE */}
-            <span>{totalTargetCounts.WIN} {t('WIN')}</span><span>{totalTargetCounts.DRAW} {t('DRAW')}</span><span>{totalTargetCounts.LOSE} {t('LOSE')}</span>
-          </div>
-          
-            <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
-              {/* 💉 텍스트 번역 적용: WIN, DRAW, LOSE */}
-              <span>{currentSolvedCounts.WIN} {t('WIN')}</span><span>{currentSolvedCounts.DRAW} {t('DRAW')}</span><span>{currentSolvedCounts.LOSE} {t('LOSE')}</span>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center mb-10">
-            {/* 💉 텍스트 번역 적용: 모드명 (기존 로직 보존) */}
-            <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">{aiSelect.length} {t(mode.split(' ')[0])}</p>
-            <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">{questionTurn} {t(mode.split(' ')[0])}</p>
-          </div>
-        )}
-
-
-        {/* 문제 아이콘 리스트 - 이제 flex-1 내부에서 더 넓은 공간을 가짐 */}
-        <div className="flex flex-wrap justify-center gap-3 mb-10 w-full px-4">
-          {aiSelect.map((hand, i) => { // 💉 [수정] '('를 '{'로 변경 (변수 선언을 위해)
-            const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
-            const isCurrent = i === questionTurn && !isMemoryPhase;
-            const showDetails = isMemoryPhase || isSolved;
-
-          return ( // 💉 명시적 return 필요
-            <div key={i} className="relative flex flex-col items-center">
-
-              {/* 💉 EXPERT MODE 조건명 */}
-              {isCurrent && mode === 'EXPERT MODE' && (
-                <span className="w-10 h-10 flex items-center justify-center shrink-0 aspect-square absolute rounded-full bg-black/50 -top-2 text-base font-black text-[#FF9900] animate-pulse -m-7">
-                  {t(targetConditions[i])}
-                </span>
-              )}
-
-              {/* 💉 문제 아이콘 컨테이너 */}
-              <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900 ${
-                showDetails ? (
-                  hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : 
-                  hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 
-                  'shadow-[0_0_12px_rgba(34,197,94,0.7)]'
-                ) : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'
-              }`}>
-
-                {/* 💉 이미지 출력 로직 */}
-                {isMemoryPhase ? (
-                  <img 
-                    src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} 
-                    className="w-full h-full object-cover" 
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    {isSolved && (
-                      <img 
-                        src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} 
-                        className="w-full h-full object-cover opacity-100" // 💉 유저 요청대로 opacity-100 적용
-                      />
-                    )}
-                  </div>
-                )}
+      {/* 2. 💉 문제 영역 컨테이너: 이제 전체가 아닌 내부 아이콘만 스크롤되도록 분리합니다. */}
+      <div className="flex-1 flex flex-col items-center min-h-0 w-full overflow-hidden">
+        
+        {/* 🅰️ 상단 고정 영역: 문제 조건 및 현황 텍스트 (스크롤되지 않음) */}
+        <div className="w-full flex-none py-4 bg-black/50 backdrop-blur-sm z-10">
+          {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
+            <div className="text-center">
+              <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
+                <span>{totalTargetCounts.WIN} {t('WIN')}</span>
+                <span>{totalTargetCounts.DRAW} {t('DRAW')}</span>
+                <span>{totalTargetCounts.LOSE} {t('LOSE')}</span>
+              </div>
+              <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
+                <span>{currentSolvedCounts.WIN} {t('WIN')}</span>
+                <span>{currentSolvedCounts.DRAW} {t('DRAW')}</span>
+                <span>{currentSolvedCounts.LOSE} {t('LOSE')}</span>
               </div>
             </div>
-          );
-          })} 
+          ) : (
+            <div className="text-center">
+              <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">
+                {aiSelect.length} {t(mode.split(' ')[0])}
+              </p>
+              <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">
+                {questionTurn} {t(mode.split(' ')[0])}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 🅱️ 중앙 스크롤 영역: 가위바위보 아이콘 리스트만 스크롤됨 */}
+        <div className="w-full flex-1 overflow-y-auto custom-scrollbar px-4 pt-6 pb-10 
+                overscroll-none touch-pan-y antialiased"> 
+          {/* 💉 overscroll-none: 스크롤 끝에서 바운스될 때 전체 페이지가 들썩이는 것을 방지
+              💉 touch-pan-y: 상하 스와이프 전용 터치 액션임을 명시하여 응답 속도 향상
+          */}
+          <div className="flex flex-wrap justify-center gap-3">
+            {aiSelect.map((hand, i) => {
+              const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
+              const isCurrent = i === questionTurn && !isMemoryPhase;
+              const showDetails = isMemoryPhase || isSolved;
+
+              return (
+                <div key={i} className="relative flex flex-col items-center">
+                  {/* 익스퍼트 모드 조건 UI */}
+                  {isCurrent && mode === 'EXPERT MODE' && (
+                    <span className="w-10 h-10 flex items-center justify-center shrink-0 aspect-square absolute rounded-full bg-black/50 -top-2 text-base font-black text-[#FF9900] -m-7 z-20">
+                      {t(targetConditions[i])}
+                    </span>
+                  )}
+
+                  {/* 아이콘 컨테이너 */}
+                  <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900 ${
+                    showDetails ? (
+                      hand === 0 ? 'shadow-[0_0_12px_rgba(236,72,153,0.7)]' : 
+                      hand === 1 ? 'shadow-[0_0_12px_rgba(59,130,246,0.7)]' : 
+                      'shadow-[0_0_12px_rgba(34,197,94,0.7)]'
+                    ) : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'
+                  }`}>
+                    {isMemoryPhase ? (
+                      <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        {isSolved && (
+                          <img src={`/images/${['scissor', 'rock', 'paper'][hand]}.png`} className="w-full h-full object-cover opacity-100" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 

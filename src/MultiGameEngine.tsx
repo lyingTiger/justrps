@@ -954,8 +954,7 @@ export default function MultiGameEngine({
 
 
   return (
-    <div className="w-full max-w-[360px] flex flex-col h-[100dvh] justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto relative
-    ">
+    <div className="w-full max-w-[360px] flex flex-col h-[100dvh] justify-start pt-6 pb-10 animate-in fade-in duration-500 overflow-hidden mx-auto relative">
 
       {/* 🚨 중앙 거대 타이머 & 레드 플래시 오버레이 */}
       {isUrgent && (
@@ -1029,79 +1028,82 @@ export default function MultiGameEngine({
 
 
       {/* 3. 💉 문제 영역 확장 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 flex flex-col items-center min-h-0">
-      <div className="w-full flex flex-col items-center my-auto py-8">
-  
-        {/* 🅰️ 텍스트 영역 (상단: 모드 표시 + Hurry Up) */}
-        <div className="relative text-center mb-10 flex-non"> 
-          {/* ✨ [Hurry Up] 게임모드 텍스트 바로 위에 겹쳐서 깜빡임 */}
-          {showHurryUp && (
-            <div className="absolute -top-10 inset-x-0 flex justify-center animate-[blink_0.4s_infinite_alternate] pointer-events-none">
-              <span className="text-red-500 text-2xl font-black uppercase italic tracking-tighter ...">
-                {t('game','game.HURRY_UP')}
-              </span>
-            </div>
-          )}
-
-          {/* 모드 표시 로직 */}
-          {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
-            <div className="select-none">
-              <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
-                <span>{totalTargetCounts.WIN} {t('game', 'WIN')}</span>
-                <span>{totalTargetCounts.DRAW} {t('game', 'DRAW')}</span>
-                <span>{totalTargetCounts.LOSE} {t('game', 'LOSE')}</span>
+      <div className="flex-1 flex flex-col items-center min-h-0 w-full overflow-hidden">
+      
+        {/* 🅰️ [고정 영역] Hurry Up 및 문제 조건 (스크롤되지 않음) */}
+        <div className="w-full flex-none py-4 bg-black/40 backdrop-blur-sm z-10 relative">
+          <div className="relative text-center"> 
+            {/* Hurry Up 알림 */}
+            {showHurryUp && (
+              <div className="absolute -top-6 inset-x-0 flex justify-center animate-[blink_0.4s_infinite_alternate] pointer-events-none">
+                <span className="text-red-500 text-xl font-black uppercase italic tracking-tighter">
+                  {t('game','game.HURRY_UP')}
+                </span>
               </div>
-              <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
-                <span>{currentSolvedCounts.WIN} {t('game', 'WIN')}</span>
-                <span>{currentSolvedCounts.DRAW} {t('game', 'DRAW')}</span>
-                <span>{currentSolvedCounts.LOSE} {t('game', 'LOSE')}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center">
-              <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">
-                {aiSelect.length} {t('game', mode.split(' ')[0])}
-              </p>
-              <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">
-                {questionTurn} {t('game', mode.split(' ')[0])}
-              </p>
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* 🅱️ 아이콘 영역 (하단: 가위바위보 손 모양) */}
-        <div className="flex flex-wrap justify-center gap-3 w-full">
-          {aiSelect.map((hand, i) => {
-            const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
-            const isCurrent = (i === questionTurn && !isMemoryPhase);
-            const showDetails = isMemoryPhase || isSolved;
-            
-            return (
-              <div key={i} className="relative flex flex-col items-center">
-                {isCurrent && mode === 'EXPERT MODE' && (
-                  <span className="w-10 h-10 flex items-center justify-center shrink-0 aspect-square absolute rounded-full bg-black/50 -top-2 text-base font-black text-[#FF9900] animate-pulse -m-7">
-                    {t('game', targetConditions[i])}
-                  </span>
-                )}
-                <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900
-                  ${showDetails ? 'shadow-none' : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
-                  {/* ... 이미지 렌더링 로직 생략 ... */}
-                  <img 
-                    src={`/images/${['scissor', 'rock', 'paper'][hand]}${(isMemoryPhase && isColorActive) ? '_g' : ''}.png`} 
-                    className={`w-full h-full object-cover ${(!isMemoryPhase && !isSolved) ? 'opacity-0' : 'opacity-100'}`} 
-                  />
+            {/* 모드별 텍스트 (WIN/DRAW/LOSE 등) */}
+            {(mode === 'SHUFFLE MODE' || mode === 'EXPERT MODE') ? (
+              <div className="select-none">
+                <div className="flex justify-center gap-3 text-2xl font-black text-[#FF9900] uppercase italic tracking-tighter">
+                  <span>{totalTargetCounts.WIN} {t('game', 'WIN')}</span>
+                  <span>{totalTargetCounts.DRAW} {t('game', 'DRAW')}</span>
+                  <span>{totalTargetCounts.LOSE} {t('game', 'LOSE')}</span>
+                </div>
+                <div className="flex justify-center gap-4 text-xl font-bold text-white opacity-80 uppercase tracking-tight mt-1">
+                  <span>{currentSolvedCounts.WIN} {t('game', 'WIN')}</span>
+                  <span>{currentSolvedCounts.DRAW} {t('game', 'DRAW')}</span>
+                  <span>{currentSolvedCounts.LOSE} {t('game', 'LOSE')}</span>
                 </div>
               </div>
-            );
-          })}
+            ) : (
+              <div className="flex flex-col items-center">
+                <p className="text-[#FF9900] text-6xl font-black tracking-tighter uppercase leading-none">
+                  {aiSelect.length} {t('game', mode.split(' ')[0])}
+                </p>
+                <p className="text-white text-2xl font-bold opacity-80 uppercase tracking-tight mt-1">
+                  {questionTurn} {t('game', mode.split(' ')[0])}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* 🅱️ [스크롤 영역] 가위바위보 아이콘 리스트 (스와이프 가능) */}
+        <div className="w-full flex-1 overflow-y-auto custom-scrollbar px-4 pt-6 pb-10 overscroll-none touch-pan-y antialiased">
+          {/* 💉 flex-1과 overflow-y-auto를 통해 이 영역만 스크롤됩니다. */}
+          <div className="flex flex-wrap justify-center gap-3">
+            {aiSelect.map((hand, i) => {
+              const isSolved = mode === 'SHUFFLE MODE' ? solvedIndices.includes(i) : i < questionTurn;
+              const isCurrent = (i === questionTurn && !isMemoryPhase);
+              const showDetails = isMemoryPhase || isSolved;
+              
+              return (
+                <div key={i} className="relative flex flex-col items-center">
+                  {/* 익스퍼트 모드 조건 UI (고정 영역 아래로 스크롤되도록 z-index 조절) */}
+                  {isCurrent && mode === 'EXPERT MODE' && (
+                    <span className="w-10 h-10 flex items-center justify-center shrink-0 aspect-square absolute rounded-full bg-black/50 -top-2 text-base font-black text-[#FF9900] -m-7 z-20">
+                      {t('game', targetConditions[i])}
+                    </span>
+                  )}
+                  <div className={`w-14 h-14 rounded-2xl transition-all duration-300 bg-zinc-900
+                    ${showDetails ? 'shadow-none' : isCurrent ? 'border-2 border-[#FF9900] shadow-[0_0_15px_rgba(255,153,0,0.5)] scale-105' : 'shadow-none'}`}>
+                    <img 
+                      src={`/images/${['scissor', 'rock', 'paper'][hand]}${(isMemoryPhase && isColorActive) ? '_g' : ''}.png`} 
+                      className={`w-full h-full object-cover ${(!isMemoryPhase && !isSolved) ? 'opacity-0' : 'opacity-100'}`} 
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
 
       {/* 💉 아이템전일 때만 나타나는 아이템 버튼 영역 */}
       {isItemMatch && !isCleared && !isEliminated && (
-        <div className="w-full px-4 mb-4 animate-in slide-in-from-bottom-2 duration-300">
+        <div className="w-full px-4 mb-4 flex-none animate-in slide-in-from-bottom-2 duration-300">
           <div className="flex items-center justify-between bg-black/60 backdrop-blur-md p-3 rounded-[24px] border border-white/10 shadow-2xl">
             
             {/* 1. 공격 아이템 그룹 (3종) */}
